@@ -1,0 +1,25 @@
+{
+  "levelId": 42,
+  "name": "좁은 틈새",
+  "difficulty": "medium",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 200, "y": 180 }],
+  "cats": [{ "x": 540, "y": 1650, "catId": "cat_042" }],
+  "pins": [
+    { "type": "normal", "x": 200, "y": 500 },
+    { "type": "normal", "x": 540, "y": 900 },
+    { "type": "normal", "x": 350, "y": 1250 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 350, "y": 650, "width": 130, "height": 40 },
+    { "type": "spike", "x": 680, "y": 1050, "width": 140, "height": 40 },
+    { "type": "moving_platform", "x": 550, "y": 1420, "width": 200, "height": 30 }
+  ],
+  "platforms": [
+    { "x": 100, "y": 550, "width": 280, "height": 20, "angle": 10 },
+    { "x": 390, "y": 950, "width": 320, "height": 20, "angle": 0 },
+    { "x": 200, "y": 1300, "width": 320, "height": 20, "angle": 0 },
+    { "x": 280, "y": 1470, "width": 480, "height": 20, "angle": 0 }
+  ]
+}

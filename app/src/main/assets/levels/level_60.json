@@ -1,0 +1,28 @@
+{
+  "levelId": 60,
+  "name": "중급 완성",
+  "difficulty": "medium",
+  "maxPins": 4,
+  "stars": { "one": 999, "two": 5, "three": 4 },
+  "balls": [{ "type": "normal", "x": 540, "y": 180 }],
+  "cats": [{ "x": 540, "y": 1700, "catId": "cat_060" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 410 },
+    { "type": "normal", "x": 820, "y": 730 },
+    { "type": "normal", "x": 180, "y": 1060 },
+    { "type": "normal", "x": 680, "y": 1380 }
+  ],
+  "obstacles": [
+    { "type": "moving_platform", "x": 150, "y": 540, "width": 200, "height": 30 },
+    { "type": "fire", "x": 380, "y": 880, "width": 180, "height": 40 },
+    { "type": "moving_platform", "x": 600, "y": 1200, "width": 200, "height": 30 },
+    { "type": "spike", "x": 200, "y": 1510, "width": 170, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 460, "width": 400, "height": 20, "angle": 0 },
+    { "x": 670, "y": 780, "width": 320, "height": 20, "angle": -30 },
+    { "x": 100, "y": 1110, "width": 280, "height": 20, "angle": 30 },
+    { "x": 530, "y": 1430, "width": 340, "height": 20, "angle": -25 },
+    { "x": 280, "y": 1560, "width": 480, "height": 20, "angle": 0 }
+  ]
+}

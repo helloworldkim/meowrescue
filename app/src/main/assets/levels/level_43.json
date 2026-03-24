@@ -1,0 +1,25 @@
+{
+  "levelId": 43,
+  "name": "정밀 루트",
+  "difficulty": "medium",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 750, "y": 180 }],
+  "cats": [{ "x": 540, "y": 1700, "catId": "cat_043" }],
+  "pins": [
+    { "type": "normal", "x": 750, "y": 520 },
+    { "type": "normal", "x": 400, "y": 880 },
+    { "type": "normal", "x": 600, "y": 1230 }
+  ],
+  "obstacles": [
+    { "type": "moving_platform", "x": 200, "y": 680, "width": 200, "height": 30 },
+    { "type": "fire", "x": 550, "y": 1050, "width": 130, "height": 40 },
+    { "type": "spike", "x": 200, "y": 1380, "width": 150, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 580, "y": 570, "width": 320, "height": 20, "angle": -15 },
+    { "x": 250, "y": 930, "width": 340, "height": 20, "angle": 10 },
+    { "x": 450, "y": 1280, "width": 320, "height": 20, "angle": 0 },
+    { "x": 300, "y": 1480, "width": 480, "height": 20, "angle": 0 }
+  ]
+}

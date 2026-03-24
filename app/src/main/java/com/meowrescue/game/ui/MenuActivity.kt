@@ -119,15 +119,19 @@ class MenuActivity : AppCompatActivity() {
         contentLayout.addView(title)
 
         val maxCompleted = repository.getMaxCompletedLevel()
+        val totalLevels = countAvailableLevels()
         val catDrawables = listOf(
             R.drawable.cat_1,
             R.drawable.cat_2,
             R.drawable.cat_3,
             R.drawable.cat_4,
-            R.drawable.cat_5
+            R.drawable.cat_5,
+            R.drawable.cat_6,
+            R.drawable.cat_7,
+            R.drawable.cat_8
         )
 
-        for (levelId in 1..5) {
+        for (levelId in 1..totalLevels) {
             val isUnlocked = levelId == 1 || levelId <= maxCompleted + 1
             val progress = if (isUnlocked) repository.getProgress(levelId) else null
             val stars = progress?.stars ?: 0
@@ -156,10 +160,10 @@ class MenuActivity : AppCompatActivity() {
                 }
             }
 
-            // Cat thumbnail
+            // Cat thumbnail (cycle through available cat drawables)
             val dp48 = (48 * resources.displayMetrics.density).toInt()
             val catThumb = ImageView(this).apply {
-                setImageResource(catDrawables[levelId - 1])
+                setImageResource(catDrawables[(levelId - 1) % catDrawables.size])
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 val lp = LinearLayout.LayoutParams(dp48, dp48)
                 lp.marginEnd = 16
@@ -203,6 +207,15 @@ class MenuActivity : AppCompatActivity() {
         lp.topMargin = 32
         backButton.layoutParams = lp
         contentLayout.addView(backButton)
+    }
+
+    private fun countAvailableLevels(): Int {
+        var count = 0
+        try {
+            val files = assets.list("levels") ?: emptyArray()
+            count = files.count { it.startsWith("level_") && it.endsWith(".json") }
+        } catch (_: Exception) {}
+        return if (count > 0) count else 5
     }
 
     private fun makeButton(text: String, bgColor: String): Button {

@@ -1,0 +1,33 @@
+{
+  "levelId": 92,
+  "name": "삼중 함정",
+  "difficulty": "hard",
+  "maxPins": 5,
+  "stars": { "one": 999, "two": 6, "three": 5 },
+  "balls": [{ "type": "bomb", "x": 540, "y": 200 }],
+  "cats": [
+    { "x": 300, "y": 1600, "catId": "cat_092" },
+    { "x": 750, "y": 1640, "catId": "cat_092b" }
+  ],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 450 },
+    { "type": "normal", "x": 190, "y": 700 },
+    { "type": "normal", "x": 860, "y": 960 },
+    { "type": "normal", "x": 220, "y": 1200 },
+    { "type": "normal", "x": 730, "y": 1420 }
+  ],
+  "obstacles": [
+    { "type": "spike", "x": 310, "y": 560, "width": 250, "height": 40 },
+    { "type": "fire", "x": 610, "y": 800, "width": 220, "height": 40 },
+    { "type": "teleport", "x": 120, "y": 1055, "width": 80, "height": 80 },
+    { "type": "spike", "x": 120, "y": 1300, "width": 200, "height": 40 },
+    { "type": "fire", "x": 530, "y": 1510, "width": 200, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 470, "width": 300, "height": 20, "angle": 0 },
+    { "x": 100, "y": 720, "width": 200, "height": 20, "angle": 0 },
+    { "x": 710, "y": 980, "width": 300, "height": 20, "angle": 0 },
+    { "x": 120, "y": 1220, "width": 200, "height": 20, "angle": 0 },
+    { "x": 580, "y": 1440, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

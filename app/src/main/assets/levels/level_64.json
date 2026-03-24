@@ -1,0 +1,26 @@
+{
+  "levelId": 64,
+  "name": "텔레포트 미로",
+  "difficulty": "hard",
+  "maxPins": 4,
+  "stars": { "one": 999, "two": 5, "three": 4 },
+  "balls": [{ "type": "normal", "x": 540, "y": 200 }],
+  "cats": [{ "x": 540, "y": 1580, "catId": "cat_064" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 450 },
+    { "type": "normal", "x": 250, "y": 700 },
+    { "type": "normal", "x": 800, "y": 950 },
+    { "type": "normal", "x": 450, "y": 1250 }
+  ],
+  "obstacles": [
+    { "type": "teleport", "x": 150, "y": 820, "width": 80, "height": 80 },
+    { "type": "fire", "x": 500, "y": 1100, "width": 200, "height": 40 },
+    { "type": "spike", "x": 300, "y": 1450, "width": 200, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 470, "width": 300, "height": 20, "angle": 0 },
+    { "x": 100, "y": 720, "width": 300, "height": 20, "angle": 0 },
+    { "x": 650, "y": 970, "width": 300, "height": 20, "angle": 0 },
+    { "x": 300, "y": 1270, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

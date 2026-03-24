@@ -67,7 +67,7 @@ class Dyn4jPhysicsEngine {
         val cy = pxToM(surface.position.y + surface.height / 2f)
         body.translate(cx, cy)
         if (surface.angle != 0f) {
-            body.rotate(Math.toRadians(surface.angle.toDouble()))
+            body.rotateAboutCenter(Math.toRadians(surface.angle.toDouble()))
         }
         body.setMass(MassType.INFINITE)
         world.addBody(body)

@@ -1,0 +1,21 @@
+{
+  "levelId": 31,
+  "name": "움직이는 발판",
+  "difficulty": "medium",
+  "maxPins": 2,
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 540, "y": 200 }],
+  "cats": [{ "x": 540, "y": 1600, "catId": "cat_031" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 600 },
+    { "type": "normal", "x": 400, "y": 1000 }
+  ],
+  "obstacles": [
+    { "type": "moving_platform", "x": 300, "y": 1200, "width": 200, "height": 30 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 650, "width": 400, "height": 20, "angle": 0 },
+    { "x": 250, "y": 1050, "width": 320, "height": 20, "angle": 0 },
+    { "x": 340, "y": 1380, "width": 400, "height": 20, "angle": 0 }
+  ]
+}

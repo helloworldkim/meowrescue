@@ -1,0 +1,18 @@
+{
+  "levelId": 10,
+  "name": "졸업 시험",
+  "difficulty": "tutorial",
+  "maxPins": 2,
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 780, "y": 200 }],
+  "cats": [{ "x": 280, "y": 1680, "catId": "cat_010" }],
+  "pins": [
+    { "type": "normal", "x": 700, "y": 580 },
+    { "type": "normal", "x": 380, "y": 1020 }
+  ],
+  "obstacles": [],
+  "platforms": [
+    { "x": 480, "y": 600, "width": 420, "height": 20, "angle": -15 },
+    { "x": 160, "y": 1040, "width": 420, "height": 20, "angle": -15 }
+  ]
+}

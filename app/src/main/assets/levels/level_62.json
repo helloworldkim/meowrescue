@@ -1,0 +1,23 @@
+{
+  "levelId": 62,
+  "name": "순간이동의 비밀",
+  "difficulty": "hard",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 200, "y": 220 }],
+  "cats": [{ "x": 750, "y": 1550, "catId": "cat_062" }],
+  "pins": [
+    { "type": "normal", "x": 200, "y": 520 },
+    { "type": "normal", "x": 540, "y": 850 },
+    { "type": "normal", "x": 780, "y": 1200 }
+  ],
+  "obstacles": [
+    { "type": "teleport", "x": 350, "y": 680, "width": 80, "height": 80 },
+    { "type": "spike", "x": 150, "y": 1400, "width": 250, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 100, "y": 540, "width": 200, "height": 20, "angle": 0 },
+    { "x": 390, "y": 870, "width": 300, "height": 20, "angle": 0 },
+    { "x": 630, "y": 1220, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

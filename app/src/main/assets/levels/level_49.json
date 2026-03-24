@@ -1,0 +1,27 @@
+{
+  "levelId": 49,
+  "name": "선택의 기로",
+  "difficulty": "medium",
+  "maxPins": 4,
+  "stars": { "one": 999, "two": 5, "three": 4 },
+  "balls": [{ "type": "normal", "x": 540, "y": 180 }],
+  "cats": [{ "x": 540, "y": 1700, "catId": "cat_049" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 450 },
+    { "type": "normal", "x": 250, "y": 780 },
+    { "type": "normal", "x": 750, "y": 1080 },
+    { "type": "normal", "x": 450, "y": 1350 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 650, "y": 610, "width": 130, "height": 40 },
+    { "type": "moving_platform", "x": 450, "y": 950, "width": 200, "height": 30 },
+    { "type": "spike", "x": 150, "y": 1220, "width": 150, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 500, "width": 400, "height": 20, "angle": 0 },
+    { "x": 100, "y": 830, "width": 320, "height": 20, "angle": 15 },
+    { "x": 600, "y": 1130, "width": 320, "height": 20, "angle": -15 },
+    { "x": 300, "y": 1400, "width": 340, "height": 20, "angle": 0 },
+    { "x": 280, "y": 1490, "width": 480, "height": 20, "angle": 0 }
+  ]
+}

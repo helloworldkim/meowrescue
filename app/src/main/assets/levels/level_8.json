@@ -1,0 +1,18 @@
+{
+  "levelId": 8,
+  "name": "경사면 첫걸음",
+  "difficulty": "tutorial",
+  "maxPins": 2,
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 300, "y": 200 }],
+  "cats": [{ "x": 820, "y": 1650, "catId": "cat_008" }],
+  "pins": [
+    { "type": "normal", "x": 350, "y": 600 },
+    { "type": "normal", "x": 600, "y": 1020 }
+  ],
+  "obstacles": [],
+  "platforms": [
+    { "x": 180, "y": 620, "width": 400, "height": 20, "angle": 0 },
+    { "x": 400, "y": 1040, "width": 460, "height": 20, "angle": 12 }
+  ]
+}

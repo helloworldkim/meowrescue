@@ -1,0 +1,27 @@
+{
+  "levelId": 78,
+  "name": "불꽃 폭탄",
+  "difficulty": "hard",
+  "maxPins": 4,
+  "stars": { "one": 999, "two": 5, "three": 4 },
+  "balls": [{ "type": "bomb", "x": 540, "y": 200 }],
+  "cats": [{ "x": 400, "y": 1620, "catId": "cat_078" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 500 },
+    { "type": "normal", "x": 260, "y": 800 },
+    { "type": "normal", "x": 790, "y": 1070 },
+    { "type": "normal", "x": 350, "y": 1350 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 300, "y": 640, "width": 300, "height": 40 },
+    { "type": "fire", "x": 160, "y": 910, "width": 200, "height": 40 },
+    { "type": "spike", "x": 590, "y": 1170, "width": 200, "height": 40 },
+    { "type": "fire", "x": 200, "y": 1450, "width": 250, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 520, "width": 300, "height": 20, "angle": 0 },
+    { "x": 160, "y": 820, "width": 200, "height": 20, "angle": 0 },
+    { "x": 640, "y": 1090, "width": 300, "height": 20, "angle": 0 },
+    { "x": 200, "y": 1370, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

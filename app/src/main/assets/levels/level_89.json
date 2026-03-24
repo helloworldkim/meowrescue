@@ -1,0 +1,30 @@
+{
+  "levelId": 89,
+  "name": "최후의 시험",
+  "difficulty": "hard",
+  "maxPins": 5,
+  "stars": { "one": 999, "two": 6, "three": 5 },
+  "balls": [{ "type": "fire", "x": 540, "y": 200 }],
+  "cats": [{ "x": 540, "y": 1680, "catId": "cat_089" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 460 },
+    { "type": "normal", "x": 180, "y": 710 },
+    { "type": "normal", "x": 860, "y": 960 },
+    { "type": "normal", "x": 200, "y": 1200 },
+    { "type": "normal", "x": 690, "y": 1440 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 260, "y": 570, "width": 300, "height": 40 },
+    { "type": "teleport", "x": 100, "y": 805, "width": 80, "height": 80 },
+    { "type": "spike", "x": 620, "y": 1060, "width": 200, "height": 40 },
+    { "type": "moving_platform", "x": 100, "y": 1270, "width": 200, "height": 30 },
+    { "type": "fire", "x": 490, "y": 1530, "width": 200, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 480, "width": 300, "height": 20, "angle": 0 },
+    { "x": 100, "y": 730, "width": 200, "height": 20, "angle": 0 },
+    { "x": 710, "y": 980, "width": 300, "height": 20, "angle": 0 },
+    { "x": 100, "y": 1220, "width": 200, "height": 20, "angle": 0 },
+    { "x": 540, "y": 1460, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "levelId": 26,
+  "name": "이중 함정",
+  "difficulty": "easy",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 180, "y": 170 }],
+  "cats": [{ "x": 860, "y": 1690, "catId": "cat_026" }],
+  "pins": [
+    { "type": "normal", "x": 220, "y": 530 },
+    { "type": "normal", "x": 480, "y": 950 },
+    { "type": "normal", "x": 750, "y": 1320 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 100, "y": 730, "width": 180, "height": 40 },
+    { "type": "spike", "x": 550, "y": 1150, "width": 130, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 150, "y": 580, "width": 300, "height": 20, "angle": 18 },
+    { "x": 330, "y": 1000, "width": 380, "height": 20, "angle": 15 },
+    { "x": 560, "y": 1370, "width": 380, "height": 20, "angle": 10 },
+    { "x": 650, "y": 1540, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

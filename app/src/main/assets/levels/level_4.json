@@ -1,30 +1,18 @@
 {
   "levelId": 4,
-  "name": "Slide Right",
-  "difficulty": "medium",
+  "name": "두 개의 관문",
+  "difficulty": "tutorial",
   "maxPins": 2,
-  "stars": {
-    "one": 999,
-    "two": 3,
-    "three": 2
-  },
-  "balls": [
-    { "type": "normal", "x": 200, "y": 200 }
-  ],
-  "cats": [
-    { "x": 800, "y": 1600, "catId": "cat_004" }
-  ],
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 540, "y": 200 }],
+  "cats": [{ "x": 540, "y": 1650, "catId": "cat_004" }],
   "pins": [
-    { "type": "normal", "x": 250, "y": 600 },
-    { "type": "normal", "x": 700, "y": 1050 }
+    { "type": "normal", "x": 540, "y": 600 },
+    { "type": "normal", "x": 540, "y": 1050 }
   ],
-  "obstacles": [
-    { "type": "spike", "x": 150, "y": 1300, "width": 200, "height": 40 }
-  ],
+  "obstacles": [],
   "platforms": [
-    { "x": 100, "y": 650, "width": 350, "height": 20, "angle": 0 },
-    { "x": 200, "y": 850, "width": 500, "height": 20, "angle": 20 },
-    { "x": 500, "y": 1100, "width": 400, "height": 20, "angle": 0 },
-    { "x": 600, "y": 1350, "width": 350, "height": 20, "angle": 10 }
+    { "x": 340, "y": 620, "width": 400, "height": 20, "angle": 0 },
+    { "x": 340, "y": 1070, "width": 400, "height": 20, "angle": 0 }
   ]
 }

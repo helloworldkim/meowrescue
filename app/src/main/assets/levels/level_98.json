@@ -1,0 +1,33 @@
+{
+  "levelId": 98,
+  "name": "최강의 시련",
+  "difficulty": "hard",
+  "maxPins": 5,
+  "stars": { "one": 999, "two": 6, "three": 5 },
+  "balls": [{ "type": "bomb", "x": 540, "y": 200 }],
+  "cats": [
+    { "x": 230, "y": 1550, "catId": "cat_098" },
+    { "x": 810, "y": 1590, "catId": "cat_098b" }
+  ],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 430 },
+    { "type": "normal", "x": 150, "y": 690 },
+    { "type": "normal", "x": 920, "y": 960 },
+    { "type": "normal", "x": 165, "y": 1200 },
+    { "type": "normal", "x": 790, "y": 1420 }
+  ],
+  "obstacles": [
+    { "type": "spike", "x": 270, "y": 540, "width": 300, "height": 40 },
+    { "type": "teleport", "x": 100, "y": 785, "width": 80, "height": 80 },
+    { "type": "fire", "x": 720, "y": 1060, "width": 200, "height": 40 },
+    { "type": "moving_platform", "x": 100, "y": 1270, "width": 200, "height": 30 },
+    { "type": "spike", "x": 590, "y": 1510, "width": 200, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 450, "width": 300, "height": 20, "angle": 25 },
+    { "x": 100, "y": 710, "width": 200, "height": 20, "angle": 0 },
+    { "x": 770, "y": 980, "width": 300, "height": 20, "angle": -25 },
+    { "x": 100, "y": 1220, "width": 200, "height": 20, "angle": 0 },
+    { "x": 640, "y": 1440, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "levelId": 28,
+  "name": "삼중 장애물",
+  "difficulty": "easy",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 540, "y": 160 }],
+  "cats": [{ "x": 540, "y": 1720, "catId": "cat_028" }],
+  "pins": [
+    { "type": "normal", "x": 300, "y": 500 },
+    { "type": "normal", "x": 700, "y": 900 },
+    { "type": "normal", "x": 430, "y": 1300 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 580, "y": 700, "width": 180, "height": 40 },
+    { "type": "spike", "x": 150, "y": 1100, "width": 120, "height": 40 },
+    { "type": "fire", "x": 700, "y": 1480, "width": 160, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 150, "y": 550, "width": 360, "height": 20, "angle": 15 },
+    { "x": 500, "y": 950, "width": 380, "height": 20, "angle": -12 },
+    { "x": 280, "y": 1350, "width": 360, "height": 20, "angle": 12 },
+    { "x": 380, "y": 1560, "width": 320, "height": 20, "angle": 0 }
+  ]
+}

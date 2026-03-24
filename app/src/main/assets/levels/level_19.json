@@ -1,0 +1,24 @@
+{
+  "levelId": 19,
+  "name": "이중 가시",
+  "difficulty": "easy",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 540, "y": 160 }],
+  "cats": [{ "x": 540, "y": 1720, "catId": "cat_019" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 480 },
+    { "type": "normal", "x": 750, "y": 880 },
+    { "type": "normal", "x": 350, "y": 1280 }
+  ],
+  "obstacles": [
+    { "type": "spike", "x": 150, "y": 680, "width": 120, "height": 40 },
+    { "type": "spike", "x": 700, "y": 1100, "width": 120, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 530, "width": 400, "height": 20, "angle": 12 },
+    { "x": 550, "y": 930, "width": 380, "height": 20, "angle": -12 },
+    { "x": 200, "y": 1330, "width": 350, "height": 20, "angle": 10 },
+    { "x": 380, "y": 1550, "width": 320, "height": 20, "angle": 0 }
+  ]
+}

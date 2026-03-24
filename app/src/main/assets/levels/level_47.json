@@ -1,0 +1,25 @@
+{
+  "levelId": 47,
+  "name": "다중 장애물",
+  "difficulty": "medium",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 540, "y": 180 }],
+  "cats": [{ "x": 540, "y": 1700, "catId": "cat_047" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 500 },
+    { "type": "normal", "x": 750, "y": 900 },
+    { "type": "normal", "x": 300, "y": 1280 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 200, "y": 660, "width": 140, "height": 40 },
+    { "type": "moving_platform", "x": 300, "y": 1060, "width": 200, "height": 30 },
+    { "type": "spike", "x": 620, "y": 1430, "width": 150, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 550, "width": 400, "height": 20, "angle": 0 },
+    { "x": 600, "y": 950, "width": 320, "height": 20, "angle": -20 },
+    { "x": 150, "y": 1330, "width": 340, "height": 20, "angle": 10 },
+    { "x": 300, "y": 1480, "width": 480, "height": 20, "angle": 0 }
+  ]
+}

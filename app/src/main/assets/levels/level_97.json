@@ -1,0 +1,33 @@
+{
+  "levelId": 97,
+  "name": "불멸의 퍼즐",
+  "difficulty": "hard",
+  "maxPins": 5,
+  "stars": { "one": 999, "two": 6, "three": 5 },
+  "balls": [{ "type": "iron", "x": 540, "y": 200 }],
+  "cats": [
+    { "x": 270, "y": 1570, "catId": "cat_097" },
+    { "x": 790, "y": 1610, "catId": "cat_097b" }
+  ],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 440 },
+    { "type": "normal", "x": 155, "y": 700 },
+    { "type": "normal", "x": 910, "y": 970 },
+    { "type": "normal", "x": 175, "y": 1210 },
+    { "type": "normal", "x": 780, "y": 1430 }
+  ],
+  "obstacles": [
+    { "type": "moving_platform", "x": 360, "y": 555, "width": 200, "height": 30 },
+    { "type": "teleport", "x": 100, "y": 795, "width": 80, "height": 80 },
+    { "type": "spike", "x": 710, "y": 1070, "width": 200, "height": 40 },
+    { "type": "teleport", "x": 100, "y": 1305, "width": 80, "height": 80 },
+    { "type": "fire", "x": 580, "y": 1520, "width": 200, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 460, "width": 300, "height": 20, "angle": -20 },
+    { "x": 100, "y": 720, "width": 200, "height": 20, "angle": 0 },
+    { "x": 760, "y": 990, "width": 300, "height": 20, "angle": 20 },
+    { "x": 100, "y": 1230, "width": 200, "height": 20, "angle": 0 },
+    { "x": 630, "y": 1450, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

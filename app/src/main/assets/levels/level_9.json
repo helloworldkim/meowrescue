@@ -1,0 +1,18 @@
+{
+  "levelId": 9,
+  "name": "미끄럼틀",
+  "difficulty": "tutorial",
+  "maxPins": 2,
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 250, "y": 200 }],
+  "cats": [{ "x": 800, "y": 1680, "catId": "cat_009" }],
+  "pins": [
+    { "type": "normal", "x": 300, "y": 580 },
+    { "type": "normal", "x": 560, "y": 1000 }
+  ],
+  "obstacles": [],
+  "platforms": [
+    { "x": 160, "y": 600, "width": 380, "height": 20, "angle": 15 },
+    { "x": 380, "y": 1020, "width": 460, "height": 20, "angle": 15 }
+  ]
+}

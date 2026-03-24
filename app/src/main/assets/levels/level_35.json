@@ -1,0 +1,22 @@
+{
+  "levelId": 35,
+  "name": "이중 발판",
+  "difficulty": "medium",
+  "maxPins": 2,
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 540, "y": 180 }],
+  "cats": [{ "x": 540, "y": 1650, "catId": "cat_035" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 520 },
+    { "type": "normal", "x": 280, "y": 980 }
+  ],
+  "obstacles": [
+    { "type": "moving_platform", "x": 150, "y": 750, "width": 200, "height": 30 },
+    { "type": "spike", "x": 600, "y": 1150, "width": 140, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 570, "width": 400, "height": 20, "angle": 0 },
+    { "x": 130, "y": 1030, "width": 320, "height": 20, "angle": 10 },
+    { "x": 280, "y": 1380, "width": 480, "height": 20, "angle": 0 }
+  ]
+}

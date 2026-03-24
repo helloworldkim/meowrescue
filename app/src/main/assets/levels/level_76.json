@@ -1,0 +1,27 @@
+{
+  "levelId": 76,
+  "name": "폭발 연쇄",
+  "difficulty": "hard",
+  "maxPins": 4,
+  "stars": { "one": 999, "two": 5, "three": 4 },
+  "balls": [{ "type": "bomb", "x": 540, "y": 200 }],
+  "cats": [{ "x": 540, "y": 1630, "catId": "cat_076" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 480 },
+    { "type": "normal", "x": 230, "y": 760 },
+    { "type": "normal", "x": 810, "y": 1030 },
+    { "type": "normal", "x": 460, "y": 1310 }
+  ],
+  "obstacles": [
+    { "type": "spike", "x": 350, "y": 620, "width": 250, "height": 40 },
+    { "type": "spike", "x": 130, "y": 860, "width": 200, "height": 40 },
+    { "type": "fire", "x": 620, "y": 1130, "width": 200, "height": 40 },
+    { "type": "spike", "x": 300, "y": 1420, "width": 250, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 500, "width": 300, "height": 20, "angle": 0 },
+    { "x": 130, "y": 780, "width": 200, "height": 20, "angle": 0 },
+    { "x": 660, "y": 1050, "width": 300, "height": 20, "angle": 0 },
+    { "x": 310, "y": 1330, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

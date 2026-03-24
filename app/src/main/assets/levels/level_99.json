@@ -1,0 +1,34 @@
+{
+  "levelId": 99,
+  "name": "전설의 끝",
+  "difficulty": "hard",
+  "maxPins": 5,
+  "stars": { "one": 999, "two": 6, "three": 5 },
+  "balls": [{ "type": "fire", "x": 540, "y": 200 }],
+  "cats": [
+    { "x": 220, "y": 1540, "catId": "cat_099" },
+    { "x": 830, "y": 1580, "catId": "cat_099b" },
+    { "x": 540, "y": 1680, "catId": "cat_099c" }
+  ],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 430 },
+    { "type": "normal", "x": 145, "y": 690 },
+    { "type": "normal", "x": 930, "y": 960 },
+    { "type": "normal", "x": 160, "y": 1200 },
+    { "type": "normal", "x": 800, "y": 1410 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 240, "y": 535, "width": 300, "height": 40 },
+    { "type": "teleport", "x": 100, "y": 785, "width": 80, "height": 80 },
+    { "type": "spike", "x": 730, "y": 1060, "width": 200, "height": 40 },
+    { "type": "teleport", "x": 100, "y": 1295, "width": 80, "height": 80 },
+    { "type": "fire", "x": 600, "y": 1500, "width": 200, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 450, "width": 300, "height": 20, "angle": 30 },
+    { "x": 100, "y": 710, "width": 200, "height": 20, "angle": 0 },
+    { "x": 780, "y": 980, "width": 300, "height": 20, "angle": -30 },
+    { "x": 100, "y": 1220, "width": 200, "height": 20, "angle": 0 },
+    { "x": 650, "y": 1430, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

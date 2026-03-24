@@ -1,0 +1,28 @@
+{
+  "levelId": 54,
+  "name": "연속 발판",
+  "difficulty": "medium",
+  "maxPins": 4,
+  "stars": { "one": 999, "two": 5, "three": 4 },
+  "balls": [{ "type": "normal", "x": 540, "y": 180 }],
+  "cats": [{ "x": 540, "y": 1700, "catId": "cat_054" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 430 },
+    { "type": "normal", "x": 250, "y": 750 },
+    { "type": "normal", "x": 720, "y": 1060 },
+    { "type": "normal", "x": 380, "y": 1360 }
+  ],
+  "obstacles": [
+    { "type": "moving_platform", "x": 600, "y": 580, "width": 200, "height": 30 },
+    { "type": "fire", "x": 420, "y": 900, "width": 150, "height": 40 },
+    { "type": "spike", "x": 130, "y": 1220, "width": 150, "height": 40 },
+    { "type": "moving_platform", "x": 600, "y": 1480, "width": 200, "height": 30 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 480, "width": 400, "height": 20, "angle": 0 },
+    { "x": 100, "y": 800, "width": 320, "height": 20, "angle": 25 },
+    { "x": 570, "y": 1110, "width": 340, "height": 20, "angle": -20 },
+    { "x": 230, "y": 1410, "width": 340, "height": 20, "angle": 15 },
+    { "x": 280, "y": 1490, "width": 480, "height": 20, "angle": 0 }
+  ]
+}

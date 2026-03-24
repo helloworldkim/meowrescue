@@ -1,0 +1,33 @@
+{
+  "levelId": 91,
+  "name": "두 마리 구출",
+  "difficulty": "hard",
+  "maxPins": 5,
+  "stars": { "one": 999, "two": 6, "three": 5 },
+  "balls": [{ "type": "fire", "x": 540, "y": 200 }],
+  "cats": [
+    { "x": 280, "y": 1580, "catId": "cat_091" },
+    { "x": 800, "y": 1620, "catId": "cat_091b" }
+  ],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 460 },
+    { "type": "normal", "x": 200, "y": 720 },
+    { "type": "normal", "x": 850, "y": 980 },
+    { "type": "normal", "x": 240, "y": 1220 },
+    { "type": "normal", "x": 720, "y": 1440 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 280, "y": 570, "width": 300, "height": 40 },
+    { "type": "teleport", "x": 100, "y": 815, "width": 80, "height": 80 },
+    { "type": "spike", "x": 650, "y": 1080, "width": 200, "height": 40 },
+    { "type": "fire", "x": 140, "y": 1320, "width": 200, "height": 40 },
+    { "type": "moving_platform", "x": 520, "y": 1510, "width": 200, "height": 30 }
+  ],
+  "platforms": [
+    { "x": 390, "y": 480, "width": 300, "height": 20, "angle": 0 },
+    { "x": 100, "y": 740, "width": 200, "height": 20, "angle": 0 },
+    { "x": 700, "y": 1000, "width": 300, "height": 20, "angle": 0 },
+    { "x": 140, "y": 1240, "width": 200, "height": 20, "angle": 0 },
+    { "x": 570, "y": 1460, "width": 300, "height": 20, "angle": 0 }
+  ]
+}

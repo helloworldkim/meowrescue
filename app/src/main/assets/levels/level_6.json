@@ -1,0 +1,18 @@
+{
+  "levelId": 6,
+  "name": "넓은 간격",
+  "difficulty": "tutorial",
+  "maxPins": 2,
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 540, "y": 200 }],
+  "cats": [{ "x": 540, "y": 1700, "catId": "cat_006" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 550 },
+    { "type": "normal", "x": 540, "y": 1100 }
+  ],
+  "obstacles": [],
+  "platforms": [
+    { "x": 340, "y": 570, "width": 400, "height": 20, "angle": 0 },
+    { "x": 340, "y": 1120, "width": 400, "height": 20, "angle": 0 }
+  ]
+}

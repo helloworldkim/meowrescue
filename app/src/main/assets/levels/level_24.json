@@ -1,0 +1,24 @@
+{
+  "levelId": 24,
+  "name": "위험한 계단",
+  "difficulty": "easy",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 850, "y": 170 }],
+  "cats": [{ "x": 200, "y": 1680, "catId": "cat_024" }],
+  "pins": [
+    { "type": "normal", "x": 780, "y": 520 },
+    { "type": "normal", "x": 520, "y": 920 },
+    { "type": "normal", "x": 280, "y": 1300 }
+  ],
+  "obstacles": [
+    { "type": "spike", "x": 850, "y": 720, "width": 130, "height": 40 },
+    { "type": "fire", "x": 350, "y": 1120, "width": 170, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 560, "y": 570, "width": 380, "height": 20, "angle": -15 },
+    { "x": 330, "y": 970, "width": 380, "height": 20, "angle": -12 },
+    { "x": 130, "y": 1350, "width": 350, "height": 20, "angle": -10 },
+    { "x": 100, "y": 1520, "width": 280, "height": 20, "angle": 0 }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "levelId": 14,
+  "name": "두 갈래 불길",
+  "difficulty": "easy",
+  "maxPins": 3,
+  "stars": { "one": 999, "two": 4, "three": 3 },
+  "balls": [{ "type": "normal", "x": 540, "y": 150 }],
+  "cats": [{ "x": 540, "y": 1700, "catId": "cat_014" }],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 500 },
+    { "type": "normal", "x": 280, "y": 900 },
+    { "type": "normal", "x": 700, "y": 1250 }
+  ],
+  "obstacles": [
+    { "type": "fire", "x": 620, "y": 750, "width": 160, "height": 40 },
+    { "type": "fire", "x": 150, "y": 1100, "width": 160, "height": 40 }
+  ],
+  "platforms": [
+    { "x": 340, "y": 550, "width": 400, "height": 20, "angle": -10 },
+    { "x": 130, "y": 950, "width": 300, "height": 20, "angle": 12 },
+    { "x": 500, "y": 1300, "width": 350, "height": 20, "angle": 0 },
+    { "x": 380, "y": 1550, "width": 300, "height": 20, "angle": 0 }
+  ]
+}
