@@ -7,12 +7,14 @@ import com.meowrescue.game.model.Obstacle
 import com.meowrescue.game.model.Pin
 import com.meowrescue.game.model.Surface
 import com.meowrescue.game.model.util.Vector2D
+import java.util.concurrent.ConcurrentLinkedQueue
 import kotlin.math.sqrt
 
 class GameEngine {
 
     enum class GameState { PLAYING, SUCCESS, FAILED, PAUSED }
 
+    @Volatile
     var gameState: GameState = GameState.PLAYING
     val balls: MutableList<Ball> = mutableListOf()
     val pins: MutableList<Pin> = mutableListOf()
@@ -21,9 +23,23 @@ class GameEngine {
     val surfaces: MutableList<Surface> = mutableListOf()
     var removedPinCount: Int = 0
 
+    // Pin-to-surface linkage: each pin "supports" nearby surfaces
+    private val pinSurfaceLinks: MutableMap<Pin, MutableList<Surface>> = mutableMapOf()
+
     var levelData: LevelData? = null
         private set
-    private val physicsEngine = PhysicsEngine()
+    private val physics = Dyn4jPhysicsEngine()
+
+    // Thread-safe pin removal queue (UI thread enqueues, game thread processes)
+    private val pinRemovalQueue = ConcurrentLinkedQueue<Pin>()
+
+    // Dead-state detection
+    private var stationaryTime = 0f
+
+    private companion object {
+        const val DEAD_STATE_TIMEOUT = 3.0f
+        const val CAT_COLLISION_RADIUS = 30f
+    }
 
     fun loadLevel(data: LevelData) {
         balls.clear()
@@ -31,10 +47,14 @@ class GameEngine {
         cats.clear()
         obstacles.clear()
         surfaces.clear()
+        pinSurfaceLinks.clear()
+        pinRemovalQueue.clear()
+        physics.clear()
 
         levelData = data
         gameState = GameState.PLAYING
         removedPinCount = 0
+        stationaryTime = 0f
 
         for (ballData in data.balls) {
             val pos = Vector2D(ballData.x, ballData.y)
@@ -45,6 +65,7 @@ class GameEngine {
                 else -> Ball.Normal(pos)
             }
             balls.add(ball)
+            physics.addBall(ball)
         }
 
         for (pinData in data.pins) {
@@ -57,10 +78,13 @@ class GameEngine {
                 else -> Pin.Normal(pos)
             }
             pins.add(pin)
+            physics.addPin(pin)
         }
 
         for (catData in data.cats) {
-            cats.add(Cat(position = Vector2D(catData.x, catData.y), catId = catData.catId))
+            val cat = Cat(position = Vector2D(catData.x, catData.y), catId = catData.catId)
+            cats.add(cat)
+            // Cats are not added to physics world; collisions checked manually
         }
 
         for (obstacleData in data.obstacles) {
@@ -69,65 +93,142 @@ class GameEngine {
             val obstacle = when (obstacleData.type.lowercase()) {
                 "fire" -> Obstacle.Fire(pos, size)
                 "spike" -> Obstacle.Spike(pos, size)
-                "movingplatform", "moving_platform" -> Obstacle.MovingPlatform(pos, size, speed = 100f, range = 150f)
-                "teleport" -> Obstacle.Teleport(pos, size, target = Vector2D(pos.x + 200f, pos.y))
-                "switchblock", "switch_block" -> Obstacle.SwitchBlock(pos, size, isOn = true)
+                "movingplatform", "moving_platform" ->
+                    Obstacle.MovingPlatform(pos, size, speed = 100f, range = 150f)
+                "teleport" ->
+                    Obstacle.Teleport(pos, size, target = Vector2D(pos.x + 200f, pos.y))
+                "switchblock", "switch_block" ->
+                    Obstacle.SwitchBlock(pos, size, isOn = true)
                 else -> Obstacle.Spike(pos, size)
             }
             obstacles.add(obstacle)
+            // Only physical obstacles go into dyn4j world
+            when (obstacle) {
+                is Obstacle.MovingPlatform -> physics.addMovingPlatform(obstacle)
+                is Obstacle.SwitchBlock -> physics.addSwitchBlock(obstacle)
+                else -> {} // Fire, Spike, Teleport checked manually each frame
+            }
         }
 
         for (platformData in data.platforms) {
-            surfaces.add(
-                Surface(
-                    position = Vector2D(platformData.x, platformData.y),
-                    width = platformData.width,
-                    height = platformData.height,
-                    angle = platformData.angle
-                )
+            val surface = Surface(
+                position = Vector2D(platformData.x, platformData.y),
+                width = platformData.width,
+                height = platformData.height,
+                angle = platformData.angle
             )
+            surfaces.add(surface)
+            physics.addSurface(surface)
+        }
+
+        // Build pin-surface links: a pin supports surfaces within 100px below it
+        // whose horizontal range overlaps with the pin's x position
+        for (pin in pins) {
+            val linked = mutableListOf<Surface>()
+            for (surface in surfaces) {
+                val dy = surface.position.y - pin.position.y
+                val pinInSurfaceX = pin.position.x >= surface.position.x &&
+                        pin.position.x <= surface.position.x + surface.width
+                if (dy in 0f..100f && pinInSurfaceX) {
+                    linked.add(surface)
+                }
+            }
+            if (linked.isNotEmpty()) {
+                pinSurfaceLinks[pin] = linked
+            }
         }
     }
 
     fun update(deltaTime: Float) {
         if (gameState != GameState.PLAYING) return
 
-        physicsEngine.updateObstacles(obstacles, deltaTime)
+        // Drain pin removal queue (thread-safe: UI thread enqueues, game thread processes)
+        while (true) {
+            val pin = pinRemovalQueue.poll() ?: break
+            executePinRemoval(pin)
+        }
 
-        val ballIterator = balls.toMutableList()
-        for (ball in ballIterator) {
-            physicsEngine.update(ball, deltaTime)
+        // Step dyn4j physics simulation
+        physics.step(deltaTime.toDouble())
 
-            for (surface in surfaces) {
-                physicsEngine.handleSurfaceCollision(ball, surface)
-            }
+        // --- Game logic checks (sensors) ---
 
-            var destroyed = false
+        // Ball vs obstacle (fire/spike/teleport)
+        val ballsToRemove = mutableListOf<Ball>()
+        for (ball in balls) {
             for (obstacle in obstacles) {
-                if (physicsEngine.checkObstacleCollision(ball, obstacle)) {
-                    destroyed = true
-                    break
+                when (obstacle) {
+                    is Obstacle.Fire -> {
+                        if (ball !is Ball.Fire && isCircleRectOverlap(
+                                ball.position, ball.radius,
+                                obstacle.position, obstacle.size.x, obstacle.size.y
+                            )
+                        ) {
+                            ballsToRemove.add(ball)
+                        }
+                    }
+                    is Obstacle.Spike -> {
+                        if (isCircleRectOverlap(
+                                ball.position, ball.radius,
+                                obstacle.position, obstacle.size.x, obstacle.size.y
+                            )
+                        ) {
+                            ballsToRemove.add(ball)
+                        }
+                    }
+                    is Obstacle.Teleport -> {
+                        if (isCircleRectOverlap(
+                                ball.position, ball.radius,
+                                obstacle.position, obstacle.size.x, obstacle.size.y
+                            )
+                        ) {
+                            physics.teleportBall(ball, obstacle.target.x, obstacle.target.y)
+                        }
+                    }
+                    else -> {} // MovingPlatform/SwitchBlock handled by dyn4j
                 }
             }
-            if (destroyed) {
-                balls.remove(ball)
-                continue
-            }
+        }
+        for (ball in ballsToRemove) {
+            balls.remove(ball)
+            physics.removeBall(ball)
+        }
 
+        // Ball vs cat rescue
+        for (ball in balls) {
             for (cat in cats) {
-                if (!cat.isRescued && physicsEngine.checkCatCollision(ball, cat)) {
-                    cat.isRescued = true
+                if (!cat.isRescued) {
+                    val dx = ball.position.x - cat.position.x
+                    val dy = ball.position.y - cat.position.y
+                    val dist = sqrt(dx * dx + dy * dy)
+                    if (dist < ball.radius + CAT_COLLISION_RADIUS) {
+                        cat.isRescued = true
+                    }
                 }
-            }
-
-            val outOfBounds = ball.position.y > 2200f ||
-                    ball.position.x < -100f ||
-                    ball.position.x > 1200f
-            if (outOfBounds) {
-                balls.remove(ball)
             }
         }
 
+        // Out of bounds removal
+        val outBalls = balls.filter { ball ->
+            ball.position.y > 2200f || ball.position.x < -100f || ball.position.x > 1200f
+        }
+        for (ball in outBalls) {
+            balls.remove(ball)
+            physics.removeBall(ball)
+        }
+
+        // Dead-state detection: fail if all balls are stationary too long
+        if (balls.isNotEmpty() && balls.all { physics.isBallStationary(it) }) {
+            stationaryTime += deltaTime
+            if (stationaryTime > DEAD_STATE_TIMEOUT) {
+                gameState = GameState.FAILED
+                return
+            }
+        } else {
+            stationaryTime = 0f
+        }
+
+        // Win/lose conditions
         val allCatsRescued = cats.isNotEmpty() && cats.all { it.isRescued }
         if (allCatsRescued) {
             gameState = GameState.SUCCESS
@@ -139,15 +240,31 @@ class GameEngine {
         }
     }
 
-    fun removePin(pin: Pin) {
+    /** Thread-safe: called from UI thread to queue pin removal */
+    fun requestPinRemoval(pin: Pin) {
+        pinRemovalQueue.add(pin)
+    }
+
+    private fun executePinRemoval(pin: Pin) {
         if (pin.isRemoved) return
         pin.isRemoved = true
         removedPinCount++
         pins.remove(pin)
+        physics.removePin(pin)
+
+        // Remove surfaces linked to this pin
+        val linkedSurfaces = pinSurfaceLinks.remove(pin)
+        if (linkedSurfaces != null) {
+            for (surface in linkedSurfaces) {
+                surfaces.remove(surface)
+                physics.removeSurface(surface)
+            }
+        }
     }
 
+    /** Thread-safe read: creates a snapshot of pins list */
     fun getPinAt(x: Float, y: Float, hitRadius: Float = 50f): Pin? {
-        return pins.firstOrNull { pin ->
+        return pins.toList().firstOrNull { pin ->
             if (pin.isRemoved) return@firstOrNull false
             val dx = pin.position.x - x
             val dy = pin.position.y - y
@@ -162,5 +279,16 @@ class GameEngine {
             removedPinCount <= data.stars.two -> 2
             else -> 1
         }
+    }
+
+    private fun isCircleRectOverlap(
+        circlePos: Vector2D, radius: Float,
+        rectPos: Vector2D, rectW: Float, rectH: Float
+    ): Boolean {
+        val closestX = circlePos.x.coerceIn(rectPos.x, rectPos.x + rectW)
+        val closestY = circlePos.y.coerceIn(rectPos.y, rectPos.y + rectH)
+        val dx = circlePos.x - closestX
+        val dy = circlePos.y - closestY
+        return (dx * dx + dy * dy) < (radius * radius)
     }
 }

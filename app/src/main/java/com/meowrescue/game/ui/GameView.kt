@@ -119,12 +119,16 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         // Background
         canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), backgroundPaint)
 
-        // Surfaces / platforms
+        // Surfaces / platforms (rotate around center to match dyn4j physics)
         for (surface in engine.surfaces) {
             canvas.save()
-            canvas.translate(surface.position.x, surface.position.y)
+            val cx = surface.position.x + surface.width / 2f
+            val cy = surface.position.y + surface.height / 2f
+            canvas.translate(cx, cy)
             if (surface.angle != 0f) canvas.rotate(surface.angle)
-            val destRect = RectF(0f, 0f, surface.width, surface.height)
+            val hw = surface.width / 2f
+            val hh = surface.height / 2f
+            val destRect = RectF(-hw, -hh, hw, hh)
             canvas.drawBitmap(platformBmp, null, destRect, null)
             canvas.restore()
         }
@@ -270,7 +274,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
                 GameEngine.GameState.FAILED -> onLevelFailed?.invoke()
                 GameEngine.GameState.PLAYING -> {
                     val pin = engine.getPinAt(x, y)
-                    if (pin != null) engine.removePin(pin)
+                    if (pin != null) engine.requestPinRemoval(pin)
                 }
                 else -> {}
             }

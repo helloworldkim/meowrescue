@@ -16,12 +16,12 @@
   ],
   "pins": [
     { "type": "normal", "x": 540, "y": 600 },
-    { "type": "normal", "x": 800, "y": 1000 }
+    { "type": "normal", "x": 540, "y": 1000 }
   ],
   "obstacles": [],
   "platforms": [
     { "x": 340, "y": 650, "width": 400, "height": 20, "angle": 0 },
-    { "x": 600, "y": 1050, "width": 400, "height": 20, "angle": 0 },
-    { "x": 650, "y": 1300, "width": 300, "height": 20, "angle": 10 }
+    { "x": 340, "y": 1050, "width": 400, "height": 20, "angle": 0 },
+    { "x": 400, "y": 1300, "width": 500, "height": 20, "angle": 10 }
   ]
 }

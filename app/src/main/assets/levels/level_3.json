@@ -2,27 +2,29 @@
   "levelId": 3,
   "name": "Watch the Fire",
   "difficulty": "medium",
-  "maxPins": 1,
+  "maxPins": 2,
   "stars": {
     "one": 999,
-    "two": 2,
-    "three": 1
+    "two": 3,
+    "three": 2
   },
   "balls": [
     { "type": "normal", "x": 300, "y": 200 }
   ],
   "cats": [
-    { "x": 300, "y": 1600, "catId": "cat_003" }
+    { "x": 700, "y": 1600, "catId": "cat_003" }
   ],
   "pins": [
-    { "type": "normal", "x": 300, "y": 700 }
+    { "type": "normal", "x": 300, "y": 700 },
+    { "type": "normal", "x": 700, "y": 1100 }
   ],
   "obstacles": [
-    { "type": "fire", "x": 200, "y": 1100, "width": 200, "height": 40 }
+    { "type": "fire", "x": 150, "y": 1000, "width": 250, "height": 40 }
   ],
   "platforms": [
     { "x": 150, "y": 750, "width": 300, "height": 20, "angle": 0 },
-    { "x": 450, "y": 950, "width": 280, "height": 20, "angle": -15 },
-    { "x": 200, "y": 1200, "width": 300, "height": 20, "angle": 0 }
+    { "x": 250, "y": 900, "width": 500, "height": 20, "angle": 15 },
+    { "x": 500, "y": 1150, "width": 400, "height": 20, "angle": 0 },
+    { "x": 550, "y": 1400, "width": 300, "height": 20, "angle": 10 }
   ]
 }
