@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Pastel theme palette -->
+    <color name="pastel_pink">#FFB3C6</color>
+    <color name="pastel_lavender">#C8B8E8</color>
+    <color name="pastel_mint">#B5EAD7</color>
+    <color name="pastel_peach">#FFDAC1</color>
+    <color name="pastel_yellow">#FFFACD</color>
+    <color name="pastel_sky">#AED9E0</color>
+    <color name="pastel_rose">#F4A7B9</color>
+
+    <!-- Primary / accent -->
+    <color name="primary">#FFB3C6</color>
+    <color name="primary_dark">#E08FA6</color>
+    <color name="accent">#C8B8E8</color>
+
+    <!-- Neutrals -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="text_dark">#333333</color>
+    <color name="text_light">#FFFFFF</color>
+    <color name="background">#FFF9FB</color>
+</resources>

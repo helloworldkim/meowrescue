@@ -1,0 +1,27 @@
+{
+  "levelId": 4,
+  "name": "Slide Right",
+  "difficulty": "medium",
+  "maxPins": 2,
+  "stars": {
+    "one": 999,
+    "two": 3,
+    "three": 2
+  },
+  "balls": [
+    { "type": "normal", "x": 200, "y": 200 }
+  ],
+  "cats": [
+    { "x": 800, "y": 1500, "catId": "cat_004" }
+  ],
+  "pins": [
+    { "type": "normal", "x": 200, "y": 600 },
+    { "type": "normal", "x": 600, "y": 1000 }
+  ],
+  "obstacles": [],
+  "platforms": [
+    { "x": 150, "y": 650, "width": 350, "height": 20, "angle": 0 },
+    { "x": 300, "y": 850, "width": 500, "height": 20, "angle": 30 },
+    { "x": 600, "y": 1200, "width": 350, "height": 20, "angle": 0 }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "levelId": 1,
+  "name": "First Rescue",
+  "difficulty": "tutorial",
+  "maxPins": 1,
+  "stars": {
+    "one": 999,
+    "two": 2,
+    "three": 1
+  },
+  "balls": [
+    { "type": "normal", "x": 540, "y": 200 }
+  ],
+  "cats": [
+    { "x": 540, "y": 1600, "catId": "cat_001" }
+  ],
+  "pins": [
+    { "type": "normal", "x": 540, "y": 800 }
+  ],
+  "obstacles": [],
+  "platforms": [
+    { "x": 340, "y": 850, "width": 400, "height": 20, "angle": 0 }
+  ]
+}
