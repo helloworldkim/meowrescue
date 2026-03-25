@@ -217,6 +217,8 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         canvas.drawBitmap(currentBackgroundBmp, null, bgDestRect, null)
 
         // Surfaces / platforms (rotate around center to match dyn4j physics)
+        // Visual height is scaled up for better visibility; physics body uses original height
+        val platformVisualScale = 2.5f
         for (surface in engine.surfaces) {
             canvas.save()
             val cx = surface.position.x + surface.width / 2f
@@ -224,7 +226,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             canvas.translate(cx, cy)
             if (surface.angle != 0f) canvas.rotate(surface.angle)
             val hw = surface.width / 2f
-            val hh = surface.height / 2f
+            val hh = surface.height / 2f * platformVisualScale
             val destRect = RectF(-hw, -hh, hw, hh)
             val bmp = platformBitmaps[surface.bitmapIndex % platformBitmaps.size]
             canvas.drawBitmap(bmp, null, destRect, null)

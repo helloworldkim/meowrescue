@@ -102,7 +102,7 @@ class GameEngine {
                 else -> Pin.Normal(pos)
             }
             pins.add(pin)
-            physics.addPin(pin)
+            // Pins are UI-only (tappable to remove linked platforms), not physics obstacles
         }
 
         for (catData in data.cats) {
@@ -291,7 +291,6 @@ class GameEngine {
         pin.isRemoved = true
         removedPinCount++
         pins.remove(pin)
-        physics.removePin(pin)
         eventListener?.onPinRemoved()
 
         // Remove surfaces linked to this pin, but only if no other non-removed pin still supports them
