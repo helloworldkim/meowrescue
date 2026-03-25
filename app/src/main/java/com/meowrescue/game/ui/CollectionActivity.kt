@@ -11,10 +11,12 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.meowrescue.game.R
 import com.meowrescue.game.data.GameRepository
+import kotlinx.coroutines.launch
 
 class CollectionActivity : AppCompatActivity() {
 
@@ -30,8 +32,13 @@ class CollectionActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         val repository = GameRepository(this)
-        val unlockedCats = repository.getUnlockedCats().toSet()
+        lifecycleScope.launch {
+            val unlockedCats = repository.getUnlockedCats().toSet()
+            buildUi(unlockedCats)
+        }
+    }
 
+    private fun buildUi(unlockedCats: Set<String>) {
         val allCats = listOf(
             CatEntry("cat_001", R.drawable.cat_1, "Orange Tabby", "Common", unlockedCats.contains("cat_001")),
             CatEntry("cat_002", R.drawable.cat_2, "Happy Cat", "Common", unlockedCats.contains("cat_002")),

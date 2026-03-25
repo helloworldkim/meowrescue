@@ -31,7 +31,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "meow_rescue_db"
                 )
-                    .allowMainThreadQueries() // MVP: acceptable for small dataset
                     .build().also { INSTANCE = it }
             }
         }
