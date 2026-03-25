@@ -21,7 +21,7 @@
   "platforms": [
     { "x": 390, "y": 500, "width": 300, "height": 20, "angle": -10 },
     { "x": 130, "y": 780, "width": 200, "height": 20, "angle": 10 },
-    { "x": 660, "y": 1050, "width": 300, "height": 20, "angle": -8 },
-    { "x": 310, "y": 1330, "width": 300, "height": 20, "angle": 5 }
+    { "x": 660, "y": 1050, "width": 300, "height": 20, "angle": -10 },
+    { "x": 310, "y": 1330, "width": 300, "height": 20, "angle": 10 }
   ]
 }

@@ -5,7 +5,7 @@
   "maxPins": 2,
   "stars": { "one": 999, "two": 3, "three": 2 },
   "balls": [{ "type": "normal", "x": 250, "y": 200 }],
-  "cats": [{ "x": 800, "y": 1680, "catId": "cat_009" }],
+  "cats": [{ "x": 820, "y": 1680, "catId": "cat_009" }],
   "pins": [
     { "type": "normal", "x": 300, "y": 580 },
     { "type": "normal", "x": 560, "y": 1000 }

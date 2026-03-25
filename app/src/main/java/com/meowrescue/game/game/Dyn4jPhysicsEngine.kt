@@ -18,7 +18,7 @@ class Dyn4jPhysicsEngine {
         /** 100 pixels = 1 meter */
         const val SCALE = 100.0
         const val RESTITUTION = 0.4
-        const val FRICTION_COEFF = 0.3
+        const val FRICTION_COEFF = 0.15
         const val BALL_DENSITY = 2.0
         const val LINEAR_DAMPING = 0.02
         const val PIN_RADIUS_PX = 20f
@@ -50,6 +50,8 @@ class Dyn4jPhysicsEngine {
         body.translate(pxToM(ball.position.x), pxToM(ball.position.y))
         body.setMass(MassType.NORMAL)
         body.linearDamping = LINEAR_DAMPING
+        // Prevent ball from sleeping on slopes — keep it always active
+        body.setAtRestDetectionEnabled(false)
         world.addBody(body)
         ballBodies[ball] = body
         return body

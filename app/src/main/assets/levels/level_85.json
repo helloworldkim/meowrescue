@@ -23,8 +23,8 @@
   "platforms": [
     { "x": 390, "y": 480, "width": 300, "height": 20, "angle": -10 },
     { "x": 100, "y": 720, "width": 200, "height": 20, "angle": 10 },
-    { "x": 690, "y": 960, "width": 300, "height": 20, "angle": -8 },
+    { "x": 690, "y": 960, "width": 300, "height": 20, "angle": -10 },
     { "x": 140, "y": 1200, "width": 200, "height": 20, "angle": 10 },
-    { "x": 530, "y": 1420, "width": 300, "height": 20, "angle": -5 }
+    { "x": 530, "y": 1420, "width": 300, "height": 20, "angle": -10 }
   ]
 }

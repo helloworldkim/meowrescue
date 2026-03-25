@@ -68,14 +68,14 @@
       "y": 870,
       "width": 300,
       "height": 20,
-      "angle": 8
+      "angle": 10
     },
     {
       "x": 630,
       "y": 1220,
       "width": 300,
       "height": 20,
-      "angle": 5
+      "angle": 10
     }
   ]
 }

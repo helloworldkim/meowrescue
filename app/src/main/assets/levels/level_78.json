@@ -19,9 +19,9 @@
     { "type": "fire", "x": 200, "y": 1450, "width": 250, "height": 40 }
   ],
   "platforms": [
-    { "x": 390, "y": 520, "width": 300, "height": 20, "angle": -8 },
-    { "x": 160, "y": 820, "width": 200, "height": 20, "angle": 8 },
-    { "x": 640, "y": 1090, "width": 300, "height": 20, "angle": -8 },
-    { "x": 200, "y": 1370, "width": 300, "height": 20, "angle": 8 }
+    { "x": 390, "y": 520, "width": 300, "height": 20, "angle": -10 },
+    { "x": 160, "y": 820, "width": 200, "height": 20, "angle": 10 },
+    { "x": 640, "y": 1090, "width": 300, "height": 20, "angle": -10 },
+    { "x": 200, "y": 1370, "width": 300, "height": 20, "angle": 10 }
   ]
 }
