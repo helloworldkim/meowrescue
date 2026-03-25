@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
@@ -26,9 +25,10 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     var onLevelFailed: (() -> Unit)? = null
 
     private var surfaceReady = false
+    private var callbackFired = false
 
     // Paints
-    private val backgroundPaint = Paint().apply { color = Color.parseColor("#FFF5E6") }
+    private val backgroundPaint = Paint().apply { color = Color.parseColor(Theme.COLOR_BACKGROUND_GAME) }
     private val surfacePaint = Paint().apply { color = Color.parseColor("#8B4513"); style = Paint.Style.FILL }
     private val hudPaint = Paint().apply {
         color = Color.parseColor("#333333")
@@ -49,6 +49,10 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         isAntiAlias = true
     }
     private val obstaclePaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
+    private val rescuedCatOverlayPaint = Paint().apply {
+        color = Color.argb(100, 0, 200, 0)
+        style = Paint.Style.FILL
+    }
 
     // Bitmap sprites
     private val ballNormalBmp = loadScaled(R.drawable.ball_normal, 60, 60)
@@ -103,6 +107,32 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
+        recycleBitmaps()
+    }
+
+    private fun recycleBitmaps() {
+        ballNormalBmp.recycle()
+        ballFireBmp.recycle()
+        ballIronBmp.recycle()
+        ballBombBmp.recycle()
+        pinNormalBmp.recycle()
+        pinTimerBmp.recycle()
+        pinDirectionBmp.recycle()
+        pinLockedBmp.recycle()
+        obstacleFireBmp.recycle()
+        obstacleSpikeBmp.recycle()
+        platformBmp.recycle()
+        teleportBmp.recycle()
+        catBitmaps.forEach { it.recycle() }
+        starFullBmp.recycle()
+        starEmptyBmp.recycle()
+        pauseBmp.recycle()
+        btnNextBmp.recycle()
+        btnRetryBmp.recycle()
+    }
+
+    fun resetCallbackState() {
+        callbackFired = false
     }
 
     fun render(engine: GameEngine) {
@@ -206,11 +236,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             val bmp = catBitmaps[catIndex]
             canvas.drawBitmap(bmp, cat.position.x - bmp.width / 2f, cat.position.y - bmp.height / 2f, null)
             if (cat.isRescued) {
-                val overlayColor = Paint().apply {
-                    color = Color.argb(100, 0, 200, 0)
-                    style = Paint.Style.FILL
-                }
-                canvas.drawCircle(cat.position.x, cat.position.y, bmp.width / 2f, overlayColor)
+                canvas.drawCircle(cat.position.x, cat.position.y, bmp.width / 2f, rescuedCatOverlayPaint)
             }
         }
 
@@ -270,8 +296,18 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             val engine = gameEngine ?: return true
 
             when (engine.gameState) {
-                GameEngine.GameState.SUCCESS -> onLevelComplete?.invoke()
-                GameEngine.GameState.FAILED -> onLevelFailed?.invoke()
+                GameEngine.GameState.SUCCESS -> {
+                    if (!callbackFired) {
+                        callbackFired = true
+                        onLevelComplete?.invoke()
+                    }
+                }
+                GameEngine.GameState.FAILED -> {
+                    if (!callbackFired) {
+                        callbackFired = true
+                        onLevelFailed?.invoke()
+                    }
+                }
                 GameEngine.GameState.PLAYING -> {
                     val pin = engine.getPinAt(x, y)
                     if (pin != null) engine.requestPinRemoval(pin)

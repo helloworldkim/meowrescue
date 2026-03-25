@@ -8,6 +8,7 @@ import com.meowrescue.game.model.Pin
 import com.meowrescue.game.model.Surface
 import com.meowrescue.game.model.util.Vector2D
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.sqrt
 
 class GameEngine {
@@ -16,11 +17,11 @@ class GameEngine {
 
     @Volatile
     var gameState: GameState = GameState.PLAYING
-    val balls: MutableList<Ball> = mutableListOf()
-    val pins: MutableList<Pin> = mutableListOf()
-    val cats: MutableList<Cat> = mutableListOf()
-    val obstacles: MutableList<Obstacle> = mutableListOf()
-    val surfaces: MutableList<Surface> = mutableListOf()
+    val balls: MutableList<Ball> = CopyOnWriteArrayList()
+    val pins: MutableList<Pin> = CopyOnWriteArrayList()
+    val cats: MutableList<Cat> = CopyOnWriteArrayList()
+    val obstacles: MutableList<Obstacle> = CopyOnWriteArrayList()
+    val surfaces: MutableList<Surface> = CopyOnWriteArrayList()
     var removedPinCount: Int = 0
 
     // Pin-to-surface linkage: each pin "supports" nearby surfaces
@@ -36,9 +37,18 @@ class GameEngine {
     // Dead-state detection
     private var stationaryTime = 0f
 
+    // Teleport cooldown: tracks remaining cooldown time per ball (seconds)
+    private val teleportCooldown = mutableMapOf<Ball, Float>()
+
     private companion object {
         const val DEAD_STATE_TIMEOUT = 3.0f
         const val CAT_COLLISION_RADIUS = 30f
+        const val TELEPORT_COOLDOWN_SECONDS = 0.5f
+
+        // Out-of-bounds constants
+        const val OUT_BOTTOM = 2200f
+        const val OUT_LEFT = -100f
+        const val OUT_RIGHT = 1200f
     }
 
     fun loadLevel(data: LevelData) {
@@ -49,6 +59,7 @@ class GameEngine {
         surfaces.clear()
         pinSurfaceLinks.clear()
         pinRemovalQueue.clear()
+        teleportCooldown.clear()
         physics.clear()
 
         levelData = data
@@ -148,6 +159,14 @@ class GameEngine {
             executePinRemoval(pin)
         }
 
+        // Tick down teleport cooldowns
+        val cooldownIter = teleportCooldown.iterator()
+        while (cooldownIter.hasNext()) {
+            val entry = cooldownIter.next()
+            val remaining = entry.value - deltaTime
+            if (remaining <= 0f) cooldownIter.remove() else teleportCooldown[entry.key] = remaining
+        }
+
         // Step dyn4j physics simulation
         physics.step(deltaTime.toDouble())
 
@@ -177,12 +196,13 @@ class GameEngine {
                         }
                     }
                     is Obstacle.Teleport -> {
-                        if (isCircleRectOverlap(
+                        if (teleportCooldown[ball] == null && isCircleRectOverlap(
                                 ball.position, ball.radius,
                                 obstacle.position, obstacle.size.x, obstacle.size.y
                             )
                         ) {
                             physics.teleportBall(ball, obstacle.target.x, obstacle.target.y)
+                            teleportCooldown[ball] = TELEPORT_COOLDOWN_SECONDS
                         }
                     }
                     else -> {} // MovingPlatform/SwitchBlock handled by dyn4j
@@ -210,7 +230,7 @@ class GameEngine {
 
         // Out of bounds removal
         val outBalls = balls.filter { ball ->
-            ball.position.y > 2200f || ball.position.x < -100f || ball.position.x > 1200f
+            ball.position.y > OUT_BOTTOM || ball.position.x < OUT_LEFT || ball.position.x > OUT_RIGHT
         }
         for (ball in outBalls) {
             balls.remove(ball)

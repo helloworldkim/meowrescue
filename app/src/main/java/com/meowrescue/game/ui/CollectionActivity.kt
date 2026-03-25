@@ -45,13 +45,13 @@ class CollectionActivity : AppCompatActivity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#FFF9FB"))
+            setBackgroundColor(Color.parseColor(Theme.COLOR_BACKGROUND))
         }
 
         val toolbar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Color.parseColor("#FFB3C6"))
+            setBackgroundColor(Color.parseColor(Theme.COLOR_TOOLBAR))
             setPadding(32, 24, 32, 24)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -147,9 +147,9 @@ class CollectionActivity : AppCompatActivity() {
             }
 
             val rarityColor = when (cat.rarity) {
-                "Legendary" -> "#FFB3C6"
-                "Rare" -> "#C8B8E8"
-                else -> "#B5EAD7"
+                "Legendary" -> Theme.COLOR_RARITY_LEGENDARY
+                "Rare" -> Theme.COLOR_RARITY_RARE
+                else -> Theme.COLOR_RARITY_COMMON
             }
             val rarityTv = TextView(holder.card.context).apply {
                 text = if (cat.collected) cat.rarity else "???"

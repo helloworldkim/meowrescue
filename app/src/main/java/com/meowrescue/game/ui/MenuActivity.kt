@@ -29,7 +29,7 @@ class MenuActivity : AppCompatActivity() {
         repository = GameRepository(this)
 
         val rootScroll = ScrollView(this).apply {
-            setBackgroundColor(Color.parseColor("#FFF9FB"))
+            setBackgroundColor(Color.parseColor(Theme.COLOR_BACKGROUND))
         }
 
         contentLayout = LinearLayout(this).apply {
@@ -64,7 +64,7 @@ class MenuActivity : AppCompatActivity() {
             text = "Meow Rescue"
             textSize = 40f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#E08FA6"))
+            setTextColor(Color.parseColor(Theme.COLOR_TITLE_TEXT))
             gravity = Gravity.CENTER
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -92,7 +92,7 @@ class MenuActivity : AppCompatActivity() {
         }
         contentLayout.addView(playButton)
 
-        val collectionButton = makeButton("Collection", "#C8B8E8")
+        val collectionButton = makeButton("Collection", Theme.COLOR_BUTTON_COLLECTION)
         collectionButton.setOnClickListener {
             startActivity(Intent(this, CollectionActivity::class.java))
         }
@@ -147,7 +147,7 @@ class MenuActivity : AppCompatActivity() {
                 lp.bottomMargin = 16
                 layoutParams = lp
                 setPadding(24, 20, 24, 20)
-                setBackgroundColor(Color.parseColor(if (isUnlocked) "#B5EAD7" else "#CCCCCC"))
+                setBackgroundColor(Color.parseColor(if (isUnlocked) Theme.COLOR_LEVEL_UNLOCKED else Theme.COLOR_LEVEL_LOCKED))
                 if (!isUnlocked) alpha = 0.4f
                 if (isUnlocked) {
                     isClickable = true
@@ -176,7 +176,7 @@ class MenuActivity : AppCompatActivity() {
                 text = "Level $levelId"
                 textSize = 18f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor(if (isUnlocked) "#333333" else "#999999"))
+                setTextColor(Color.parseColor(if (isUnlocked) Theme.COLOR_PRIMARY_TEXT else Theme.COLOR_MUTED_TEXT))
                 val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 layoutParams = lp
             }
@@ -198,7 +198,7 @@ class MenuActivity : AppCompatActivity() {
             contentLayout.addView(row)
         }
 
-        val backButton = makeButton("Back", "#FFDAC1")
+        val backButton = makeButton("Back", Theme.COLOR_BUTTON_BACK)
         backButton.setOnClickListener { showMainMenu() }
         val lp = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,

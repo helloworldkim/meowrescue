@@ -47,6 +47,7 @@ class GameActivity : AppCompatActivity() {
         }
 
         gameEngine.loadLevel(levelData)
+        gameView.resetCallbackState()
 
         gameLoop = GameLoop(gameEngine, gameView)
 
@@ -87,7 +88,8 @@ class GameActivity : AppCompatActivity() {
 
     private fun showSuccessDialog() {
         val stars = gameEngine.calculateStars()
-        repository.saveProgress(levelId, stars, catId = null)
+        val rescuedCatId = gameEngine.cats.firstOrNull { it.isRescued }?.catId
+        repository.saveProgress(levelId, stars, catId = rescuedCatId)
 
         val dp24 = (24 * resources.displayMetrics.density).toInt()
         val starsLayout = LinearLayout(this).apply {

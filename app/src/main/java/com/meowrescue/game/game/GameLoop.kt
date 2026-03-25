@@ -16,6 +16,7 @@ class GameLoop(
     private var gameThread: Thread? = null
 
     fun start() {
+        if (running) return
         running = true
         gameThread = Thread(this).also { it.start() }
     }

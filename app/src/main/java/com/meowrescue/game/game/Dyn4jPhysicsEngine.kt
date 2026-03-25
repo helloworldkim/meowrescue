@@ -55,22 +55,25 @@ class Dyn4jPhysicsEngine {
         return body
     }
 
-    fun addSurface(surface: Surface): Body {
+    /** Creates, positions, and registers a static (infinite mass) rectangular body. */
+    private fun createStaticRectBody(cx: Double, cy: Double, w: Float, h: Float, angleDeg: Float = 0f): Body {
         val body = Body()
-        val rect = Geometry.createRectangle(pxToM(surface.width), pxToM(surface.height))
+        val rect = Geometry.createRectangle(pxToM(w), pxToM(h))
         val fixture = BodyFixture(rect)
         fixture.restitution = RESTITUTION
         fixture.friction = FRICTION_COEFF
         body.addFixture(fixture)
-        // dyn4j rectangles are centered; translate to center of surface
-        val cx = pxToM(surface.position.x + surface.width / 2f)
-        val cy = pxToM(surface.position.y + surface.height / 2f)
         body.translate(cx, cy)
-        if (surface.angle != 0f) {
-            body.rotateAboutCenter(Math.toRadians(surface.angle.toDouble()))
-        }
+        if (angleDeg != 0f) body.rotateAboutCenter(Math.toRadians(angleDeg.toDouble()))
         body.setMass(MassType.INFINITE)
         world.addBody(body)
+        return body
+    }
+
+    fun addSurface(surface: Surface): Body {
+        val cx = pxToM(surface.position.x + surface.width / 2f)
+        val cy = pxToM(surface.position.y + surface.height / 2f)
+        val body = createStaticRectBody(cx, cy, surface.width, surface.height, surface.angle)
         surfaceBodies[surface] = body
         return body
     }
@@ -90,34 +93,18 @@ class Dyn4jPhysicsEngine {
     }
 
     fun addMovingPlatform(obstacle: Obstacle.MovingPlatform): Body {
-        val body = Body()
-        val rect = Geometry.createRectangle(pxToM(obstacle.size.x), pxToM(obstacle.size.y))
-        val fixture = BodyFixture(rect)
-        fixture.restitution = RESTITUTION
-        fixture.friction = FRICTION_COEFF
-        body.addFixture(fixture)
         val cx = pxToM(obstacle.position.x + obstacle.size.x / 2f)
         val cy = pxToM(obstacle.position.y + obstacle.size.y / 2f)
-        body.translate(cx, cy)
-        body.setMass(MassType.INFINITE)
-        world.addBody(body)
+        val body = createStaticRectBody(cx, cy, obstacle.size.x, obstacle.size.y)
         obstacleBodies[obstacle] = body
         return body
     }
 
     fun addSwitchBlock(obstacle: Obstacle.SwitchBlock): Body? {
         if (!obstacle.isOn) return null
-        val body = Body()
-        val rect = Geometry.createRectangle(pxToM(obstacle.size.x), pxToM(obstacle.size.y))
-        val fixture = BodyFixture(rect)
-        fixture.restitution = RESTITUTION
-        fixture.friction = FRICTION_COEFF
-        body.addFixture(fixture)
         val cx = pxToM(obstacle.position.x + obstacle.size.x / 2f)
         val cy = pxToM(obstacle.position.y + obstacle.size.y / 2f)
-        body.translate(cx, cy)
-        body.setMass(MassType.INFINITE)
-        world.addBody(body)
+        val body = createStaticRectBody(cx, cy, obstacle.size.x, obstacle.size.y)
         obstacleBodies[obstacle] = body
         return body
     }

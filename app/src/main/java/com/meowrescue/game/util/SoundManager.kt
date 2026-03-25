@@ -5,6 +5,8 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.SoundPool
 
+// NOTE: SoundManager is initialized in MenuActivity but playEffect/playBgm/stopBgm
+// are not yet called from game code. Sound integration is planned for Phase 4.
 object SoundManager {
 
     private var soundPool: SoundPool? = null

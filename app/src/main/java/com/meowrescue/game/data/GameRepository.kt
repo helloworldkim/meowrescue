@@ -9,11 +9,14 @@ class GameRepository(context: Context) {
     private val prefs = context.getSharedPreferences("meow_rescue", MODE_PRIVATE)
 
     fun saveProgress(levelId: Int, stars: Int, catId: String?) {
+        val existing = db.userProgressDao().getProgressForLevel(levelId)
+        val bestStars = maxOf(stars, existing?.stars ?: 0)
+        val bestCat = catId ?: existing?.catUnlocked
         val progress = UserProgress(
             levelId = levelId,
-            stars = stars,
-            completed = stars > 0,
-            catUnlocked = catId
+            stars = bestStars,
+            completed = bestStars > 0,
+            catUnlocked = bestCat
         )
         db.userProgressDao().saveProgress(progress)
     }

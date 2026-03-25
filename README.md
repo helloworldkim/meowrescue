@@ -23,7 +23,7 @@ Meow Rescue는 안드로이드 하이퍼캐주얼 퍼즐 게임입니다. 플레
 - **고양이 컬렉션**: 8종의 귀여운 고양이 캐릭터 수집
 - **별점 시스템**: 핀 제거 횟수 기반 1~3성 평가
 - **진행도 저장**: Room DB로 레벨 클리어, 별점, 해금 고양이 저장
-- **스레드 안전**: UI 스레드와 게임 스레드 간 안전한 동기화
+- **스레드 안전**: `CopyOnWriteArrayList` 기반 엔티티 목록, UI/게임 스레드 간 안전한 동기화
 
 ## 난이도 구성 (GDD 4.1)
 
@@ -69,14 +69,17 @@ com.meowrescue.game
 │   ├── GameActivity.kt        // 게임 화면 (풀스크린 몰입 모드)
 │   ├── GameView.kt            // SurfaceView 비트맵 스프라이트 렌더링
 │   ├── MenuActivity.kt        // 메인 메뉴 + 동적 레벨 선택
-│   └── CollectionActivity.kt  // 고양이 컬렉션 그리드
+│   ├── CollectionActivity.kt  // 고양이 컬렉션 그리드
+│   └── Theme.kt               // UI 색상 상수 모음
 ├── data/
 │   ├── AppDatabase.kt         // Room 데이터베이스 싱글턴
 │   ├── UserProgressDao.kt     // 레벨 진행도 쿼리 DAO
 │   └── GameRepository.kt      // Room + SharedPreferences 래핑 리포지토리
+├── model/
+│   └── util/
+│       └── Vector2D.kt        // 가변 2D 벡터 (연산자 오버로드)
 └── util/
-    ├── Vector2D.kt            // 가변 2D 벡터 (연산자 오버로드)
-    ├── SoundManager.kt        // SoundPool + MediaPlayer 관리
+    ├── SoundManager.kt        // SoundPool + MediaPlayer 관리 (Phase 4 예정)
     └── ResourceManager.kt     // 리소스 로딩 유틸리티
 ```
 
