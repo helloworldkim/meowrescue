@@ -92,12 +92,16 @@ class MenuActivity : AppCompatActivity() {
             lp.topMargin = 16
             lp.bottomMargin = 16
             layoutParams = lp
-            setOnClickListener { loadAndShowLevelSelect() }
+            setOnClickListener {
+                SoundManager.playButtonTap()
+                loadAndShowLevelSelect()
+            }
         }
         contentLayout.addView(playButton)
 
         val collectionButton = makeButton("Collection", Theme.COLOR_BUTTON_COLLECTION)
         collectionButton.setOnClickListener {
+            SoundManager.playButtonTap()
             startActivity(Intent(this, CollectionActivity::class.java))
         }
         contentLayout.addView(collectionButton)
@@ -168,6 +172,7 @@ class MenuActivity : AppCompatActivity() {
                     isClickable = true
                     isFocusable = true
                     setOnClickListener {
+                        SoundManager.playButtonTap()
                         val intent = Intent(this@MenuActivity, GameActivity::class.java)
                         intent.putExtra("level_id", levelId)
                         startActivity(intent)
@@ -292,7 +297,10 @@ class MenuActivity : AppCompatActivity() {
             lp.gravity = Gravity.CENTER_HORIZONTAL
             lp.topMargin = 40
             layoutParams = lp
-            setOnClickListener { showMainMenu() }
+            setOnClickListener {
+                SoundManager.playButtonTap()
+                showMainMenu()
+            }
         }
         contentLayout.addView(homeButton)
     }
@@ -326,10 +334,16 @@ class MenuActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (showingLevelSelect) loadAndShowLevelSelect()
+        SoundManager.playBgm("menu")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        SoundManager.pauseBgm()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        SoundManager.release()
+        SoundManager.stopBgm()
     }
 }

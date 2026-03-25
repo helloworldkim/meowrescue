@@ -13,6 +13,7 @@ import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.game.GameEngine
 import com.meowrescue.game.game.GameLoop
 import com.meowrescue.game.level.LevelLoader
+import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.launch
 
 class GameActivity : AppCompatActivity() {
@@ -22,6 +23,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var gameLoop: GameLoop
     private var levelId: Int = 1
     private lateinit var repository: GameRepository
+    private var levelDifficulty: String = "tutorial"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,8 +48,21 @@ class GameActivity : AppCompatActivity() {
         }
 
         gameEngine.loadLevel(levelData)
-        gameView.setBackgroundForLevel(levelData.difficulty)
+        levelDifficulty = levelData.difficulty
+        gameView.setBackgroundForLevel(levelDifficulty)
         gameView.resetCallbackState()
+
+        // Sound: connect game events to SFX
+        gameEngine.eventListener = object : GameEngine.GameEventListener {
+            override fun onPinRemoved() = SoundManager.playPinRemove()
+            override fun onBallDestroyed(isBomb: Boolean) {
+                if (isBomb) SoundManager.playBombExplode() else SoundManager.playBallDestroy()
+            }
+            override fun onCatRescued() = SoundManager.playCatRescue()
+            override fun onTeleport() = SoundManager.playTeleport()
+            override fun onLevelSuccess() = SoundManager.playLevelClear()
+            override fun onLevelFailed() = SoundManager.playLevelFail()
+        }
 
         gameLoop = GameLoop(gameEngine, gameView)
 
@@ -58,6 +73,7 @@ class GameActivity : AppCompatActivity() {
                 repository.saveProgress(levelId, stars, catId = rescuedCatId)
             }
             runOnUiThread {
+                SoundManager.playButtonTap()
                 val intent = Intent(this, GameActivity::class.java)
                 intent.putExtra("level_id", levelId + 1)
                 startActivity(intent)
@@ -67,6 +83,7 @@ class GameActivity : AppCompatActivity() {
 
         gameView.onLevelFailed = {
             runOnUiThread {
+                SoundManager.playButtonTap()
                 val intent = Intent(this, GameActivity::class.java)
                 intent.putExtra("level_id", levelId)
                 startActivity(intent)
@@ -75,23 +92,30 @@ class GameActivity : AppCompatActivity() {
         }
 
         gameView.onNavigateHome = {
-            runOnUiThread { finish() }
+            runOnUiThread {
+                SoundManager.playButtonTap()
+                finish()
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
         gameLoop.start()
+        // Play BGM matching the level difficulty
+        SoundManager.playBgm(levelDifficulty)
     }
 
     override fun onPause() {
         super.onPause()
         gameLoop.stop()
+        SoundManager.pauseBgm()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         gameLoop.stop()
+        SoundManager.stopBgm()
     }
 
     private fun applyImmersiveMode() {

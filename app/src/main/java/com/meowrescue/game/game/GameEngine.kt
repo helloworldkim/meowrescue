@@ -15,6 +15,18 @@ class GameEngine {
 
     enum class GameState { PLAYING, SUCCESS, FAILED, PAUSED }
 
+    /** Game events for sound/UI integration */
+    interface GameEventListener {
+        fun onPinRemoved() {}
+        fun onBallDestroyed(isBomb: Boolean) {}
+        fun onCatRescued() {}
+        fun onTeleport() {}
+        fun onLevelSuccess() {}
+        fun onLevelFailed() {}
+    }
+
+    var eventListener: GameEventListener? = null
+
     @Volatile
     var gameState: GameState = GameState.PLAYING
     val balls: MutableList<Ball> = CopyOnWriteArrayList()
@@ -203,6 +215,7 @@ class GameEngine {
                         ) {
                             physics.teleportBall(ball, obstacle.target.x, obstacle.target.y)
                             teleportCooldown[ball] = TELEPORT_COOLDOWN_SECONDS
+                            eventListener?.onTeleport()
                         }
                     }
                     else -> {} // MovingPlatform/SwitchBlock handled by dyn4j
@@ -212,6 +225,7 @@ class GameEngine {
         for (ball in ballsToRemove) {
             balls.remove(ball)
             physics.removeBall(ball)
+            eventListener?.onBallDestroyed(ball is Ball.Bomb)
         }
 
         // Ball vs cat rescue
@@ -223,6 +237,7 @@ class GameEngine {
                     val dist = sqrt(dx * dx + dy * dy)
                     if (dist < ball.radius + CAT_COLLISION_RADIUS) {
                         cat.isRescued = true
+                        eventListener?.onCatRescued()
                     }
                 }
             }
@@ -242,6 +257,7 @@ class GameEngine {
             stationaryTime += deltaTime
             if (stationaryTime > DEAD_STATE_TIMEOUT) {
                 gameState = GameState.FAILED
+                eventListener?.onLevelFailed()
                 return
             }
         } else {
@@ -252,11 +268,13 @@ class GameEngine {
         val allCatsRescued = cats.isNotEmpty() && cats.all { it.isRescued }
         if (allCatsRescued) {
             gameState = GameState.SUCCESS
+            eventListener?.onLevelSuccess()
             return
         }
 
         if (balls.isEmpty() && !allCatsRescued) {
             gameState = GameState.FAILED
+            eventListener?.onLevelFailed()
         }
     }
 
@@ -271,6 +289,7 @@ class GameEngine {
         removedPinCount++
         pins.remove(pin)
         physics.removePin(pin)
+        eventListener?.onPinRemoved()
 
         // Remove surfaces linked to this pin
         val linkedSurfaces = pinSurfaceLinks.remove(pin)
