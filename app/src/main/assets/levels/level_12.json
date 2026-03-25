@@ -8,7 +8,8 @@
   "cats": [{ "x": 750, "y": 1650, "catId": "cat_012" }],
   "pins": [
     { "type": "normal", "x": 300, "y": 650 },
-    { "type": "normal", "x": 650, "y": 1050 }
+    { "type": "normal", "x": 650, "y": 1050 },
+    { "type": "normal", "x": 750, "y": 1350 }
   ],
   "obstacles": [
     { "type": "fire", "x": 150, "y": 900, "width": 180, "height": 40 }

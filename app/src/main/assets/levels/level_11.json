@@ -8,7 +8,8 @@
   "cats": [{ "x": 300, "y": 1600, "catId": "cat_011" }],
   "pins": [
     { "type": "normal", "x": 540, "y": 700 },
-    { "type": "normal", "x": 700, "y": 1100 }
+    { "type": "normal", "x": 540, "y": 1100 },
+    { "type": "normal", "x": 200, "y": 1350 }
   ],
   "obstacles": [
     { "type": "fire", "x": 400, "y": 1300, "width": 200, "height": 40 }
@@ -16,6 +17,6 @@
   "platforms": [
     { "x": 340, "y": 750, "width": 400, "height": 20, "angle": 0 },
     { "x": 340, "y": 1150, "width": 400, "height": 20, "angle": -15 },
-    { "x": 100, "y": 1400, "width": 300, "height": 20, "angle": 0 }
+    { "x": 100, "y": 1400, "width": 300, "height": 20, "angle": 8 }
   ]
 }
