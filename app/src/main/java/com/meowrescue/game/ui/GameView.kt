@@ -20,6 +20,12 @@ import com.meowrescue.game.model.Pin
 class GameView(context: Context, attrs: AttributeSet? = null) :
     SurfaceView(context, attrs), SurfaceHolder.Callback {
 
+    companion object {
+        /** Design resolution — all game coordinates are authored for this size */
+        const val DESIGN_WIDTH = 1080f
+        const val DESIGN_HEIGHT = 1920f
+    }
+
     var gameEngine: GameEngine? = null
     var onLevelComplete: (() -> Unit)? = null
     var onLevelFailed: (() -> Unit)? = null
@@ -27,6 +33,11 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
 
     private var surfaceReady = false
     private var callbackFired = false
+
+    // Virtual coordinate scaling (computed in surfaceChanged)
+    private var scale = 1f
+    private var offsetX = 0f
+    private var offsetY = 0f
 
     // Paints
     private val backgroundPaint = Paint().apply { color = Color.parseColor(Theme.COLOR_BACKGROUND_GAME) }
@@ -94,8 +105,8 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     private val btnRetryBmp = loadScaled(R.drawable.btn_retry, 90, 120)
     private val btnHomeBmp = loadScaled(R.drawable.btn_home, 90, 120)
 
-    // Background: load only the needed one (actual 512x768 = 2:3 portrait, ~7MB each)
-    private var currentBackgroundBmp: Bitmap = loadScaled(R.drawable.bg_tutorial, 1080, 1620)
+    // Background: load at design resolution (actual 512x768 = 2:3 portrait)
+    private var currentBackgroundBmp: Bitmap = loadScaled(R.drawable.bg_tutorial, 1080, 1920)
 
     // Popup overlays: actual 384x512 (3:4 portrait)
     private val popupClearBmp = loadScaled(R.drawable.popup_clear, 360, 480)
@@ -111,7 +122,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     fun setBackgroundForLevel(difficulty: String) {
         val resId = bgResMap[difficulty.lowercase()] ?: R.drawable.bg_tutorial
         val oldBmp = currentBackgroundBmp
-        currentBackgroundBmp = loadScaled(resId, 1080, 1620)
+        currentBackgroundBmp = loadScaled(resId, 1080, 1920)
         oldBmp.recycle()
     }
 
@@ -131,7 +142,15 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         surfaceReady = true
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+        // Compute uniform scale to fit design resolution into actual surface
+        val scaleX = width / DESIGN_WIDTH
+        val scaleY = height / DESIGN_HEIGHT
+        scale = minOf(scaleX, scaleY)
+        // Center the game area (letterbox on the shorter axis)
+        offsetX = (width - DESIGN_WIDTH * scale) / 2f
+        offsetY = (height - DESIGN_HEIGHT * scale) / 2f
+    }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
@@ -185,8 +204,16 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     }
 
     private fun drawFrame(canvas: Canvas, engine: GameEngine) {
-        // Background
-        val bgDestRect = RectF(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat())
+        // Fill letterbox areas with black
+        canvas.drawColor(Color.BLACK)
+
+        // Apply virtual coordinate transform: all subsequent drawing uses design coords (1080x1920)
+        canvas.save()
+        canvas.translate(offsetX, offsetY)
+        canvas.scale(scale, scale)
+
+        // Background — fills entire design area
+        val bgDestRect = RectF(0f, 0f, DESIGN_WIDTH, DESIGN_HEIGHT)
         canvas.drawBitmap(currentBackgroundBmp, null, bgDestRect, null)
 
         // Surfaces / platforms (rotate around center to match dyn4j physics)
@@ -262,15 +289,15 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         hudPaint.textAlign = Paint.Align.LEFT
         canvas.drawText("Level ${engine.levelData?.levelId ?: ""}", 20f, hudY, hudPaint)
 
-        // HUD Stars (36x48 each, 4px gap → 40px step, total 116px → offset -58)
+        // HUD Stars (36x48 each, 4px gap -> 40px step, total 116px -> offset -58)
         val stars = engine.calculateStars()
         for (i in 0 until 3) {
             val starBmp = if (i < stars) starFullBmp else starEmptyBmp
-            canvas.drawBitmap(starBmp, canvas.width / 2f - 58f + i * 40f, hudY - 36f, null)
+            canvas.drawBitmap(starBmp, DESIGN_WIDTH / 2f - 58f + i * 40f, hudY - 36f, null)
         }
 
         // Pause button (top-right)
-        canvas.drawBitmap(pauseBmp, canvas.width - pauseBmp.width - 20f, hudY - pauseBmp.height / 2f - 10f, null)
+        canvas.drawBitmap(pauseBmp, DESIGN_WIDTH - pauseBmp.width - 20f, hudY - pauseBmp.height / 2f - 10f, null)
 
         // State overlays
         when (engine.gameState) {
@@ -283,12 +310,21 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             }
             else -> {}
         }
+
+        canvas.restore()
+    }
+
+    /** Convert screen touch coordinates to design (game) coordinates */
+    private fun screenToDesign(screenX: Float, screenY: Float): Pair<Float, Float> {
+        val gameX = (screenX - offsetX) / scale
+        val gameY = (screenY - offsetY) / scale
+        return gameX to gameY
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.action == MotionEvent.ACTION_DOWN) {
-            val x = event.x
-            val y = event.y
+            // Inverse-transform touch coords from screen space to design space
+            val (x, y) = screenToDesign(event.x, event.y)
             val engine = gameEngine ?: return true
 
             when (engine.gameState) {
@@ -316,16 +352,16 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     private fun drawOverlay(canvas: Canvas, popupBmp: Bitmap, actionBtnBmp: Bitmap, showStars: Int) {
         // Semi-transparent dark overlay
         overlayPaint.color = Color.argb(120, 0, 0, 0)
-        canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), overlayPaint)
+        canvas.drawRect(0f, 0f, DESIGN_WIDTH, DESIGN_HEIGHT, overlayPaint)
 
         // Popup centered
-        val popupX = canvas.width / 2f - popupBmp.width / 2f
-        val popupY = canvas.height / 2f - popupBmp.height / 2f
+        val popupX = DESIGN_WIDTH / 2f - popupBmp.width / 2f
+        val popupY = DESIGN_HEIGHT / 2f - popupBmp.height / 2f
         canvas.drawBitmap(popupBmp, popupX, popupY, null)
 
         // Stars on popup (only if showStars > 0, 36x48 each, 40px step)
         if (showStars > 0) {
-            val startX = canvas.width / 2f - 58f
+            val startX = DESIGN_WIDTH / 2f - 58f
             for (i in 0 until 3) {
                 val starBmp = if (i < showStars) starFullBmp else starEmptyBmp
                 canvas.drawBitmap(starBmp, startX + i * 40f, popupY + 60f, null)
@@ -334,7 +370,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
 
         // btnHome left side, action button right side below popup
         val btnY = popupY + popupBmp.height - actionBtnBmp.height / 2f
-        val centerX = canvas.width / 2f
+        val centerX = DESIGN_WIDTH / 2f
         canvas.drawBitmap(btnHomeBmp, centerX - btnHomeBmp.width - 20f, btnY, null)
         canvas.drawBitmap(actionBtnBmp, centerX + 20f, btnY, null)
     }
@@ -346,9 +382,9 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         actionCallback: (() -> Unit)?
     ) {
         if (callbackFired) return
-        val popupY = height / 2f - popupBmp.height / 2f
+        val popupY = DESIGN_HEIGHT / 2f - popupBmp.height / 2f
         val btnY = popupY + popupBmp.height - actionBtnBmp.height / 2f
-        val centerX = width / 2f
+        val centerX = DESIGN_WIDTH / 2f
         val btnBottom = btnY + actionBtnBmp.height
 
         val homeLeft = centerX - btnHomeBmp.width - 20f
