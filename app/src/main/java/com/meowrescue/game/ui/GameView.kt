@@ -23,6 +23,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     var gameEngine: GameEngine? = null
     var onLevelComplete: (() -> Unit)? = null
     var onLevelFailed: (() -> Unit)? = null
+    var onNavigateHome: (() -> Unit)? = null
 
     private var surfaceReady = false
     private var callbackFired = false
@@ -53,6 +54,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         color = Color.argb(100, 0, 200, 0)
         style = Paint.Style.FILL
     }
+    private val switchOffPaint = Paint().apply { alpha = (0.4f * 255).toInt() }
 
     // Bitmap sprites
     private val ballNormalBmp = loadScaled(R.drawable.ball_normal, 60, 60)
@@ -64,11 +66,23 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     private val pinTimerBmp = loadScaled(R.drawable.pin_timer, 50, 90)
     private val pinDirectionBmp = loadScaled(R.drawable.pin_direction, 50, 90)
     private val pinLockedBmp = loadScaled(R.drawable.pin_locked, 50, 90)
+    private val pinChainBmp = loadScaled(R.drawable.pin_chain, 50, 90)
 
     private val obstacleFireBmp = loadScaled(R.drawable.obstacle_fire, 100, 100)
     private val obstacleSpikeBmp = loadScaled(R.drawable.obstacle_spike, 100, 100)
     private val platformBmp = loadScaled(R.drawable.platform, 200, 30)
     private val teleportBmp = loadScaled(R.drawable.teleport, 80, 80)
+    private val platformCloudBmp = loadScaled(R.drawable.platform_cloud, 200, 30)
+    private val switchBlockBmp = loadScaled(R.drawable.switch_block, 100, 100)
+
+    private val platformBitmaps = listOf(
+        loadScaled(R.drawable.platform_1, 200, 30),
+        loadScaled(R.drawable.platform_2, 200, 30),
+        loadScaled(R.drawable.platform_3, 200, 30),
+        loadScaled(R.drawable.platform_4, 200, 30),
+        loadScaled(R.drawable.platform_5, 200, 30),
+        loadScaled(R.drawable.platform_6, 200, 30)
+    )
 
     private val catBitmaps = listOf(
         loadScaled(R.drawable.cat_1, 80, 80),
@@ -86,6 +100,28 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     private val pauseBmp = loadScaled(R.drawable.icon_pause, 50, 50)
     private val btnNextBmp = loadScaled(R.drawable.btn_next, 240, 80)
     private val btnRetryBmp = loadScaled(R.drawable.btn_retry, 240, 80)
+    private val btnHomeBmp = loadScaled(R.drawable.btn_home, 240, 80)
+
+    // Backgrounds
+    private val bgTutorialBmp = loadScaled(R.drawable.bg_tutorial, 1080, 1920)
+    private val bgBeginnerBmp = loadScaled(R.drawable.bg_beginner, 1080, 1920)
+    private val bgIntermediateBmp = loadScaled(R.drawable.bg_intermediate, 1080, 1920)
+    private val bgAdvancedBmp = loadScaled(R.drawable.bg_advanced, 1080, 1920)
+
+    // Popup overlays
+    private val popupClearBmp = loadScaled(R.drawable.popup_clear, 600, 400)
+    private val popupFailBmp = loadScaled(R.drawable.popup_fail, 600, 400)
+
+    var currentBackgroundBmp: Bitmap = bgTutorialBmp
+
+    fun setBackgroundForLevel(difficulty: String) {
+        currentBackgroundBmp = when (difficulty.lowercase()) {
+            "beginner" -> bgBeginnerBmp
+            "intermediate" -> bgIntermediateBmp
+            "advanced" -> bgAdvancedBmp
+            else -> bgTutorialBmp
+        }
+    }
 
     private fun loadScaled(resId: Int, w: Int, h: Int): Bitmap {
         val raw = BitmapFactory.decodeResource(resources, resId)
@@ -119,16 +155,27 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         pinTimerBmp.recycle()
         pinDirectionBmp.recycle()
         pinLockedBmp.recycle()
+        pinChainBmp.recycle()
         obstacleFireBmp.recycle()
         obstacleSpikeBmp.recycle()
         platformBmp.recycle()
         teleportBmp.recycle()
+        platformCloudBmp.recycle()
+        switchBlockBmp.recycle()
+        platformBitmaps.forEach { it.recycle() }
         catBitmaps.forEach { it.recycle() }
         starFullBmp.recycle()
         starEmptyBmp.recycle()
         pauseBmp.recycle()
         btnNextBmp.recycle()
         btnRetryBmp.recycle()
+        btnHomeBmp.recycle()
+        bgTutorialBmp.recycle()
+        bgBeginnerBmp.recycle()
+        bgIntermediateBmp.recycle()
+        bgAdvancedBmp.recycle()
+        popupClearBmp.recycle()
+        popupFailBmp.recycle()
     }
 
     fun resetCallbackState() {
@@ -147,10 +194,11 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
 
     private fun drawFrame(canvas: Canvas, engine: GameEngine) {
         // Background
-        canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), backgroundPaint)
+        val bgDestRect = RectF(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat())
+        canvas.drawBitmap(currentBackgroundBmp, null, bgDestRect, null)
 
         // Surfaces / platforms (rotate around center to match dyn4j physics)
-        for (surface in engine.surfaces) {
+        for ((index, surface) in engine.surfaces.withIndex()) {
             canvas.save()
             val cx = surface.position.x + surface.width / 2f
             val cy = surface.position.y + surface.height / 2f
@@ -159,7 +207,8 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             val hw = surface.width / 2f
             val hh = surface.height / 2f
             val destRect = RectF(-hw, -hh, hw, hh)
-            canvas.drawBitmap(platformBmp, null, destRect, null)
+            val bmp = platformBitmaps[index % platformBitmaps.size]
+            canvas.drawBitmap(bmp, null, destRect, null)
             canvas.restore()
         }
 
@@ -185,7 +234,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
                         obstacle.position.x, obstacle.position.y,
                         obstacle.position.x + obstacle.size.x, obstacle.position.y + obstacle.size.y
                     )
-                    canvas.drawBitmap(platformBmp, null, destRect, null)
+                    canvas.drawBitmap(platformCloudBmp, null, destRect, null)
                 }
                 is Obstacle.Teleport -> {
                     canvas.drawBitmap(
@@ -196,12 +245,11 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
                     )
                 }
                 is Obstacle.SwitchBlock -> {
-                    obstaclePaint.color = if (obstacle.isOn) Color.parseColor("#228B22") else Color.parseColor("#CC2200")
-                    canvas.drawRect(
+                    val destRect = RectF(
                         obstacle.position.x, obstacle.position.y,
-                        obstacle.position.x + obstacle.size.x, obstacle.position.y + obstacle.size.y,
-                        obstaclePaint
+                        obstacle.position.x + obstacle.size.x, obstacle.position.y + obstacle.size.y
                     )
+                    canvas.drawBitmap(switchBlockBmp, null, destRect, if (!obstacle.isOn) switchOffPaint else null)
                 }
             }
         }
@@ -213,7 +261,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
                 is Pin.Normal -> pinNormalBmp
                 is Pin.Timer -> pinTimerBmp
                 is Pin.Directional -> pinDirectionBmp
-                is Pin.Chain -> pinNormalBmp
+                is Pin.Chain -> pinChainBmp
                 is Pin.Locked -> pinLockedBmp
             }
             canvas.drawBitmap(bmp, pin.position.x - bmp.width / 2f, pin.position.y - bmp.height / 2f, null)
@@ -258,32 +306,44 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         // State overlays
         when (engine.gameState) {
             GameEngine.GameState.SUCCESS -> {
-                overlayPaint.color = Color.argb(180, 0, 180, 80)
+                // Semi-transparent dark overlay
+                overlayPaint.color = Color.argb(120, 0, 0, 0)
                 canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), overlayPaint)
-                canvas.drawText("Level Clear!", canvas.width / 2f, canvas.height / 2f - 100f, overlayTextPaint)
+
+                // Popup clear centered
+                val popupX = canvas.width / 2f - popupClearBmp.width / 2f
+                val popupY = canvas.height / 2f - popupClearBmp.height / 2f
+                canvas.drawBitmap(popupClearBmp, popupX, popupY, null)
+
+                // Stars on popup
                 val starCount = engine.calculateStars()
                 val startX = canvas.width / 2f - 72f
                 for (i in 0 until 3) {
                     val starBmp = if (i < starCount) starFullBmp else starEmptyBmp
-                    canvas.drawBitmap(starBmp, startX + i * 72f, canvas.height / 2f - 60f, null)
+                    canvas.drawBitmap(starBmp, startX + i * 72f, popupY + 60f, null)
                 }
-                canvas.drawBitmap(
-                    btnNextBmp,
-                    canvas.width / 2f - btnNextBmp.width / 2f,
-                    canvas.height / 2f + 40f,
-                    null
-                )
+
+                // btnNext right side, btnHome left side below popup center
+                val btnY = popupY + popupClearBmp.height - btnNextBmp.height / 2f
+                val centerX = canvas.width / 2f
+                canvas.drawBitmap(btnHomeBmp, centerX - btnHomeBmp.width - 20f, btnY, null)
+                canvas.drawBitmap(btnNextBmp, centerX + 20f, btnY, null)
             }
             GameEngine.GameState.FAILED -> {
-                overlayPaint.color = Color.argb(180, 200, 40, 40)
+                // Semi-transparent dark overlay
+                overlayPaint.color = Color.argb(120, 0, 0, 0)
                 canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), overlayPaint)
-                canvas.drawText("Failed!", canvas.width / 2f, canvas.height / 2f - 80f, overlayTextPaint)
-                canvas.drawBitmap(
-                    btnRetryBmp,
-                    canvas.width / 2f - btnRetryBmp.width / 2f,
-                    canvas.height / 2f + 20f,
-                    null
-                )
+
+                // Popup fail centered
+                val popupX = canvas.width / 2f - popupFailBmp.width / 2f
+                val popupY = canvas.height / 2f - popupFailBmp.height / 2f
+                canvas.drawBitmap(popupFailBmp, popupX, popupY, null)
+
+                // btnRetry right side, btnHome left side
+                val btnY = popupY + popupFailBmp.height - btnRetryBmp.height / 2f
+                val centerX = canvas.width / 2f
+                canvas.drawBitmap(btnHomeBmp, centerX - btnHomeBmp.width - 20f, btnY, null)
+                canvas.drawBitmap(btnRetryBmp, centerX + 20f, btnY, null)
             }
             else -> {}
         }
@@ -298,14 +358,44 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             when (engine.gameState) {
                 GameEngine.GameState.SUCCESS -> {
                     if (!callbackFired) {
-                        callbackFired = true
-                        onLevelComplete?.invoke()
+                        val popupY = height / 2f - popupClearBmp.height / 2f
+                        val btnY = popupY + popupClearBmp.height - btnNextBmp.height / 2f
+                        val centerX = width / 2f
+
+                        val homeLeft = centerX - btnHomeBmp.width - 20f
+                        val homeRight = centerX - 20f
+                        val nextLeft = centerX + 20f
+                        val nextRight = centerX + 20f + btnNextBmp.width
+                        val btnBottom = btnY + btnNextBmp.height
+
+                        if (x in nextLeft..nextRight && y in btnY..btnBottom) {
+                            callbackFired = true
+                            onLevelComplete?.invoke()
+                        } else if (x in homeLeft..homeRight && y in btnY..btnBottom) {
+                            callbackFired = true
+                            onNavigateHome?.invoke()
+                        }
                     }
                 }
                 GameEngine.GameState.FAILED -> {
                     if (!callbackFired) {
-                        callbackFired = true
-                        onLevelFailed?.invoke()
+                        val popupY = height / 2f - popupFailBmp.height / 2f
+                        val btnY = popupY + popupFailBmp.height - btnRetryBmp.height / 2f
+                        val centerX = width / 2f
+
+                        val homeLeft = centerX - btnHomeBmp.width - 20f
+                        val homeRight = centerX - 20f
+                        val retryLeft = centerX + 20f
+                        val retryRight = centerX + 20f + btnRetryBmp.width
+                        val btnBottom = btnY + btnRetryBmp.height
+
+                        if (x in retryLeft..retryRight && y in btnY..btnBottom) {
+                            callbackFired = true
+                            onLevelFailed?.invoke()
+                        } else if (x in homeLeft..homeRight && y in btnY..btnBottom) {
+                            callbackFired = true
+                            onNavigateHome?.invoke()
+                        }
                     }
                 }
                 GameEngine.GameState.PLAYING -> {

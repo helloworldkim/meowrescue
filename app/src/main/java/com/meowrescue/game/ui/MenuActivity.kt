@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -131,11 +132,15 @@ class MenuActivity : AppCompatActivity() {
             R.drawable.cat_8
         )
 
+        val density = resources.displayMetrics.density
+
         for (levelId in 1..totalLevels) {
             val isUnlocked = levelId == 1 || levelId <= maxCompleted + 1
+            val isCompleted = isUnlocked && (repository.getProgress(levelId)?.stars ?: 0) > 0
             val progress = if (isUnlocked) repository.getProgress(levelId) else null
             val stars = progress?.stars ?: 0
 
+            // Outer row: cat thumbnail + level button entry side by side
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
@@ -143,11 +148,9 @@ class MenuActivity : AppCompatActivity() {
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-                lp.topMargin = 16
-                lp.bottomMargin = 16
+                lp.topMargin = 12
+                lp.bottomMargin = 12
                 layoutParams = lp
-                setPadding(24, 20, 24, 20)
-                setBackgroundColor(Color.parseColor(if (isUnlocked) Theme.COLOR_LEVEL_UNLOCKED else Theme.COLOR_LEVEL_LOCKED))
                 if (!isUnlocked) alpha = 0.4f
                 if (isUnlocked) {
                     isClickable = true
@@ -160,8 +163,8 @@ class MenuActivity : AppCompatActivity() {
                 }
             }
 
-            // Cat thumbnail (cycle through available cat drawables)
-            val dp48 = (48 * resources.displayMetrics.density).toInt()
+            // Cat thumbnail on the left
+            val dp48 = (48 * density).toInt()
             val catThumb = ImageView(this).apply {
                 setImageResource(catDrawables[(levelId - 1) % catDrawables.size])
                 scaleType = ImageView.ScaleType.FIT_CENTER
@@ -171,42 +174,113 @@ class MenuActivity : AppCompatActivity() {
             }
             row.addView(catThumb)
 
-            // Level label
+            // FrameLayout: level_button background + overlays
+            val dp56 = (56 * density).toInt()
+            val entryFrame = FrameLayout(this).apply {
+                val lp = LinearLayout.LayoutParams(0, dp56, 1f)
+                layoutParams = lp
+            }
+
+            // level_button background image
+            val buttonBg = ImageView(this).apply {
+                setImageResource(R.drawable.level_button)
+                scaleType = ImageView.ScaleType.FIT_XY
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            }
+            entryFrame.addView(buttonBg)
+
+            // Level number text overlaid on button
             val levelLabel = TextView(this).apply {
                 text = "Level $levelId"
                 textSize = 18f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.parseColor(if (isUnlocked) Theme.COLOR_PRIMARY_TEXT else Theme.COLOR_MUTED_TEXT))
-                val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                val lp = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                lp.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                lp.marginStart = (16 * density).toInt()
                 layoutParams = lp
             }
-            row.addView(levelLabel)
+            entryFrame.addView(levelLabel)
 
-            // Stars row
-            val dp24 = (24 * resources.displayMetrics.density).toInt()
+            // Stars row (right side of frame)
+            val starsLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                val lp = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                lp.gravity = Gravity.CENTER_VERTICAL or Gravity.END
+                lp.marginEnd = (8 * density).toInt()
+                layoutParams = lp
+            }
+            val dp20 = (20 * density).toInt()
             for (i in 1..3) {
                 val starImg = ImageView(this).apply {
                     setImageResource(if (i <= stars) R.drawable.star_full else R.drawable.star_empty)
                     scaleType = ImageView.ScaleType.FIT_CENTER
-                    val lp = LinearLayout.LayoutParams(dp24, dp24)
-                    lp.marginStart = 4
+                    val lp = LinearLayout.LayoutParams(dp20, dp20)
+                    lp.marginStart = 2
                     layoutParams = lp
                 }
-                row.addView(starImg)
+                starsLayout.addView(starImg)
+            }
+            entryFrame.addView(starsLayout)
+
+            // level_cleared overlay for completed levels
+            if (isCompleted) {
+                val clearedImg = ImageView(this).apply {
+                    setImageResource(R.drawable.level_cleared)
+                    scaleType = ImageView.ScaleType.FIT_END
+                    val lp = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    layoutParams = lp
+                }
+                entryFrame.addView(clearedImg)
             }
 
+            // level_locked overlay for locked levels
+            if (!isUnlocked) {
+                val lockedImg = ImageView(this).apply {
+                    setImageResource(R.drawable.level_locked)
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    val lp = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    layoutParams = lp
+                }
+                entryFrame.addView(lockedImg)
+            }
+
+            row.addView(entryFrame)
             contentLayout.addView(row)
         }
 
-        val backButton = makeButton("Back", Theme.COLOR_BUTTON_BACK)
-        backButton.setOnClickListener { showMainMenu() }
-        val lp = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
-        lp.topMargin = 32
-        backButton.layoutParams = lp
-        contentLayout.addView(backButton)
+        // Home/Back button using btn_home image
+        val dp56 = (56 * density).toInt()
+        val dp160 = (160 * density).toInt()
+        val homeButton = ImageView(this).apply {
+            setImageResource(R.drawable.btn_home)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            isClickable = true
+            isFocusable = true
+            val lp = LinearLayout.LayoutParams(dp160, dp56)
+            lp.gravity = Gravity.CENTER_HORIZONTAL
+            lp.topMargin = 32
+            layoutParams = lp
+            setOnClickListener { showMainMenu() }
+        }
+        contentLayout.addView(homeButton)
     }
 
     private fun countAvailableLevels(): Int {
