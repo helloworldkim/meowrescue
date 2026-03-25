@@ -128,7 +128,7 @@ class Dyn4jPhysicsEngine {
     private val platformDirections = mutableMapOf<Obstacle.MovingPlatform, Double>()
     private val platformOrigins = mutableMapOf<Obstacle.MovingPlatform, Double>()
 
-    fun step(deltaTime: Double) {
+    fun step(deltaTime: Double): Boolean {
         // Update moving platforms before physics step
         for ((obstacle, body) in obstacleBodies) {
             if (obstacle is Obstacle.MovingPlatform) {
@@ -136,16 +136,28 @@ class Dyn4jPhysicsEngine {
             }
         }
 
+        // Record pre-step Y velocities to detect bounces
+        val preVelocities = ballBodies.mapValues { (_, body) -> body.linearVelocity.y }
+
         // Step the dyn4j physics world
         world.update(deltaTime)
 
         // Sync ball positions from physics bodies back to game model
+        // and detect bounces (Y velocity reversal from downward to upward)
+        var bounced = false
         for ((ball, body) in ballBodies) {
+            val preVy = preVelocities[ball] ?: 0.0
+            val postVy = body.linearVelocity.y
+            // Bounce = was moving down (vy > 0) and now moving up (vy < 0) with enough force
+            if (preVy > 0.5 && postVy < -0.3) {
+                bounced = true
+            }
             ball.position.x = mToPx(body.worldCenter.x)
             ball.position.y = mToPx(body.worldCenter.y)
             ball.velocity.x = mToPx(body.linearVelocity.x)
             ball.velocity.y = mToPx(body.linearVelocity.y)
         }
+        return bounced
     }
 
     private fun updateMovingPlatform(platform: Obstacle.MovingPlatform, body: Body, dt: Double) {

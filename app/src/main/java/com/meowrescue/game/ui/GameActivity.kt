@@ -59,6 +59,7 @@ class GameActivity : AppCompatActivity() {
             override fun onBallDestroyed(isBomb: Boolean) {
                 if (isBomb) SoundManager.playBombExplode() else SoundManager.playBallDestroy()
             }
+            override fun onBallBounce() = SoundManager.playBallBounce()
             override fun onCatRescued() = SoundManager.playCatRescue()
             override fun onTeleport() = SoundManager.playTeleport()
             override fun onLevelSuccess() = SoundManager.playLevelClear()

@@ -53,19 +53,19 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     }
     private val switchOffPaint = Paint().apply { alpha = (0.4f * 255).toInt() }
 
-    // Bitmap sprites (sizes preserve actual image aspect ratios)
+    // Bitmap sprites (sizes scaled up for visibility in design coords)
     // Balls: actual 768x512 (3:2) — keep square for circular physics objects
-    private val ballNormalBmp = loadScaled(R.drawable.ball_normal, 60, 60)
-    private val ballFireBmp = loadScaled(R.drawable.ball_fire, 60, 60)
-    private val ballIronBmp = loadScaled(R.drawable.ball_iron, 72, 72)
-    private val ballBombBmp = loadScaled(R.drawable.ball_bomb, 80, 80)
+    private val ballNormalBmp = loadScaled(R.drawable.ball_normal, 80, 80)
+    private val ballFireBmp = loadScaled(R.drawable.ball_fire, 80, 80)
+    private val ballIronBmp = loadScaled(R.drawable.ball_iron, 96, 96)
+    private val ballBombBmp = loadScaled(R.drawable.ball_bomb, 104, 104)
 
     // Pins: actual 384x563 (2:3 portrait), pin_timer 614x461 (4:3)
-    private val pinNormalBmp = loadScaled(R.drawable.pin_normal, 40, 58)
-    private val pinTimerBmp = loadScaled(R.drawable.pin_timer, 58, 44)
-    private val pinDirectionBmp = loadScaled(R.drawable.pin_direction, 40, 58)
-    private val pinLockedBmp = loadScaled(R.drawable.pin_locked, 40, 58)
-    private val pinChainBmp = loadScaled(R.drawable.pin_chain, 40, 58)
+    private val pinNormalBmp = loadScaled(R.drawable.pin_normal, 54, 78)
+    private val pinTimerBmp = loadScaled(R.drawable.pin_timer, 78, 58)
+    private val pinDirectionBmp = loadScaled(R.drawable.pin_direction, 54, 78)
+    private val pinLockedBmp = loadScaled(R.drawable.pin_locked, 54, 78)
+    private val pinChainBmp = loadScaled(R.drawable.pin_chain, 54, 78)
 
     // Obstacles: fire/spike 512x512 (1:1), teleport/switch 768x512 (3:2)
     private val obstacleFireBmp = loadScaled(R.drawable.obstacle_fire, 100, 100)
@@ -86,14 +86,14 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
 
     // Cats: actual 384x512 (3:4 portrait)
     private val catBitmaps = listOf(
-        loadScaled(R.drawable.cat_1, 60, 80),
-        loadScaled(R.drawable.cat_2, 60, 80),
-        loadScaled(R.drawable.cat_3, 60, 80),
-        loadScaled(R.drawable.cat_4, 60, 80),
-        loadScaled(R.drawable.cat_5, 60, 80),
-        loadScaled(R.drawable.cat_6, 60, 80),
-        loadScaled(R.drawable.cat_7, 60, 80),
-        loadScaled(R.drawable.cat_8, 60, 80)
+        loadScaled(R.drawable.cat_1, 80, 106),
+        loadScaled(R.drawable.cat_2, 80, 106),
+        loadScaled(R.drawable.cat_3, 80, 106),
+        loadScaled(R.drawable.cat_4, 80, 106),
+        loadScaled(R.drawable.cat_5, 80, 106),
+        loadScaled(R.drawable.cat_6, 80, 106),
+        loadScaled(R.drawable.cat_7, 80, 106),
+        loadScaled(R.drawable.cat_8, 80, 106)
     )
 
     // Stars: actual 384x512 (3:4 portrait)

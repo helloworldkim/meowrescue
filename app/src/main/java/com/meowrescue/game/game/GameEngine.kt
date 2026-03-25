@@ -19,6 +19,7 @@ class GameEngine {
     interface GameEventListener {
         fun onPinRemoved() {}
         fun onBallDestroyed(isBomb: Boolean) {}
+        fun onBallBounce() {}
         fun onCatRescued() {}
         fun onTeleport() {}
         fun onLevelSuccess() {}
@@ -181,7 +182,8 @@ class GameEngine {
         }
 
         // Step dyn4j physics simulation
-        physics.step(deltaTime.toDouble())
+        val bounced = physics.step(deltaTime.toDouble())
+        if (bounced) eventListener?.onBallBounce()
 
         // --- Game logic checks (sensors) ---
 
