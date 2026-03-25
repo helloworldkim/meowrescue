@@ -9,6 +9,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.game.GameEngine
 import com.meowrescue.game.game.GameLoop
@@ -66,6 +67,10 @@ class GameActivity : AppCompatActivity() {
 
         gameLoop = GameLoop(gameEngine, gameView)
 
+        // Preload ads
+        AdManager.loadInterstitial(this)
+        AdManager.loadRewarded(this)
+
         gameView.onLevelComplete = {
             runOnUiThread {
                 val stars = gameEngine.calculateStars()
@@ -74,27 +79,51 @@ class GameActivity : AppCompatActivity() {
                     repository.saveProgress(levelId, stars, catId = rescuedCatId)
                 }
                 SoundManager.playButtonTap()
-                val nextLevel = levelId + 1
-                val maxLevel = gameView.let {
-                    try { LevelLoader.loadLevel(this, nextLevel); nextLevel }
-                    catch (_: Exception) { levelId }
+                val goToNext = {
+                    val nextLevel = levelId + 1
+                    val maxLevel = try {
+                        LevelLoader.loadLevel(this, nextLevel); nextLevel
+                    } catch (_: Exception) { levelId }
+                    if (maxLevel > levelId) {
+                        val intent = Intent(this, GameActivity::class.java)
+                        intent.putExtra("level_id", nextLevel)
+                        startActivity(intent)
+                    }
+                    finish()
                 }
-                if (maxLevel > levelId) {
-                    val intent = Intent(this, GameActivity::class.java)
-                    intent.putExtra("level_id", nextLevel)
-                    startActivity(intent)
+                if (AdManager.shouldShowInterstitial(levelId)) {
+                    AdManager.showInterstitial(this) { goToNext() }
+                } else {
+                    goToNext()
                 }
-                finish()
             }
         }
 
         gameView.onLevelFailed = {
             runOnUiThread {
                 SoundManager.playButtonTap()
-                val intent = Intent(this, GameActivity::class.java)
-                intent.putExtra("level_id", levelId)
-                startActivity(intent)
-                finish()
+                val restartLevel = {
+                    val intent = Intent(this, GameActivity::class.java)
+                    intent.putExtra("level_id", levelId)
+                    startActivity(intent)
+                    finish()
+                }
+                if (AdManager.isRewardedReady()) {
+                    android.app.AlertDialog.Builder(this)
+                        .setTitle("Continue?")
+                        .setMessage("Watch an ad to retry this level!")
+                        .setPositiveButton("Watch Ad") { _, _ ->
+                            AdManager.showRewarded(this,
+                                onRewarded = { restartLevel() },
+                                onDismissed = { restartLevel() }
+                            )
+                        }
+                        .setNegativeButton("Skip") { _, _ -> restartLevel() }
+                        .setCancelable(false)
+                        .show()
+                } else {
+                    restartLevel()
+                }
             }
         }
 

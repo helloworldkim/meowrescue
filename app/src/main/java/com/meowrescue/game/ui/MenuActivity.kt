@@ -13,7 +13,9 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
+import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.data.UserProgress
 import com.meowrescue.game.util.SoundManager
@@ -24,14 +26,22 @@ class MenuActivity : AppCompatActivity() {
     private lateinit var repository: GameRepository
     private var showingLevelSelect = false
     private lateinit var contentLayout: LinearLayout
+    private var bannerAd: AdView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SoundManager.init(this)
         repository = GameRepository(this)
 
-        val rootScroll = ScrollView(this).apply {
+        val rootLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor(Theme.COLOR_BACKGROUND))
+        }
+
+        val rootScroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
         }
 
         contentLayout = LinearLayout(this).apply {
@@ -40,7 +50,17 @@ class MenuActivity : AppCompatActivity() {
             setPadding(48, 80, 48, 80)
         }
         rootScroll.addView(contentLayout)
-        setContentView(rootScroll)
+        rootLayout.addView(rootScroll)
+
+        // Banner ad at bottom
+        bannerAd = AdManager.createBannerAd(this)
+        val bannerParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { gravity = Gravity.CENTER_HORIZONTAL }
+        rootLayout.addView(bannerAd, bannerParams)
+
+        setContentView(rootLayout)
 
         showMainMenu()
     }
@@ -328,16 +348,19 @@ class MenuActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        bannerAd?.resume()
         if (showingLevelSelect) loadAndShowLevelSelect()
         SoundManager.playBgm("menu")
     }
 
     override fun onPause() {
         super.onPause()
+        bannerAd?.pause()
         SoundManager.pauseBgm()
     }
 
     override fun onDestroy() {
+        bannerAd?.destroy()
         super.onDestroy()
         SoundManager.stopBgm()
     }

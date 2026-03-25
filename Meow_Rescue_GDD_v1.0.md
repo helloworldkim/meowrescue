@@ -166,7 +166,7 @@
 | **렌더링** | Android Canvas / SurfaceView |
 | **물리 엔진** | dyn4j 5.0.2 (2D 물리 라이브러리) |
 | **데이터 저장** | Room DB + SharedPreferences |
-| **광고** | Google AdMob SDK (미구현, 추후 연동 예정) |
+| **광고** | Google AdMob SDK (전면/보상형/배너 광고 구현 완료) |
 | **분석** | Firebase Analytics (미구현, 추후 연동 예정) |
 | **앱 보안** | Google Play Integrity API (미구현, 추후 연동 예정) |
 | **최소 버전** | Android API 24 (Android 7.0) |
@@ -176,7 +176,9 @@
 
 ```
 com.meowrescue.game
-├── MeowRescueApp.kt              // Application 클래스 (초기화)
+├── MeowRescueApp.kt              // Application 클래스 (초기화, AdMob SDK 초기화)
+├── ads/
+│   └── AdManager.kt              // AdMob 광고 중앙 관리 (전면/보상형/배너, 빈도 제어)
 ├── game/
 │   ├── GameEngine.kt              // 게임 상태 관리 + GameEventListener
 │   ├── GameLoop.kt                // 60 FPS 게임 스레드
@@ -206,7 +208,7 @@ com.meowrescue.game
     └── SoundManager.kt            // SoundPool(SFX 11종) + MediaPlayer(BGM 5종) 사운드 관리
 ```
 
-> **참고**: `ads/AdManager.kt`는 아직 미구현 상태입니다. AdMob 연동은 Phase 3에서 진행 예정입니다.
+> **참고**: `ads/AdManager.kt`에 AdMob 전면/보상형/배너 광고가 구현되어 있습니다. 광고 정책(첫 5레벨 광고 없음, 3레벨 간격, 세션당 상한 10회)이 적용되어 있습니다.
 
 ### 6.3 핵심 모델 설계 (Kotlin)
 
