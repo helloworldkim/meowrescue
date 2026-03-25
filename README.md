@@ -48,7 +48,7 @@ Meow Rescue는 안드로이드 하이퍼캐주얼 퍼즐 게임입니다. 플레
 | 데이터베이스 | Room 2.6.1 |
 | JDK | 21 |
 | 최소 SDK | API 24 (Android 7.0) |
-| 타겟 SDK | API 34 |
+| 타겟 SDK | API 35 (Android 15) |
 
 ## 프로젝트 구조
 

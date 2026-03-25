@@ -3,32 +3,134 @@
   "name": "궁극의 도전",
   "difficulty": "hard",
   "maxPins": 5,
-  "stars": { "one": 999, "two": 6, "three": 5 },
-  "balls": [{ "type": "bomb", "x": 540, "y": 200 }],
+  "stars": {
+    "one": 999,
+    "two": 6,
+    "three": 5
+  },
+  "balls": [
+    {
+      "type": "bomb",
+      "x": 540,
+      "y": 200
+    }
+  ],
   "cats": [
-    { "x": 200, "y": 1530, "catId": "cat_100" },
-    { "x": 540, "y": 1590, "catId": "cat_100b" },
-    { "x": 860, "y": 1530, "catId": "cat_100c" }
+    {
+      "x": 871,
+      "y": 705,
+      "catId": "cat_100"
+    },
+    {
+      "x": 681,
+      "y": 1195,
+      "catId": "cat_100b"
+    },
+    {
+      "x": 660,
+      "y": 1530,
+      "catId": "cat_100c"
+    }
   ],
   "pins": [
-    { "type": "normal", "x": 540, "y": 420 },
-    { "type": "normal", "x": 140, "y": 680 },
-    { "type": "normal", "x": 940, "y": 950 },
-    { "type": "normal", "x": 155, "y": 1190 },
-    { "type": "normal", "x": 810, "y": 1400 }
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 420
+    },
+    {
+      "type": "normal",
+      "x": 140,
+      "y": 680
+    },
+    {
+      "type": "normal",
+      "x": 940,
+      "y": 950
+    },
+    {
+      "type": "normal",
+      "x": 155,
+      "y": 1190
+    },
+    {
+      "type": "normal",
+      "x": 810,
+      "y": 1400
+    }
   ],
   "obstacles": [
-    { "type": "fire", "x": 230, "y": 525, "width": 300, "height": 40 },
-    { "type": "teleport", "x": 100, "y": 775, "width": 80, "height": 80 },
-    { "type": "spike", "x": 740, "y": 1050, "width": 200, "height": 40 },
-    { "type": "teleport", "x": 100, "y": 1285, "width": 80, "height": 80 },
-    { "type": "moving_platform", "x": 610, "y": 1475, "width": 200, "height": 30 }
+    {
+      "type": "fire",
+      "x": 230,
+      "y": 525,
+      "width": 300,
+      "height": 40
+    },
+    {
+      "type": "teleport",
+      "x": 100,
+      "y": 775,
+      "width": 80,
+      "height": 80
+    },
+    {
+      "type": "spike",
+      "x": 740,
+      "y": 1050,
+      "width": 200,
+      "height": 40
+    },
+    {
+      "type": "teleport",
+      "x": 100,
+      "y": 1285,
+      "width": 80,
+      "height": 80
+    },
+    {
+      "type": "moving_platform",
+      "x": 610,
+      "y": 1475,
+      "width": 200,
+      "height": 30
+    }
   ],
   "platforms": [
-    { "x": 390, "y": 440, "width": 300, "height": 20, "angle": 35 },
-    { "x": 100, "y": 700, "width": 200, "height": 20, "angle": 0 },
-    { "x": 790, "y": 970, "width": 300, "height": 20, "angle": -35 },
-    { "x": 100, "y": 1210, "width": 200, "height": 20, "angle": 0 },
-    { "x": 660, "y": 1420, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 390,
+      "y": 440,
+      "width": 300,
+      "height": 20,
+      "angle": 12
+    },
+    {
+      "x": 100,
+      "y": 700,
+      "width": 200,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 790,
+      "y": 970,
+      "width": 300,
+      "height": 20,
+      "angle": -5
+    },
+    {
+      "x": 100,
+      "y": 1210,
+      "width": 200,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 660,
+      "y": 1420,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

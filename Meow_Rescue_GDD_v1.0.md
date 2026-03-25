@@ -1,4 +1,4 @@
-# 🐱 Meow Rescue — Game Design Document (GDD) v1.0
+# 🐱 Meow Rescue — Game Design Document (GDD) v1.1
 
 > **핀을 빼서 공을 굴려 고양이를 구출하는 물리 퍼즐 게임**
 
@@ -111,8 +111,8 @@
 | **튜토리얼** | 1~10 | 핀 1~2개, 장애물 없음 | 조작법 학습 |
 | **초급** | 11~30 | 핀 2~3개, 불/가시 등장 | 순서 퍼즐 이해 |
 | **중급** | 31~60 | 타이머 핀, 움직이는 바닥 | 타이밍 + 전략 |
-| **상급** | 61~100 | 연쇄 핀, 텔레포트, 특수 공 | 복합 퍼즐 |
-| **마스터** | 101+ | 모든 요소 복합 | 도전 요소 |
+| **상급** | 61~90 | 연쇄 핀, 텔레포트, 특수 공 | 복합 퍼즐 |
+| **보스** | 91~100 | 멀티캣, 스킵-플랫폼 패턴 | 최종 도전 |
 
 ### 4.2 별점 시스템
 
@@ -120,13 +120,14 @@
 - ⭐⭐ **2성**: 제한된 핀 빼기 횟수 이내로 클리어
 - ⭐⭐⭐ **3성**: 최소 핀 빼기로 클리어 (Perfect)
 
-### 4.3 보스 스테이지
+### 4.3 보스 스테이지 (레벨 91~100)
 
-매 10레벨마다 보스 스테이지가 등장합니다:
-- 일반 스테이지보다 크고 복잡한 맵
-- 여러 마리의 고양이를 동시에 구출
+마지막 10레벨은 멀티캣 보스 스테이지입니다:
+- 2~3마리의 고양이를 **하나의 공**으로 순차 구출
+- **스킵-플랫폼 패턴**: 5개 플랫폼 중 Plat1→Plat3→Plat5만 활용하는 경로
+- Plat1(+12°)에서 공이 오른쪽으로 튀어 Cat1 구출, Plat3(-5°)에서 왼쪽으로 튀어 Cat2/Cat3 구출
 - 클리어 시 **희귀/전설 고양이** 획득
-- 특별한 클리어 연출과 보상
+- 레벨 91~98: 고양이 2마리, 레벨 99~100: 고양이 3마리
 
 ---
 
@@ -165,45 +166,47 @@
 | **렌더링** | Android Canvas / SurfaceView |
 | **물리 엔진** | dyn4j 5.0.2 (2D 물리 라이브러리) |
 | **데이터 저장** | Room DB + SharedPreferences |
-| **광고** | Google AdMob SDK |
-| **분석** | Firebase Analytics |
-| **앱 보안** | Google Play Integrity API |
+| **광고** | Google AdMob SDK (미구현, 추후 연동 예정) |
+| **분석** | Firebase Analytics (미구현, 추후 연동 예정) |
+| **앱 보안** | Google Play Integrity API (미구현, 추후 연동 예정) |
 | **최소 버전** | Android API 24 (Android 7.0) |
+| **컴파일/타겟 SDK** | API 36 (Android 16) |
 
 ### 6.2 프로젝트 패키지 구조
 
 ```
 com.meowrescue.game
+├── MeowRescueApp.kt              // Application 클래스 (초기화)
 ├── game/
-│   ├── GameEngine.kt          // 게임 상태 관리 + GameEventListener
-│   ├── GameLoop.kt            // 60 FPS 게임 스레드
-│   └── Dyn4jPhysicsEngine.kt  // dyn4j 물리 월드 래퍼 (중력, 충돌, 바운스)
+│   ├── GameEngine.kt              // 게임 상태 관리 + GameEventListener
+│   ├── GameLoop.kt                // 60 FPS 게임 스레드
+│   └── Dyn4jPhysicsEngine.kt     // dyn4j 물리 월드 래퍼 (중력, 충돌, 바운스)
 ├── model/
-│   ├── Pin.kt                 // 핀 데이터 클래스 (sealed class)
-│   ├── Ball.kt                // 공 데이터 클래스
-│   ├── Cat.kt                 // 고양이 데이터 클래스
-│   ├── Obstacle.kt            // 장애물 데이터 클래스 (sealed class)
-│   ├── Surface.kt             // 플랫폼 데이터 (위치, 크기, 각도)
+│   ├── Pin.kt                     // 핀 데이터 클래스 (sealed class)
+│   ├── Ball.kt                    // 공 데이터 클래스
+│   ├── Cat.kt                     // 고양이 데이터 클래스
+│   ├── Obstacle.kt                // 장애물 데이터 클래스 (sealed class)
+│   ├── Surface.kt                 // 플랫폼 데이터 (위치, 크기, 각도)
 │   └── util/
-│       └── Vector2D.kt        // 가변 2D 벡터 (연산자 오버로드)
+│       └── Vector2D.kt            // 가변 2D 벡터 (연산자 오버로드)
 ├── level/
-│   ├── LevelData.kt           // 레벨 데이터 모델
-│   └── LevelLoader.kt         // JSON 기반 레벨 로더
+│   ├── LevelData.kt               // 레벨 데이터 모델
+│   └── LevelLoader.kt             // JSON 기반 레벨 로더
 ├── ui/
-│   ├── GameActivity.kt        // 게임 화면 Activity
-│   ├── GameView.kt            // SurfaceView 기반 게임 렌더링 + 오버레이
-│   ├── MenuActivity.kt        // 메인 메뉴 + 지그재그 레벨맵
-│   ├── CollectionActivity.kt  // 고양이 컬렉션 화면
-│   └── Theme.kt               // UI 색상 상수 모음
-├── ads/
-│   └── AdManager.kt           // AdMob 초기화 및 광고 로드/표시
+│   ├── GameActivity.kt            // 게임 화면 Activity
+│   ├── GameView.kt                // SurfaceView 기반 게임 렌더링 + 오버레이
+│   ├── MenuActivity.kt            // 메인 메뉴 + 지그재그 레벨맵
+│   ├── CollectionActivity.kt      // 고양이 컬렉션 화면
+│   └── Theme.kt                   // UI 색상 상수 모음
 ├── data/
-│   ├── GameRepository.kt      // 데이터 접근 레이어
-│   ├── UserProgressDao.kt     // Room DAO (유저 진행도)
-│   └── AppDatabase.kt         // Room Database
+│   ├── GameRepository.kt          // 데이터 접근 레이어
+│   ├── UserProgressDao.kt         // Room DAO (유저 진행도)
+│   └── AppDatabase.kt             // Room Database
 └── util/
-    └── SoundManager.kt        // SoundPool(SFX 11종) + MediaPlayer(BGM 5종) 사운드 관리
+    └── SoundManager.kt            // SoundPool(SFX 11종) + MediaPlayer(BGM 5종) 사운드 관리
 ```
+
+> **참고**: `ads/AdManager.kt`는 아직 미구현 상태입니다. AdMob 연동은 Phase 3에서 진행 예정입니다.
 
 ### 6.3 핵심 모델 설계 (Kotlin)
 
@@ -273,35 +276,70 @@ class Dyn4jPhysicsEngine {
 - **중력**: 9.8 m/s² (Y-down 좌표계)
 - **연속 충돌 감지**: 고속 공의 터널링 방지
 - **경사면 물리**: 각도에 따른 자연스러운 슬라이딩
+- **플랫폼 각도**: 양수 = 시계방향(공이 오른쪽으로), 음수 = 반시계방향(공이 왼쪽으로)
+
+**충돌 및 경계 상수:**
+
+| 상수 | 값 | 설명 |
+|------|-----|------|
+| `CAT_COLLISION_RADIUS` | 30px | 고양이 구출 판정 반경 |
+| `Ball.Normal.radius` | 15px | 일반 공 반지름 |
+| `Ball.Fire.radius` | 15px | 불공 반지름 |
+| `Ball.Iron.radius` | 18px | 철공 반지름 |
+| `Ball.Bomb.radius` | 20px | 폭탄 공 반지름 |
+| `OUT_RIGHT` | 1200px | 오른쪽 화면 밖 경계 |
+| `OUT_LEFT` | -100px | 왼쪽 화면 밖 경계 |
+| `OUT_BOTTOM` | 2200px | 아래쪽 화면 밖 경계 |
+| 텔레포트 타겟 | `pos.x + 200, pos.y` | 텔레포트 시 X +200px 이동 |
+| 무빙 플랫폼 | speed=100, range=150 | 좌우 ±150px 진동 |
 
 ### 6.5 레벨 데이터 형식 (JSON)
 
 ```json
 {
-  "levelId": 1,
-  "name": "첫 번째 구출",
+  "levelId": 5,
+  "name": "지그재그 낙하",
   "difficulty": "tutorial",
-  "maxPins": 1,
-  "stars": {
-    "one": 999,
-    "two": 2,
-    "three": 1
-  },
-  "balls": [
-    { "type": "normal", "x": 200, "y": 100 }
-  ],
-  "cats": [
-    { "x": 200, "y": 700, "catId": "cat_001" }
-  ],
+  "maxPins": 2,
+  "stars": { "one": 999, "two": 3, "three": 2 },
+  "balls": [{ "type": "normal", "x": 300, "y": 200 }],
+  "cats": [{ "x": 700, "y": 1650, "catId": "cat_005" }],
   "pins": [
-    { "type": "normal", "x": 200, "y": 400 }
+    { "type": "normal", "x": 350, "y": 580 },
+    { "type": "normal", "x": 650, "y": 1020 }
   ],
   "obstacles": [],
   "platforms": [
-    { "x": 100, "y": 450, "width": 200, "height": 20, "angle": 0 }
+    { "x": 180, "y": 600, "width": 380, "height": 20, "angle": 8 },
+    { "x": 480, "y": 1040, "width": 380, "height": 20, "angle": 5 }
   ]
 }
 ```
+
+**필드 설명:**
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `levelId` | int | 레벨 번호 (1~100) |
+| `difficulty` | string | `tutorial`, `easy`, `medium`, `hard` |
+| `maxPins` | int | 최대 핀 빼기 횟수 |
+| `stars.one/two/three` | int | 별점 기준 (핀 빼기 횟수) |
+| `balls[].type` | string | `normal`, `fire`, `iron`, `bomb` |
+| `cats[].catId` | string | 고양이 고유 ID (`cat_001` ~ `cat_100c`) |
+| `pins[].type` | string | `normal` (추후 `timer`, `directional` 등 확장) |
+| `obstacles[].type` | string | `fire`, `spike`, `moving_platform`, `teleport`, `switch_block` |
+| `platforms[].angle` | float | 플랫폼 기울기 (양수=오른쪽, 음수=왼쪽, 0=수평) |
+
+### 6.6 레벨 설계 패턴
+
+**싱글캣 레벨 (1~90):** 공 1개 → 플랫폼 경유 → 고양이 1마리 구출
+- 플랫폼 각도를 통해 고양이 방향으로 공을 유도
+- 올-플랫(angle=0) 레벨은 반드시 cat_x ≈ ball_x 로 설계
+
+**멀티캣 보스 레벨 (91~100):** 공 1개 → 여러 고양이 순차 구출
+- **스킵-플랫폼 패턴**: Plat1(+12°) → Plat3(-5°) → Plat5(0°) 경로
+- Cat1: Plat1→Plat3 자유낙하 궤적 위에 배치
+- Cat2/Cat3: 마지막 플랫폼 아래에 배치
 
 ---
 
@@ -419,5 +457,5 @@ class Dyn4jPhysicsEngine {
 
 ---
 
-*Meow Rescue GDD v1.0 — 2026.03*
+*Meow Rescue GDD v1.1 — 2026.03*
 *Platform: Android (Kotlin) | Genre: Hyper-Casual Puzzle*

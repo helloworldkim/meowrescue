@@ -3,31 +3,129 @@
   "name": "극한 도전",
   "difficulty": "hard",
   "maxPins": 5,
-  "stars": { "one": 999, "two": 6, "three": 5 },
-  "balls": [{ "type": "iron", "x": 540, "y": 200 }],
+  "stars": {
+    "one": 999,
+    "two": 6,
+    "three": 5
+  },
+  "balls": [
+    {
+      "type": "iron",
+      "x": 540,
+      "y": 200
+    }
+  ],
   "cats": [
-    { "x": 250, "y": 1560, "catId": "cat_093" },
-    { "x": 780, "y": 1600, "catId": "cat_093b" }
+    {
+      "x": 868,
+      "y": 715,
+      "catId": "cat_093"
+    },
+    {
+      "x": 590,
+      "y": 1600,
+      "catId": "cat_093b"
+    }
   ],
   "pins": [
-    { "type": "normal", "x": 540, "y": 440 },
-    { "type": "normal", "x": 180, "y": 690 },
-    { "type": "normal", "x": 870, "y": 950 },
-    { "type": "normal", "x": 200, "y": 1190 },
-    { "type": "normal", "x": 740, "y": 1410 }
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 440
+    },
+    {
+      "type": "normal",
+      "x": 180,
+      "y": 690
+    },
+    {
+      "type": "normal",
+      "x": 870,
+      "y": 950
+    },
+    {
+      "type": "normal",
+      "x": 200,
+      "y": 1190
+    },
+    {
+      "type": "normal",
+      "x": 740,
+      "y": 1410
+    }
   ],
   "obstacles": [
-    { "type": "moving_platform", "x": 350, "y": 555, "width": 200, "height": 30 },
-    { "type": "teleport", "x": 100, "y": 785, "width": 80, "height": 80 },
-    { "type": "spike", "x": 670, "y": 1050, "width": 200, "height": 40 },
-    { "type": "moving_platform", "x": 100, "y": 1260, "width": 200, "height": 30 },
-    { "type": "fire", "x": 540, "y": 1500, "width": 200, "height": 40 }
+    {
+      "type": "moving_platform",
+      "x": 350,
+      "y": 555,
+      "width": 200,
+      "height": 30
+    },
+    {
+      "type": "teleport",
+      "x": 100,
+      "y": 785,
+      "width": 80,
+      "height": 80
+    },
+    {
+      "type": "spike",
+      "x": 670,
+      "y": 1050,
+      "width": 200,
+      "height": 40
+    },
+    {
+      "type": "moving_platform",
+      "x": 100,
+      "y": 1260,
+      "width": 200,
+      "height": 30
+    },
+    {
+      "type": "fire",
+      "x": 540,
+      "y": 1500,
+      "width": 200,
+      "height": 40
+    }
   ],
   "platforms": [
-    { "x": 390, "y": 460, "width": 300, "height": 20, "angle": 0 },
-    { "x": 100, "y": 710, "width": 200, "height": 20, "angle": 0 },
-    { "x": 720, "y": 970, "width": 300, "height": 20, "angle": 0 },
-    { "x": 100, "y": 1210, "width": 200, "height": 20, "angle": 0 },
-    { "x": 590, "y": 1430, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 390,
+      "y": 460,
+      "width": 300,
+      "height": 20,
+      "angle": 12
+    },
+    {
+      "x": 100,
+      "y": 710,
+      "width": 200,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 720,
+      "y": 970,
+      "width": 300,
+      "height": 20,
+      "angle": -5
+    },
+    {
+      "x": 100,
+      "y": 1210,
+      "width": 200,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 590,
+      "y": 1430,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

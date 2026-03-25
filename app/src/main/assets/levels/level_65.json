@@ -3,22 +3,86 @@
   "name": "공간 왜곡",
   "difficulty": "hard",
   "maxPins": 3,
-  "stars": { "one": 999, "two": 4, "three": 3 },
-  "balls": [{ "type": "normal", "x": 150, "y": 250 }],
-  "cats": [{ "x": 800, "y": 1620, "catId": "cat_065" }],
+  "stars": {
+    "one": 999,
+    "two": 4,
+    "three": 3
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 150,
+      "y": 250
+    }
+  ],
+  "cats": [
+    {
+      "x": 800,
+      "y": 1620,
+      "catId": "cat_065"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 200, "y": 550 },
-    { "type": "normal", "x": 600, "y": 900 },
-    { "type": "normal", "x": 400, "y": 1200 }
+    {
+      "type": "normal",
+      "x": 200,
+      "y": 550
+    },
+    {
+      "type": "normal",
+      "x": 600,
+      "y": 900
+    },
+    {
+      "type": "normal",
+      "x": 400,
+      "y": 1200
+    }
   ],
   "obstacles": [
-    { "type": "teleport", "x": 500, "y": 650, "width": 80, "height": 80 },
-    { "type": "moving_platform", "x": 300, "y": 1050, "width": 200, "height": 30 },
-    { "type": "spike", "x": 600, "y": 1380, "width": 200, "height": 40 }
+    {
+      "type": "teleport",
+      "x": 500,
+      "y": 650,
+      "width": 80,
+      "height": 80
+    },
+    {
+      "type": "moving_platform",
+      "x": 300,
+      "y": 1050,
+      "width": 200,
+      "height": 30
+    },
+    {
+      "type": "spike",
+      "x": 600,
+      "y": 1380,
+      "width": 200,
+      "height": 40
+    }
   ],
   "platforms": [
-    { "x": 100, "y": 570, "width": 200, "height": 20, "angle": 0 },
-    { "x": 450, "y": 920, "width": 300, "height": 20, "angle": 0 },
-    { "x": 250, "y": 1220, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 100,
+      "y": 570,
+      "width": 200,
+      "height": 20,
+      "angle": 15
+    },
+    {
+      "x": 450,
+      "y": 920,
+      "width": 300,
+      "height": 20,
+      "angle": 10
+    },
+    {
+      "x": 250,
+      "y": 1220,
+      "width": 300,
+      "height": 20,
+      "angle": 8
+    }
   ]
 }

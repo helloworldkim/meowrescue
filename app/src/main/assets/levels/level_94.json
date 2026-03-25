@@ -3,31 +3,129 @@
   "name": "차원 폭풍",
   "difficulty": "hard",
   "maxPins": 5,
-  "stars": { "one": 999, "two": 6, "three": 5 },
-  "balls": [{ "type": "fire", "x": 540, "y": 200 }],
+  "stars": {
+    "one": 999,
+    "two": 6,
+    "three": 5
+  },
+  "balls": [
+    {
+      "type": "fire",
+      "x": 540,
+      "y": 200
+    }
+  ],
   "cats": [
-    { "x": 320, "y": 1570, "catId": "cat_094" },
-    { "x": 760, "y": 1610, "catId": "cat_094b" }
+    {
+      "x": 870,
+      "y": 730,
+      "catId": "cat_094"
+    },
+    {
+      "x": 600,
+      "y": 1610,
+      "catId": "cat_094b"
+    }
   ],
   "pins": [
-    { "type": "normal", "x": 540, "y": 450 },
-    { "type": "normal", "x": 170, "y": 710 },
-    { "type": "normal", "x": 880, "y": 970 },
-    { "type": "normal", "x": 210, "y": 1210 },
-    { "type": "normal", "x": 750, "y": 1430 }
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 450
+    },
+    {
+      "type": "normal",
+      "x": 170,
+      "y": 710
+    },
+    {
+      "type": "normal",
+      "x": 880,
+      "y": 970
+    },
+    {
+      "type": "normal",
+      "x": 210,
+      "y": 1210
+    },
+    {
+      "type": "normal",
+      "x": 750,
+      "y": 1430
+    }
   ],
   "obstacles": [
-    { "type": "fire", "x": 250, "y": 560, "width": 300, "height": 40 },
-    { "type": "teleport", "x": 100, "y": 805, "width": 80, "height": 80 },
-    { "type": "fire", "x": 680, "y": 1070, "width": 200, "height": 40 },
-    { "type": "teleport", "x": 110, "y": 1305, "width": 80, "height": 80 },
-    { "type": "spike", "x": 550, "y": 1520, "width": 200, "height": 40 }
+    {
+      "type": "fire",
+      "x": 250,
+      "y": 560,
+      "width": 300,
+      "height": 40
+    },
+    {
+      "type": "teleport",
+      "x": 100,
+      "y": 805,
+      "width": 80,
+      "height": 80
+    },
+    {
+      "type": "fire",
+      "x": 680,
+      "y": 1070,
+      "width": 200,
+      "height": 40
+    },
+    {
+      "type": "teleport",
+      "x": 110,
+      "y": 1305,
+      "width": 80,
+      "height": 80
+    },
+    {
+      "type": "spike",
+      "x": 550,
+      "y": 1520,
+      "width": 200,
+      "height": 40
+    }
   ],
   "platforms": [
-    { "x": 390, "y": 470, "width": 300, "height": 20, "angle": 0 },
-    { "x": 100, "y": 730, "width": 200, "height": 20, "angle": 0 },
-    { "x": 730, "y": 990, "width": 300, "height": 20, "angle": 0 },
-    { "x": 110, "y": 1230, "width": 200, "height": 20, "angle": 0 },
-    { "x": 600, "y": 1450, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 390,
+      "y": 470,
+      "width": 300,
+      "height": 20,
+      "angle": 12
+    },
+    {
+      "x": 100,
+      "y": 730,
+      "width": 200,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 730,
+      "y": 990,
+      "width": 300,
+      "height": 20,
+      "angle": -5
+    },
+    {
+      "x": 110,
+      "y": 1230,
+      "width": 200,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 600,
+      "y": 1450,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }
