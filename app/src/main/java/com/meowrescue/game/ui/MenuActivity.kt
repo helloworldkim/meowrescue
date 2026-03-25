@@ -16,7 +16,6 @@ import androidx.lifecycle.lifecycleScope
 import com.meowrescue.game.R
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.data.UserProgress
-import com.meowrescue.game.util.ResourceManager
 import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.launch
 
@@ -28,7 +27,6 @@ class MenuActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        ResourceManager.init(this)
         SoundManager.init(this)
         repository = GameRepository(this)
 
@@ -51,12 +49,13 @@ class MenuActivity : AppCompatActivity() {
         contentLayout.removeAllViews()
         showingLevelSelect = false
 
-        // Cat mascot image
+        // Cat mascot image (actual 384x512 = 3:4 portrait → 150x200dp)
         val catImage = ImageView(this).apply {
             setImageResource(R.drawable.cat_1)
             scaleType = ImageView.ScaleType.FIT_CENTER
+            val dp150 = (150 * resources.displayMetrics.density).toInt()
             val dp200 = (200 * resources.displayMetrics.density).toInt()
-            val lp = LinearLayout.LayoutParams(dp200, dp200)
+            val lp = LinearLayout.LayoutParams(dp150, dp200)
             lp.gravity = Gravity.CENTER_HORIZONTAL
             lp.bottomMargin = 32
             layoutParams = lp
@@ -79,15 +78,15 @@ class MenuActivity : AppCompatActivity() {
         }
         contentLayout.addView(title)
 
-        // Play button using btn_play.png as image
+        // Play button using btn_play.png (actual 384x512 = 3:4 portrait → 105x140dp)
         val playButton = ImageView(this).apply {
             setImageResource(R.drawable.btn_play)
             scaleType = ImageView.ScaleType.FIT_CENTER
             isClickable = true
             isFocusable = true
-            val dp180 = (180 * resources.displayMetrics.density).toInt()
-            val dp72 = (72 * resources.displayMetrics.density).toInt()
-            val lp = LinearLayout.LayoutParams(dp180, dp72)
+            val dp105 = (105 * resources.displayMetrics.density).toInt()
+            val dp140 = (140 * resources.displayMetrics.density).toInt()
+            val lp = LinearLayout.LayoutParams(dp105, dp140)
             lp.gravity = Gravity.CENTER_HORIZONTAL
             lp.topMargin = 16
             lp.bottomMargin = 16
@@ -142,21 +141,18 @@ class MenuActivity : AppCompatActivity() {
         contentLayout.addView(title)
 
         val density = resources.displayMetrics.density
-        val btnSize   = (80 * density).toInt()   // square level button
-        val starSize  = (16 * density).toInt()   // small stars
-        val pathW     = (40 * density).toInt()   // path connector width
-        val pathH     = (60 * density).toInt()   // path connector height
+        val btnSize   = (80 * density).toInt()   // square level button (512x512 = 1:1)
+        val starW     = (12 * density).toInt()   // star width (384x512 = 3:4)
+        val starH     = (16 * density).toInt()   // star height
+        val pathSize  = (80 * density).toInt()   // path connector (512x512 = 1:1 square)
 
         for ((levelId, progress) in progressList) {
             val isUnlocked = levelId == 1 || levelId <= maxCompleted + 1
             val stars = if (isUnlocked) progress?.stars ?: 0 else 0
             val isCompleted = isUnlocked && stars > 0
-
-            // Odd levels align LEFT, even levels align RIGHT (zigzag pattern)
             val isLeftAligned = (levelId % 2 == 1)
             val rowGravity = if (isLeftAligned) Gravity.START else Gravity.END
 
-            // Row holding the level button, aligned left or right
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = rowGravity or Gravity.CENTER_VERTICAL
@@ -180,102 +176,17 @@ class MenuActivity : AppCompatActivity() {
                 }
             }
 
-            // FrameLayout: level_button background + level number + stars + overlays
-            val entryFrame = FrameLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(btnSize, btnSize)
-            }
-
-            // level_button background image
-            val buttonBg = ImageView(this).apply {
-                setImageResource(R.drawable.level_button)
-                scaleType = ImageView.ScaleType.FIT_XY
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                )
-            }
-            entryFrame.addView(buttonBg)
-
-            // Level number text centered in the button
-            val levelLabel = TextView(this).apply {
-                text = "$levelId"
-                textSize = 20f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor(if (isUnlocked) Theme.COLOR_PRIMARY_TEXT else Theme.COLOR_MUTED_TEXT))
-                gravity = Gravity.CENTER
-                val lp = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                )
-                lp.gravity = Gravity.CENTER
-                lp.bottomMargin = (18 * density).toInt() // shift up slightly to leave room for stars
-                layoutParams = lp
-            }
-            entryFrame.addView(levelLabel)
-
-            // Stars row pinned to bottom-center of the button
-            val starsLayout = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_HORIZONTAL
-                val lp = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT
-                )
-                lp.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                lp.bottomMargin = (6 * density).toInt()
-                layoutParams = lp
-            }
-            for (i in 1..3) {
-                val starImg = ImageView(this).apply {
-                    setImageResource(if (i <= stars) R.drawable.star_full else R.drawable.star_empty)
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    val lp = LinearLayout.LayoutParams(starSize, starSize)
-                    lp.marginStart = 1
-                    lp.marginEnd = 1
-                    layoutParams = lp
-                }
-                starsLayout.addView(starImg)
-            }
-            entryFrame.addView(starsLayout)
-
-            // level_cleared overlay for completed levels
-            if (isCompleted) {
-                val clearedImg = ImageView(this).apply {
-                    setImageResource(R.drawable.level_cleared)
-                    scaleType = ImageView.ScaleType.FIT_XY
-                    layoutParams = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    )
-                }
-                entryFrame.addView(clearedImg)
-            }
-
-            // level_locked overlay for locked levels
-            if (!isUnlocked) {
-                val lockedImg = ImageView(this).apply {
-                    setImageResource(R.drawable.level_locked)
-                    scaleType = ImageView.ScaleType.CENTER_INSIDE
-                    layoutParams = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    )
-                }
-                entryFrame.addView(lockedImg)
-            }
-
-            row.addView(entryFrame)
+            row.addView(buildLevelEntry(levelId, stars, isUnlocked, isCompleted, density, btnSize, starW, starH))
             contentLayout.addView(row)
 
             // Path connector between levels (not after the last one)
             if (levelId < totalLevels) {
-                // Flip horizontally on right-to-left segments so the path curves the right way
                 val pathFlip = if (!isLeftAligned) -1f else 1f
                 val pathView = ImageView(this).apply {
                     setImageResource(R.drawable.path)
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     scaleX = pathFlip
-                    val lp = LinearLayout.LayoutParams(pathW, pathH)
+                    val lp = LinearLayout.LayoutParams(pathSize, pathSize)
                     lp.gravity = Gravity.CENTER_HORIZONTAL
                     lp.topMargin = 2
                     lp.bottomMargin = 2
@@ -285,15 +196,15 @@ class MenuActivity : AppCompatActivity() {
             }
         }
 
-        // Home/Back button using btn_home image
-        val dp56  = (56 * density).toInt()
-        val dp160 = (160 * density).toInt()
+        // Home/Back button (actual 384x512 = 3:4 portrait → 75x100dp)
+        val dp75  = (75 * density).toInt()
+        val dp100 = (100 * density).toInt()
         val homeButton = ImageView(this).apply {
             setImageResource(R.drawable.btn_home)
             scaleType = ImageView.ScaleType.FIT_CENTER
             isClickable = true
             isFocusable = true
-            val lp = LinearLayout.LayoutParams(dp160, dp56)
+            val lp = LinearLayout.LayoutParams(dp75, dp100)
             lp.gravity = Gravity.CENTER_HORIZONTAL
             lp.topMargin = 40
             layoutParams = lp
@@ -303,6 +214,90 @@ class MenuActivity : AppCompatActivity() {
             }
         }
         contentLayout.addView(homeButton)
+    }
+
+    private fun buildLevelEntry(
+        levelId: Int, stars: Int, isUnlocked: Boolean, isCompleted: Boolean,
+        density: Float, btnSize: Int, starW: Int, starH: Int
+    ): FrameLayout {
+        val frame = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(btnSize, btnSize)
+        }
+
+        // Background
+        frame.addView(ImageView(this).apply {
+            setImageResource(R.drawable.level_button)
+            scaleType = ImageView.ScaleType.FIT_XY
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        })
+
+        // Level number
+        frame.addView(TextView(this).apply {
+            text = "$levelId"
+            textSize = 20f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor(if (isUnlocked) Theme.COLOR_PRIMARY_TEXT else Theme.COLOR_MUTED_TEXT))
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ).apply {
+                this.gravity = Gravity.CENTER
+                bottomMargin = (18 * density).toInt()
+            }
+        })
+
+        // Stars row
+        val starsLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                this.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                bottomMargin = (6 * density).toInt()
+            }
+        }
+        for (i in 1..3) {
+            starsLayout.addView(ImageView(this).apply {
+                setImageResource(if (i <= stars) R.drawable.star_full else R.drawable.star_empty)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                layoutParams = LinearLayout.LayoutParams(starW, starH).apply {
+                    marginStart = 1; marginEnd = 1
+                }
+            })
+        }
+        frame.addView(starsLayout)
+
+        // Cleared overlay
+        if (isCompleted) {
+            frame.addView(ImageView(this).apply {
+                setImageResource(R.drawable.level_cleared)
+                scaleType = ImageView.ScaleType.FIT_XY
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            })
+        }
+
+        // Locked overlay
+        if (!isUnlocked) {
+            frame.addView(ImageView(this).apply {
+                setImageResource(R.drawable.level_locked)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            })
+        }
+
+        return frame
     }
 
     private fun countAvailableLevels(): Int {
@@ -318,7 +313,7 @@ class MenuActivity : AppCompatActivity() {
         return Button(this).apply {
             this.text = text
             textSize = 20f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(Color.parseColor(Theme.COLOR_PRIMARY_TEXT))
             setBackgroundColor(Color.parseColor(bgColor))
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,

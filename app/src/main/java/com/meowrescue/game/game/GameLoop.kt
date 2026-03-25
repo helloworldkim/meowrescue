@@ -12,6 +12,7 @@ class GameLoop(
         const val TARGET_TIME = 1_000_000_000L / TARGET_FPS
     }
 
+    @Volatile
     var running = false
     private var gameThread: Thread? = null
 
@@ -23,7 +24,11 @@ class GameLoop(
 
     fun stop() {
         running = false
-        gameThread?.join()
+        try {
+            gameThread?.join(2000)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
         gameThread = null
     }
 

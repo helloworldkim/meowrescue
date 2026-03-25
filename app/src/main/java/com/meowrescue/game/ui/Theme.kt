@@ -15,4 +15,5 @@ object Theme {
     const val COLOR_RARITY_LEGENDARY = "#FFB3C6"
     const val COLOR_RARITY_RARE = "#C8B8E8"
     const val COLOR_RARITY_COMMON = "#B5EAD7"
+    const val COLOR_CARD_BACKGROUND = "#FFFFFF"
 }

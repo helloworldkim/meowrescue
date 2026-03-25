@@ -163,7 +163,7 @@
 |------|------|
 | **언어** | Kotlin |
 | **렌더링** | Android Canvas / SurfaceView |
-| **물리 엔진** | 직접 구현 (간단한 중력 + 충돌 판정) |
+| **물리 엔진** | dyn4j 5.0.2 (2D 물리 라이브러리) |
 | **데이터 저장** | Room DB + SharedPreferences |
 | **광고** | Google AdMob SDK |
 | **분석** | Firebase Analytics |
@@ -175,24 +175,26 @@
 ```
 com.meowrescue.game
 ├── game/
-│   ├── GameEngine.kt          // 게임 루프 및 상태 관리
-│   ├── GameLoop.kt            // 프레임 업데이트 루프
-│   ├── PhysicsEngine.kt       // 물리 연산 (중력, 충돌, 바운스)
-│   └── CollisionDetector.kt   // 충돌 판정 로직
+│   ├── GameEngine.kt          // 게임 상태 관리 + GameEventListener
+│   ├── GameLoop.kt            // 60 FPS 게임 스레드
+│   └── Dyn4jPhysicsEngine.kt  // dyn4j 물리 월드 래퍼 (중력, 충돌, 바운스)
 ├── model/
 │   ├── Pin.kt                 // 핀 데이터 클래스 (sealed class)
 │   ├── Ball.kt                // 공 데이터 클래스
 │   ├── Cat.kt                 // 고양이 데이터 클래스
-│   └── Obstacle.kt            // 장애물 데이터 클래스 (sealed class)
+│   ├── Obstacle.kt            // 장애물 데이터 클래스 (sealed class)
+│   ├── Surface.kt             // 플랫폼 데이터 (위치, 크기, 각도)
+│   └── util/
+│       └── Vector2D.kt        // 가변 2D 벡터 (연산자 오버로드)
 ├── level/
 │   ├── LevelData.kt           // 레벨 데이터 모델
-│   ├── LevelLoader.kt         // JSON 기반 레벨 로더
-│   └── LevelGenerator.kt      // 레벨 자동 생성기
+│   └── LevelLoader.kt         // JSON 기반 레벨 로더
 ├── ui/
 │   ├── GameActivity.kt        // 게임 화면 Activity
-│   ├── GameView.kt            // SurfaceView 기반 게임 렌더링
-│   ├── MenuActivity.kt        // 메인 메뉴 화면
-│   └── CollectionActivity.kt  // 고양이 컬렉션 화면
+│   ├── GameView.kt            // SurfaceView 기반 게임 렌더링 + 오버레이
+│   ├── MenuActivity.kt        // 메인 메뉴 + 지그재그 레벨맵
+│   ├── CollectionActivity.kt  // 고양이 컬렉션 화면
+│   └── Theme.kt               // UI 색상 상수 모음
 ├── ads/
 │   └── AdManager.kt           // AdMob 초기화 및 광고 로드/표시
 ├── data/
@@ -200,9 +202,7 @@ com.meowrescue.game
 │   ├── UserProgressDao.kt     // Room DAO (유저 진행도)
 │   └── AppDatabase.kt         // Room Database
 └── util/
-    ├── Vector2D.kt            // 2D 벡터 연산 유틸
-    ├── SoundManager.kt        // 효과음/BGM 관리
-    └── ResourceManager.kt     // 리소스 로딩 관리
+    └── SoundManager.kt        // SoundPool(SFX 11종) + MediaPlayer(BGM 5종) 사운드 관리
 ```
 
 ### 6.3 핵심 모델 설계 (Kotlin)
@@ -242,40 +242,37 @@ sealed class Obstacle(val position: Vector2D, val size: Vector2D) {
 }
 ```
 
-### 6.4 물리 엔진 (간단 구현)
+### 6.4 물리 엔진 (dyn4j 5.0.2)
 
-복잡한 물리 엔진 라이브러리 없이 직접 구현합니다:
+dyn4j 2D 물리 라이브러리를 사용하여 정확한 물리 시뮬레이션을 구현합니다:
 
 ```kotlin
-class PhysicsEngine {
+class Dyn4jPhysicsEngine {
+    private val world = World<Body>()
+
     companion object {
-        const val GRAVITY = 980f        // 중력 가속도 (px/s²)
-        const val BOUNCE_FACTOR = 0.6f  // 반발 계수
-        const val FRICTION = 0.98f      // 마찰 계수
+        const val PIXELS_PER_METER = 100.0   // 100px = 1m 좌표 변환
+        const val RESTITUTION = 0.4          // 반발 계수
+        const val FRICTION = 0.3             // 마찰 계수
     }
 
-    fun update(ball: Ball, deltaTime: Float) {
-        // 중력 적용
-        ball.velocity.y += GRAVITY * deltaTime
-
-        // 위치 업데이트
-        ball.position.x += ball.velocity.x * deltaTime
-        ball.position.y += ball.velocity.y * deltaTime
-
-        // 마찰 적용
-        ball.velocity.x *= FRICTION
+    init {
+        world.gravity = Vector2(0.0, 9.8)    // Y-down 중력
+        world.settings.isContinuousDetectionEnabled = true  // 터널링 방지
     }
 
-    fun handleCollision(ball: Ball, surface: Surface) {
-        // AABB 충돌 판정
-        if (isColliding(ball, surface)) {
-            // 반사 벡터 계산
-            ball.velocity.y *= -BOUNCE_FACTOR
-            ball.position.y = surface.top - ball.radius
-        }
+    fun step(deltaTime: Double) {
+        world.update(deltaTime)
+        // 물리 바디 → 게임 엔티티 위치 동기화
     }
 }
 ```
+
+**주요 특성:**
+- **좌표 변환**: 100px = 1m (화면 좌표 ↔ 물리 좌표)
+- **중력**: 9.8 m/s² (Y-down 좌표계)
+- **연속 충돌 감지**: 고속 공의 터널링 방지
+- **경사면 물리**: 각도에 따른 자연스러운 슬라이딩
 
 ### 6.5 레벨 데이터 형식 (JSON)
 

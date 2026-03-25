@@ -30,97 +30,89 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
 
     // Paints
     private val backgroundPaint = Paint().apply { color = Color.parseColor(Theme.COLOR_BACKGROUND_GAME) }
-    private val surfacePaint = Paint().apply { color = Color.parseColor("#8B4513"); style = Paint.Style.FILL }
     private val hudPaint = Paint().apply {
-        color = Color.parseColor("#333333")
+        color = Color.parseColor(Theme.COLOR_PRIMARY_TEXT)
         textSize = 40f
         isAntiAlias = true
     }
     private val overlayPaint = Paint().apply { style = Paint.Style.FILL }
-    private val overlayTextPaint = Paint().apply {
-        color = Color.WHITE
-        textSize = 72f
-        textAlign = Paint.Align.CENTER
-        isAntiAlias = true
-    }
-    private val overlaySubTextPaint = Paint().apply {
-        color = Color.WHITE
-        textSize = 44f
-        textAlign = Paint.Align.CENTER
-        isAntiAlias = true
-    }
-    private val obstaclePaint = Paint().apply { isAntiAlias = true; style = Paint.Style.FILL }
     private val rescuedCatOverlayPaint = Paint().apply {
         color = Color.argb(100, 0, 200, 0)
         style = Paint.Style.FILL
     }
     private val switchOffPaint = Paint().apply { alpha = (0.4f * 255).toInt() }
 
-    // Bitmap sprites
+    // Bitmap sprites (sizes preserve actual image aspect ratios)
+    // Balls: actual 768x512 (3:2) — keep square for circular physics objects
     private val ballNormalBmp = loadScaled(R.drawable.ball_normal, 60, 60)
     private val ballFireBmp = loadScaled(R.drawable.ball_fire, 60, 60)
     private val ballIronBmp = loadScaled(R.drawable.ball_iron, 72, 72)
     private val ballBombBmp = loadScaled(R.drawable.ball_bomb, 80, 80)
 
-    private val pinNormalBmp = loadScaled(R.drawable.pin_normal, 50, 90)
-    private val pinTimerBmp = loadScaled(R.drawable.pin_timer, 50, 90)
-    private val pinDirectionBmp = loadScaled(R.drawable.pin_direction, 50, 90)
-    private val pinLockedBmp = loadScaled(R.drawable.pin_locked, 50, 90)
-    private val pinChainBmp = loadScaled(R.drawable.pin_chain, 50, 90)
+    // Pins: actual 384x563 (2:3 portrait), pin_timer 614x461 (4:3)
+    private val pinNormalBmp = loadScaled(R.drawable.pin_normal, 40, 58)
+    private val pinTimerBmp = loadScaled(R.drawable.pin_timer, 58, 44)
+    private val pinDirectionBmp = loadScaled(R.drawable.pin_direction, 40, 58)
+    private val pinLockedBmp = loadScaled(R.drawable.pin_locked, 40, 58)
+    private val pinChainBmp = loadScaled(R.drawable.pin_chain, 40, 58)
 
+    // Obstacles: fire/spike 512x512 (1:1), teleport/switch 768x512 (3:2)
     private val obstacleFireBmp = loadScaled(R.drawable.obstacle_fire, 100, 100)
     private val obstacleSpikeBmp = loadScaled(R.drawable.obstacle_spike, 100, 100)
-    private val platformBmp = loadScaled(R.drawable.platform, 200, 30)
-    private val teleportBmp = loadScaled(R.drawable.teleport, 80, 80)
-    private val platformCloudBmp = loadScaled(R.drawable.platform_cloud, 200, 30)
-    private val switchBlockBmp = loadScaled(R.drawable.switch_block, 100, 100)
+    private val teleportBmp = loadScaled(R.drawable.teleport, 90, 60)
+    private val platformCloudBmp = loadScaled(R.drawable.platform_cloud, 200, 200)
+    private val switchBlockBmp = loadScaled(R.drawable.switch_block, 120, 80)
 
+    // Platforms: actual 768x341 (2.25:1)
     private val platformBitmaps = listOf(
-        loadScaled(R.drawable.platform_1, 200, 30),
-        loadScaled(R.drawable.platform_2, 200, 30),
-        loadScaled(R.drawable.platform_3, 200, 30),
-        loadScaled(R.drawable.platform_4, 200, 30),
-        loadScaled(R.drawable.platform_5, 200, 30),
-        loadScaled(R.drawable.platform_6, 200, 30)
+        loadScaled(R.drawable.platform_1, 200, 89),
+        loadScaled(R.drawable.platform_2, 200, 89),
+        loadScaled(R.drawable.platform_3, 200, 89),
+        loadScaled(R.drawable.platform_4, 200, 89),
+        loadScaled(R.drawable.platform_5, 200, 89),
+        loadScaled(R.drawable.platform_6, 200, 89)
     )
 
+    // Cats: actual 384x512 (3:4 portrait)
     private val catBitmaps = listOf(
-        loadScaled(R.drawable.cat_1, 80, 80),
-        loadScaled(R.drawable.cat_2, 80, 80),
-        loadScaled(R.drawable.cat_3, 80, 80),
-        loadScaled(R.drawable.cat_4, 80, 80),
-        loadScaled(R.drawable.cat_5, 80, 80),
-        loadScaled(R.drawable.cat_6, 80, 80),
-        loadScaled(R.drawable.cat_7, 80, 80),
-        loadScaled(R.drawable.cat_8, 80, 80)
+        loadScaled(R.drawable.cat_1, 60, 80),
+        loadScaled(R.drawable.cat_2, 60, 80),
+        loadScaled(R.drawable.cat_3, 60, 80),
+        loadScaled(R.drawable.cat_4, 60, 80),
+        loadScaled(R.drawable.cat_5, 60, 80),
+        loadScaled(R.drawable.cat_6, 60, 80),
+        loadScaled(R.drawable.cat_7, 60, 80),
+        loadScaled(R.drawable.cat_8, 60, 80)
     )
 
-    private val starFullBmp = loadScaled(R.drawable.star_full, 48, 48)
-    private val starEmptyBmp = loadScaled(R.drawable.star_empty, 48, 48)
+    // Stars: actual 384x512 (3:4 portrait)
+    private val starFullBmp = loadScaled(R.drawable.star_full, 36, 48)
+    private val starEmptyBmp = loadScaled(R.drawable.star_empty, 36, 48)
     private val pauseBmp = loadScaled(R.drawable.icon_pause, 50, 50)
-    private val btnNextBmp = loadScaled(R.drawable.btn_next, 240, 80)
-    private val btnRetryBmp = loadScaled(R.drawable.btn_retry, 240, 80)
-    private val btnHomeBmp = loadScaled(R.drawable.btn_home, 240, 80)
+    // Buttons: actual 384x512 (3:4 portrait) — sized to fit overlay popup
+    private val btnNextBmp = loadScaled(R.drawable.btn_next, 90, 120)
+    private val btnRetryBmp = loadScaled(R.drawable.btn_retry, 90, 120)
+    private val btnHomeBmp = loadScaled(R.drawable.btn_home, 90, 120)
 
-    // Backgrounds
-    private val bgTutorialBmp = loadScaled(R.drawable.bg_tutorial, 1080, 1920)
-    private val bgBeginnerBmp = loadScaled(R.drawable.bg_beginner, 1080, 1920)
-    private val bgIntermediateBmp = loadScaled(R.drawable.bg_intermediate, 1080, 1920)
-    private val bgAdvancedBmp = loadScaled(R.drawable.bg_advanced, 1080, 1920)
+    // Background: load only the needed one (actual 512x768 = 2:3 portrait, ~7MB each)
+    private var currentBackgroundBmp: Bitmap = loadScaled(R.drawable.bg_tutorial, 1080, 1620)
 
-    // Popup overlays
-    private val popupClearBmp = loadScaled(R.drawable.popup_clear, 600, 400)
-    private val popupFailBmp = loadScaled(R.drawable.popup_fail, 600, 400)
+    // Popup overlays: actual 384x512 (3:4 portrait)
+    private val popupClearBmp = loadScaled(R.drawable.popup_clear, 360, 480)
+    private val popupFailBmp = loadScaled(R.drawable.popup_fail, 360, 480)
 
-    var currentBackgroundBmp: Bitmap = bgTutorialBmp
+    private val bgResMap = mapOf(
+        "tutorial" to R.drawable.bg_tutorial,
+        "beginner" to R.drawable.bg_beginner,
+        "intermediate" to R.drawable.bg_intermediate,
+        "advanced" to R.drawable.bg_advanced
+    )
 
     fun setBackgroundForLevel(difficulty: String) {
-        currentBackgroundBmp = when (difficulty.lowercase()) {
-            "beginner" -> bgBeginnerBmp
-            "intermediate" -> bgIntermediateBmp
-            "advanced" -> bgAdvancedBmp
-            else -> bgTutorialBmp
-        }
+        val resId = bgResMap[difficulty.lowercase()] ?: R.drawable.bg_tutorial
+        val oldBmp = currentBackgroundBmp
+        currentBackgroundBmp = loadScaled(resId, 1080, 1620)
+        oldBmp.recycle()
     }
 
     private fun loadScaled(resId: Int, w: Int, h: Int): Bitmap {
@@ -143,6 +135,10 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
+    }
+
+    /** Call after game loop has fully stopped to safely recycle all bitmaps. */
+    fun cleanup() {
         recycleBitmaps()
     }
 
@@ -158,7 +154,6 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         pinChainBmp.recycle()
         obstacleFireBmp.recycle()
         obstacleSpikeBmp.recycle()
-        platformBmp.recycle()
         teleportBmp.recycle()
         platformCloudBmp.recycle()
         switchBlockBmp.recycle()
@@ -170,10 +165,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         btnNextBmp.recycle()
         btnRetryBmp.recycle()
         btnHomeBmp.recycle()
-        bgTutorialBmp.recycle()
-        bgBeginnerBmp.recycle()
-        bgIntermediateBmp.recycle()
-        bgAdvancedBmp.recycle()
+        currentBackgroundBmp.recycle()
         popupClearBmp.recycle()
         popupFailBmp.recycle()
     }
@@ -215,27 +207,9 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         // Obstacles
         for (obstacle in engine.obstacles) {
             when (obstacle) {
-                is Obstacle.Fire -> {
-                    val destRect = RectF(
-                        obstacle.position.x, obstacle.position.y,
-                        obstacle.position.x + obstacle.size.x, obstacle.position.y + obstacle.size.y
-                    )
-                    canvas.drawBitmap(obstacleFireBmp, null, destRect, null)
-                }
-                is Obstacle.Spike -> {
-                    val destRect = RectF(
-                        obstacle.position.x, obstacle.position.y,
-                        obstacle.position.x + obstacle.size.x, obstacle.position.y + obstacle.size.y
-                    )
-                    canvas.drawBitmap(obstacleSpikeBmp, null, destRect, null)
-                }
-                is Obstacle.MovingPlatform -> {
-                    val destRect = RectF(
-                        obstacle.position.x, obstacle.position.y,
-                        obstacle.position.x + obstacle.size.x, obstacle.position.y + obstacle.size.y
-                    )
-                    canvas.drawBitmap(platformCloudBmp, null, destRect, null)
-                }
+                is Obstacle.Fire -> canvas.drawBitmap(obstacleFireBmp, null, obstacle.toRectF(), null)
+                is Obstacle.Spike -> canvas.drawBitmap(obstacleSpikeBmp, null, obstacle.toRectF(), null)
+                is Obstacle.MovingPlatform -> canvas.drawBitmap(platformCloudBmp, null, obstacle.toRectF(), null)
                 is Obstacle.Teleport -> {
                     canvas.drawBitmap(
                         teleportBmp,
@@ -245,11 +219,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
                     )
                 }
                 is Obstacle.SwitchBlock -> {
-                    val destRect = RectF(
-                        obstacle.position.x, obstacle.position.y,
-                        obstacle.position.x + obstacle.size.x, obstacle.position.y + obstacle.size.y
-                    )
-                    canvas.drawBitmap(switchBlockBmp, null, destRect, if (!obstacle.isOn) switchOffPaint else null)
+                    canvas.drawBitmap(switchBlockBmp, null, obstacle.toRectF(), if (!obstacle.isOn) switchOffPaint else null)
                 }
             }
         }
@@ -279,9 +249,8 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         }
 
         // Cats
-        for (cat in engine.cats) {
-            val catIndex = engine.cats.indexOf(cat) % catBitmaps.size
-            val bmp = catBitmaps[catIndex]
+        for ((catIndex, cat) in engine.cats.withIndex()) {
+            val bmp = catBitmaps[catIndex % catBitmaps.size]
             canvas.drawBitmap(bmp, cat.position.x - bmp.width / 2f, cat.position.y - bmp.height / 2f, null)
             if (cat.isRescued) {
                 canvas.drawCircle(cat.position.x, cat.position.y, bmp.width / 2f, rescuedCatOverlayPaint)
@@ -293,11 +262,11 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         hudPaint.textAlign = Paint.Align.LEFT
         canvas.drawText("Level ${engine.levelData?.levelId ?: ""}", 20f, hudY, hudPaint)
 
-        // HUD Stars
+        // HUD Stars (36x48 each, 4px gap → 40px step, total 116px → offset -58)
         val stars = engine.calculateStars()
         for (i in 0 until 3) {
             val starBmp = if (i < stars) starFullBmp else starEmptyBmp
-            canvas.drawBitmap(starBmp, canvas.width / 2f - 72f + i * 48f, hudY - 36f, null)
+            canvas.drawBitmap(starBmp, canvas.width / 2f - 58f + i * 40f, hudY - 36f, null)
         }
 
         // Pause button (top-right)
@@ -306,44 +275,11 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         // State overlays
         when (engine.gameState) {
             GameEngine.GameState.SUCCESS -> {
-                // Semi-transparent dark overlay
-                overlayPaint.color = Color.argb(120, 0, 0, 0)
-                canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), overlayPaint)
-
-                // Popup clear centered
-                val popupX = canvas.width / 2f - popupClearBmp.width / 2f
-                val popupY = canvas.height / 2f - popupClearBmp.height / 2f
-                canvas.drawBitmap(popupClearBmp, popupX, popupY, null)
-
-                // Stars on popup
                 val starCount = engine.calculateStars()
-                val startX = canvas.width / 2f - 72f
-                for (i in 0 until 3) {
-                    val starBmp = if (i < starCount) starFullBmp else starEmptyBmp
-                    canvas.drawBitmap(starBmp, startX + i * 72f, popupY + 60f, null)
-                }
-
-                // btnNext right side, btnHome left side below popup center
-                val btnY = popupY + popupClearBmp.height - btnNextBmp.height / 2f
-                val centerX = canvas.width / 2f
-                canvas.drawBitmap(btnHomeBmp, centerX - btnHomeBmp.width - 20f, btnY, null)
-                canvas.drawBitmap(btnNextBmp, centerX + 20f, btnY, null)
+                drawOverlay(canvas, popupClearBmp, btnNextBmp, starCount)
             }
             GameEngine.GameState.FAILED -> {
-                // Semi-transparent dark overlay
-                overlayPaint.color = Color.argb(120, 0, 0, 0)
-                canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), overlayPaint)
-
-                // Popup fail centered
-                val popupX = canvas.width / 2f - popupFailBmp.width / 2f
-                val popupY = canvas.height / 2f - popupFailBmp.height / 2f
-                canvas.drawBitmap(popupFailBmp, popupX, popupY, null)
-
-                // btnRetry right side, btnHome left side
-                val btnY = popupY + popupFailBmp.height - btnRetryBmp.height / 2f
-                val centerX = canvas.width / 2f
-                canvas.drawBitmap(btnHomeBmp, centerX - btnHomeBmp.width - 20f, btnY, null)
-                canvas.drawBitmap(btnRetryBmp, centerX + 20f, btnY, null)
+                drawOverlay(canvas, popupFailBmp, btnRetryBmp, showStars = 0)
             }
             else -> {}
         }
@@ -356,48 +292,10 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             val engine = gameEngine ?: return true
 
             when (engine.gameState) {
-                GameEngine.GameState.SUCCESS -> {
-                    if (!callbackFired) {
-                        val popupY = height / 2f - popupClearBmp.height / 2f
-                        val btnY = popupY + popupClearBmp.height - btnNextBmp.height / 2f
-                        val centerX = width / 2f
-
-                        val homeLeft = centerX - btnHomeBmp.width - 20f
-                        val homeRight = centerX - 20f
-                        val nextLeft = centerX + 20f
-                        val nextRight = centerX + 20f + btnNextBmp.width
-                        val btnBottom = btnY + btnNextBmp.height
-
-                        if (x in nextLeft..nextRight && y in btnY..btnBottom) {
-                            callbackFired = true
-                            onLevelComplete?.invoke()
-                        } else if (x in homeLeft..homeRight && y in btnY..btnBottom) {
-                            callbackFired = true
-                            onNavigateHome?.invoke()
-                        }
-                    }
-                }
-                GameEngine.GameState.FAILED -> {
-                    if (!callbackFired) {
-                        val popupY = height / 2f - popupFailBmp.height / 2f
-                        val btnY = popupY + popupFailBmp.height - btnRetryBmp.height / 2f
-                        val centerX = width / 2f
-
-                        val homeLeft = centerX - btnHomeBmp.width - 20f
-                        val homeRight = centerX - 20f
-                        val retryLeft = centerX + 20f
-                        val retryRight = centerX + 20f + btnRetryBmp.width
-                        val btnBottom = btnY + btnRetryBmp.height
-
-                        if (x in retryLeft..retryRight && y in btnY..btnBottom) {
-                            callbackFired = true
-                            onLevelFailed?.invoke()
-                        } else if (x in homeLeft..homeRight && y in btnY..btnBottom) {
-                            callbackFired = true
-                            onNavigateHome?.invoke()
-                        }
-                    }
-                }
+                GameEngine.GameState.SUCCESS ->
+                    handleOverlayTouch(x, y, popupClearBmp, btnNextBmp, onLevelComplete)
+                GameEngine.GameState.FAILED ->
+                    handleOverlayTouch(x, y, popupFailBmp, btnRetryBmp, onLevelFailed)
                 GameEngine.GameState.PLAYING -> {
                     val pin = engine.getPinAt(x, y)
                     if (pin != null) engine.requestPinRemoval(pin)
@@ -406,5 +304,64 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             }
         }
         return true
+    }
+
+    /** Creates a RectF from an obstacle's position and size. */
+    private fun Obstacle.toRectF(): RectF = RectF(
+        position.x, position.y,
+        position.x + size.x, position.y + size.y
+    )
+
+    /** Draws a popup overlay with dimmed background, optional stars, and two action buttons. */
+    private fun drawOverlay(canvas: Canvas, popupBmp: Bitmap, actionBtnBmp: Bitmap, showStars: Int) {
+        // Semi-transparent dark overlay
+        overlayPaint.color = Color.argb(120, 0, 0, 0)
+        canvas.drawRect(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat(), overlayPaint)
+
+        // Popup centered
+        val popupX = canvas.width / 2f - popupBmp.width / 2f
+        val popupY = canvas.height / 2f - popupBmp.height / 2f
+        canvas.drawBitmap(popupBmp, popupX, popupY, null)
+
+        // Stars on popup (only if showStars > 0, 36x48 each, 40px step)
+        if (showStars > 0) {
+            val startX = canvas.width / 2f - 58f
+            for (i in 0 until 3) {
+                val starBmp = if (i < showStars) starFullBmp else starEmptyBmp
+                canvas.drawBitmap(starBmp, startX + i * 40f, popupY + 60f, null)
+            }
+        }
+
+        // btnHome left side, action button right side below popup
+        val btnY = popupY + popupBmp.height - actionBtnBmp.height / 2f
+        val centerX = canvas.width / 2f
+        canvas.drawBitmap(btnHomeBmp, centerX - btnHomeBmp.width - 20f, btnY, null)
+        canvas.drawBitmap(actionBtnBmp, centerX + 20f, btnY, null)
+    }
+
+    /** Handles touch events on overlay popup buttons (home + action). */
+    private fun handleOverlayTouch(
+        x: Float, y: Float,
+        popupBmp: Bitmap, actionBtnBmp: Bitmap,
+        actionCallback: (() -> Unit)?
+    ) {
+        if (callbackFired) return
+        val popupY = height / 2f - popupBmp.height / 2f
+        val btnY = popupY + popupBmp.height - actionBtnBmp.height / 2f
+        val centerX = width / 2f
+        val btnBottom = btnY + actionBtnBmp.height
+
+        val homeLeft = centerX - btnHomeBmp.width - 20f
+        val homeRight = centerX - 20f
+        val actionLeft = centerX + 20f
+        val actionRight = centerX + 20f + actionBtnBmp.width
+
+        if (x in actionLeft..actionRight && y in btnY..btnBottom) {
+            callbackFired = true
+            actionCallback?.invoke()
+        } else if (x in homeLeft..homeRight && y in btnY..btnBottom) {
+            callbackFired = true
+            onNavigateHome?.invoke()
+        }
     }
 }

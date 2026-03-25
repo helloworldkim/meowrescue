@@ -69,7 +69,7 @@ class CollectionActivity : AppCompatActivity() {
         val backBtn = TextView(this).apply {
             text = "< Back"
             textSize = 18f
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(Color.parseColor(Theme.COLOR_PRIMARY_TEXT))
             setOnClickListener { finish() }
         }
         toolbar.addView(backBtn)
@@ -78,7 +78,7 @@ class CollectionActivity : AppCompatActivity() {
             text = "Cat Collection"
             textSize = 24f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#333333"))
+            setTextColor(Color.parseColor(Theme.COLOR_PRIMARY_TEXT))
             val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             lp.marginStart = 24
             layoutParams = lp
@@ -112,7 +112,7 @@ class CollectionActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER
                 setPadding(16, 24, 16, 24)
-                setBackgroundColor(Color.parseColor("#FFFFFF"))
+                setBackgroundColor(Color.parseColor(Theme.COLOR_CARD_BACKGROUND))
                 val lp = ViewGroup.MarginLayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
@@ -150,7 +150,7 @@ class CollectionActivity : AppCompatActivity() {
                 text = if (cat.collected) cat.name else "???"
                 textSize = 12f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#555555"))
+                setTextColor(Color.parseColor(Theme.COLOR_SECONDARY_TEXT))
             }
 
             val rarityColor = when (cat.rarity) {
@@ -163,7 +163,7 @@ class CollectionActivity : AppCompatActivity() {
                 textSize = 11f
                 gravity = Gravity.CENTER
                 setBackgroundColor(Color.parseColor(rarityColor))
-                setTextColor(Color.parseColor("#333333"))
+                setTextColor(Color.parseColor(Theme.COLOR_PRIMARY_TEXT))
                 setPadding(8, 4, 8, 4)
             }
 

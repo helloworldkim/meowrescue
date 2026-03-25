@@ -67,16 +67,23 @@ class GameActivity : AppCompatActivity() {
         gameLoop = GameLoop(gameEngine, gameView)
 
         gameView.onLevelComplete = {
-            val stars = gameEngine.calculateStars()
-            val rescuedCatId = gameEngine.cats.firstOrNull { it.isRescued }?.catId
-            lifecycleScope.launch {
-                repository.saveProgress(levelId, stars, catId = rescuedCatId)
-            }
             runOnUiThread {
+                val stars = gameEngine.calculateStars()
+                val rescuedCatId = gameEngine.cats.firstOrNull { it.isRescued }?.catId
+                lifecycleScope.launch {
+                    repository.saveProgress(levelId, stars, catId = rescuedCatId)
+                }
                 SoundManager.playButtonTap()
-                val intent = Intent(this, GameActivity::class.java)
-                intent.putExtra("level_id", levelId + 1)
-                startActivity(intent)
+                val nextLevel = levelId + 1
+                val maxLevel = gameView.let {
+                    try { LevelLoader.loadLevel(this, nextLevel); nextLevel }
+                    catch (_: Exception) { levelId }
+                }
+                if (maxLevel > levelId) {
+                    val intent = Intent(this, GameActivity::class.java)
+                    intent.putExtra("level_id", nextLevel)
+                    startActivity(intent)
+                }
                 finish()
             }
         }
@@ -115,6 +122,7 @@ class GameActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         gameLoop.stop()
+        gameView.cleanup()
         SoundManager.stopBgm()
     }
 

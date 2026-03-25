@@ -23,7 +23,9 @@ Meow Rescue는 안드로이드 하이퍼캐주얼 퍼즐 게임입니다. 플레
 - **고양이 컬렉션**: 8종의 귀여운 고양이 캐릭터 수집
 - **별점 시스템**: 핀 제거 횟수 기반 1~3성 평가
 - **진행도 저장**: Room DB로 레벨 클리어, 별점, 해금 고양이 저장
-- **스레드 안전**: `CopyOnWriteArrayList` 기반 엔티티 목록, UI/게임 스레드 간 안전한 동기화
+- **사운드 시스템**: SoundPool 기반 11종 SFX + MediaPlayer 기반 난이도별 5종 BGM
+- **지그재그 레벨맵**: path.png 연결선과 함께 좌우 교차 배치되는 레벨 선택 화면
+- **스레드 안전**: `CopyOnWriteArrayList` 엔티티 목록, `@Volatile` 게임 상태/루프 플래그, 타임아웃 join, 방어적 MediaPlayer 예외 처리
 
 ## 난이도 구성 (GDD 4.1)
 
@@ -67,10 +69,10 @@ com.meowrescue.game
 │   └── LevelLoader.kt         // assets에서 JSON 기반 레벨 로딩
 ├── ui/
 │   ├── GameActivity.kt        // 게임 화면 (풀스크린 몰입 모드)
-│   ├── GameView.kt            // SurfaceView 비트맵 스프라이트 렌더링
-│   ├── MenuActivity.kt        // 메인 메뉴 + 동적 레벨 선택
+│   ├── GameView.kt            // SurfaceView 비트맵 스프라이트 렌더링 + 오버레이
+│   ├── MenuActivity.kt        // 메인 메뉴 + 지그재그 레벨맵
 │   ├── CollectionActivity.kt  // 고양이 컬렉션 그리드
-│   └── Theme.kt               // UI 색상 상수 모음
+│   └── Theme.kt               // UI 색상 상수 모음 (14개 색상)
 ├── data/
 │   ├── AppDatabase.kt         // Room 데이터베이스 싱글턴
 │   ├── UserProgressDao.kt     // 레벨 진행도 쿼리 DAO
@@ -79,8 +81,7 @@ com.meowrescue.game
 │   └── util/
 │       └── Vector2D.kt        // 가변 2D 벡터 (연산자 오버로드)
 └── util/
-    ├── SoundManager.kt        // SoundPool + MediaPlayer 관리 (Phase 4 예정)
-    └── ResourceManager.kt     // 리소스 로딩 유틸리티
+    └── SoundManager.kt        // SoundPool(SFX 11종) + MediaPlayer(BGM 5종) 사운드 관리
 ```
 
 ## 물리 엔진
@@ -172,7 +173,7 @@ APK 출력 경로: `app/build/outputs/apk/debug/app-debug.apk`
 - [x] Phase 1: MVP 프로토타입 (게임 루프, 물리 엔진, 핀 메카닉)
 - [x] Phase 2: dyn4j 물리 엔진 도입, 10개 튜토리얼 레벨
 - [x] Phase 3: 100레벨 완성 (튜토리얼/초급/중급/상급)
-- [ ] Phase 4: 효과음, BGM 추가
+- [x] Phase 4: 효과음(11종 SFX), BGM(5종) + 이미지 비율 교정 + 코드 리팩토링 + 안정성 개선
 - [ ] Phase 5: AdMob 광고 연동
 - [ ] Phase 6: 고양이 컬렉션 시스템 확장 (50종+)
 - [ ] Phase 7: Play 스토어 출시 준비

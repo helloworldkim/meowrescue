@@ -48,7 +48,7 @@ object LevelLoader {
             )
         }
 
-        val obstaclesArr = obj.getJSONArray("obstacles")
+        val obstaclesArr = obj.optJSONArray("obstacles") ?: org.json.JSONArray()
         val obstacles = (0 until obstaclesArr.length()).map { i ->
             val o = obstaclesArr.getJSONObject(i)
             ObstacleData(
@@ -60,7 +60,7 @@ object LevelLoader {
             )
         }
 
-        val platformsArr = obj.getJSONArray("platforms")
+        val platformsArr = obj.optJSONArray("platforms") ?: org.json.JSONArray()
         val platforms = (0 until platformsArr.length()).map { i ->
             val p = platformsArr.getJSONObject(i)
             PlatformData(

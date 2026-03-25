@@ -101,7 +101,9 @@ object SoundManager {
         val resId = bgmMap[key.lowercase()] ?: return
 
         // Don't restart if same BGM is already playing
-        if (currentBgmKey == key && mediaPlayer?.isPlaying == true) return
+        try {
+            if (currentBgmKey == key && mediaPlayer?.isPlaying == true) return
+        } catch (_: IllegalStateException) { /* fall through to restart */ }
 
         stopBgm()
         mediaPlayer = MediaPlayer.create(ctx, resId)?.apply {
@@ -113,21 +115,27 @@ object SoundManager {
     }
 
     fun stopBgm() {
-        mediaPlayer?.apply {
-            if (isPlaying) stop()
-            release()
-        }
+        try {
+            mediaPlayer?.apply {
+                if (isPlaying) stop()
+                release()
+            }
+        } catch (_: IllegalStateException) { /* already released or error state */ }
         mediaPlayer = null
         currentBgmKey = null
     }
 
     fun pauseBgm() {
-        mediaPlayer?.takeIf { it.isPlaying }?.pause()
+        try {
+            mediaPlayer?.takeIf { it.isPlaying }?.pause()
+        } catch (_: IllegalStateException) { /* ignore */ }
     }
 
     fun resumeBgm() {
         if (!soundEnabled) return
-        mediaPlayer?.start()
+        try {
+            mediaPlayer?.start()
+        } catch (_: IllegalStateException) { /* ignore */ }
     }
 
     fun release() {
