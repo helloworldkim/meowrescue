@@ -190,7 +190,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         canvas.drawBitmap(currentBackgroundBmp, null, bgDestRect, null)
 
         // Surfaces / platforms (rotate around center to match dyn4j physics)
-        for ((index, surface) in engine.surfaces.withIndex()) {
+        for (surface in engine.surfaces) {
             canvas.save()
             val cx = surface.position.x + surface.width / 2f
             val cy = surface.position.y + surface.height / 2f
@@ -199,7 +199,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             val hw = surface.width / 2f
             val hh = surface.height / 2f
             val destRect = RectF(-hw, -hh, hw, hh)
-            val bmp = platformBitmaps[index % platformBitmaps.size]
+            val bmp = platformBitmaps[surface.bitmapIndex % platformBitmaps.size]
             canvas.drawBitmap(bmp, null, destRect, null)
             canvas.restore()
         }

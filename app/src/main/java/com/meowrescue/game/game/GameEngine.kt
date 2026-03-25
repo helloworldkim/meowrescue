@@ -133,12 +133,13 @@ class GameEngine {
             }
         }
 
-        for (platformData in data.platforms) {
+        for ((index, platformData) in data.platforms.withIndex()) {
             val surface = Surface(
                 position = Vector2D(platformData.x, platformData.y),
                 width = platformData.width,
                 height = platformData.height,
-                angle = platformData.angle
+                angle = platformData.angle,
+                bitmapIndex = index
             )
             surfaces.add(surface)
             physics.addSurface(surface)
@@ -291,12 +292,17 @@ class GameEngine {
         physics.removePin(pin)
         eventListener?.onPinRemoved()
 
-        // Remove surfaces linked to this pin
+        // Remove surfaces linked to this pin, but only if no other non-removed pin still supports them
         val linkedSurfaces = pinSurfaceLinks.remove(pin)
         if (linkedSurfaces != null) {
             for (surface in linkedSurfaces) {
-                surfaces.remove(surface)
-                physics.removeSurface(surface)
+                val stillSupported = pinSurfaceLinks.any { (_, surfaces) ->
+                    surface in surfaces
+                }
+                if (!stillSupported) {
+                    surfaces.remove(surface)
+                    physics.removeSurface(surface)
+                }
             }
         }
     }
