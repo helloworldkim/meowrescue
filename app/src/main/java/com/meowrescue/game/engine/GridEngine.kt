@@ -4,6 +4,7 @@ import com.meowrescue.game.model.Block
 import com.meowrescue.game.model.BlockType
 import com.meowrescue.game.model.GridState
 import com.meowrescue.game.model.MatchResult
+import java.util.Random
 import com.meowrescue.game.util.GridConstants
 
 object GridEngine {
@@ -145,5 +146,63 @@ object GridEngine {
     fun getValidTapTargets(grid: GridState): List<Pair<Int, Int>> {
         val matches = findMatches(grid)
         return matches.flatMap { it.positions }
+    }
+
+    fun swapBlocks(grid: GridState, r1: Int, c1: Int, r2: Int, c2: Int) {
+        val a = grid.get(r1, c1)
+        val b = grid.get(r2, c2)
+        grid.set(r1, c1, b?.copy(row = r1, col = c1))
+        grid.set(r2, c2, a?.copy(row = r2, col = c2))
+    }
+
+    fun hasValidSwaps(grid: GridState): Boolean {
+        for (row in 0 until grid.height) {
+            for (col in 0 until grid.width) {
+                // Try swap right
+                if (col + 1 < grid.width) {
+                    swapBlocks(grid, row, col, row, col + 1)
+                    val hasMatch = findMatches(grid).isNotEmpty()
+                    swapBlocks(grid, row, col, row, col + 1)
+                    if (hasMatch) return true
+                }
+                // Try swap down
+                if (row + 1 < grid.height) {
+                    swapBlocks(grid, row, col, row + 1, col)
+                    val hasMatch = findMatches(grid).isNotEmpty()
+                    swapBlocks(grid, row, col, row + 1, col)
+                    if (hasMatch) return true
+                }
+            }
+        }
+        return false
+    }
+
+    fun shuffle(grid: GridState, random: java.util.Random = java.util.Random()): GridState {
+        val allBlocks = mutableListOf<BlockType>()
+        for (row in 0 until grid.height) {
+            for (col in 0 until grid.width) {
+                val block = grid.get(row, col)
+                if (block != null && block.type != BlockType.EMPTY) {
+                    allBlocks.add(block.type)
+                }
+            }
+        }
+
+        var attempts = 0
+        do {
+            allBlocks.shuffle(random)
+            var idx = 0
+            for (row in 0 until grid.height) {
+                for (col in 0 until grid.width) {
+                    if (idx < allBlocks.size) {
+                        grid.set(row, col, Block(type = allBlocks[idx], row = row, col = col))
+                        idx++
+                    }
+                }
+            }
+            attempts++
+        } while (!hasValidSwaps(grid) && attempts < 100)
+
+        return grid
     }
 }

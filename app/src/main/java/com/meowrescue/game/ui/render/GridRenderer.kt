@@ -26,6 +26,17 @@ class GridRenderer(context: Context) {
         style = Paint.Style.FILL
     }
 
+    private val selectionPaint = Paint().apply {
+        color = Color.argb(200, 255, 255, 0)
+        style = Paint.Style.STROKE
+        strokeWidth = 6f
+        isAntiAlias = true
+    }
+
+    // Selection state
+    private var selectedRow = -1
+    private var selectedCol = -1
+
     // Animation state
     private var matchingPositions: Set<Pair<Int, Int>> = emptySet()
     private var matchAnimProgress = 0f
@@ -83,8 +94,22 @@ class GridRenderer(context: Context) {
                 if (bmp != null) {
                     canvas.drawBitmap(bmp, null, rect, null)
                 }
+
+                if (row == selectedRow && col == selectedCol) {
+                    canvas.drawRoundRect(rect, 8f, 8f, selectionPaint)
+                }
             }
         }
+    }
+
+    fun setSelection(row: Int, col: Int) {
+        selectedRow = row
+        selectedCol = col
+    }
+
+    fun clearSelection() {
+        selectedRow = -1
+        selectedCol = -1
     }
 
     fun setMatchAnimation(positions: Set<Pair<Int, Int>>, progress: Float) {

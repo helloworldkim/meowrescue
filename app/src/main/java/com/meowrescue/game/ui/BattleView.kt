@@ -39,6 +39,7 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
     val enemyRenderer = EnemyRenderer(context)
     val effectRenderer = EffectRenderer()
     private val battleHUD = BattleHUD()
+    val tutorialOverlay = TutorialOverlay(context)
 
     private var backgroundBmp: Bitmap = loadScaled(R.drawable.bg_tutorial, 1080, 1920)
 
@@ -150,6 +151,10 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         if (showingVictory) drawResultOverlay(canvas, true)
         if (showingDefeat) drawResultOverlay(canvas, false)
 
+        if (tutorialOverlay.isActive) {
+            tutorialOverlay.draw(canvas, GridConstants.DESIGN_WIDTH, GridConstants.DESIGN_HEIGHT)
+        }
+
         if (shakeX != 0f || shakeY != 0f) {
             canvas.translate(-shakeX, -shakeY)
         }
@@ -160,10 +165,12 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
     private fun drawPhaseIndicator(canvas: Canvas, phase: BattleTurnPhase) {
         val text = when (phase) {
             BattleTurnPhase.PLAYER_INPUT -> "Your Turn"
+            BattleTurnPhase.SWAP_BACK -> "No Match!"
             BattleTurnPhase.MATCHING -> "Matching!"
             BattleTurnPhase.CASCADING -> "Cascade!"
             BattleTurnPhase.PLAYER_ATTACK -> "Attack!"
             BattleTurnPhase.ENEMY_ATTACK -> "Enemy Turn"
+            BattleTurnPhase.NO_MOVES -> "No Moves!"
             BattleTurnPhase.VICTORY, BattleTurnPhase.DEFEAT -> return
         }
         canvas.drawText(text, GridConstants.DESIGN_WIDTH / 2f, 730f, phaseTextPaint)
@@ -232,6 +239,11 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         val (x, y) = screenToDesign(event.x, event.y)
         val engine = battleEngine ?: return true
 
+        if (tutorialOverlay.isActive) {
+            tutorialOverlay.advance()
+            return true
+        }
+
         if (showingVictory || showingDefeat) {
             if (!overlayCallbackFired) {
                 val centerX = GridConstants.DESIGN_WIDTH / 2f
@@ -254,6 +266,11 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
             if (gridPos != null) {
                 val (row, col) = gridPos
                 engine.onPlayerSelectBlock(row, col)
+                if (engine.selectedRow >= 0) {
+                    gridRenderer.setSelection(engine.selectedRow, engine.selectedCol)
+                } else {
+                    gridRenderer.clearSelection()
+                }
             }
         }
 

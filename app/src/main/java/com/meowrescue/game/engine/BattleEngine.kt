@@ -9,12 +9,17 @@ class BattleEngine(val state: BattleState) {
 
     interface BattleEventListener {
         fun onPhaseChanged(phase: BattleTurnPhase) {}
+        fun onBlockSelected(row: Int, col: Int) {}
+        fun onSwapStarted(r1: Int, c1: Int, r2: Int, c2: Int) {}
+        fun onSwapFailed(r1: Int, c1: Int, r2: Int, c2: Int) {}
         fun onMatchFound(matches: List<MatchResult>) {}
         fun onCascade(round: Int, matches: List<MatchResult>) {}
         fun onDamageDealt(results: List<DamageResult>) {}
         fun onPlayerHealed(amount: Int) {}
         fun onEnemyAttack(enemy: Enemy, effect: EnemyAI.AttackEffect) {}
         fun onEnemyDefeated(enemy: Enemy) {}
+        fun onNoValidMoves(canShuffle: Boolean) {}
+        fun onShuffle() {}
         fun onVictory() {}
         fun onDefeat() {}
     }
@@ -23,76 +28,130 @@ class BattleEngine(val state: BattleState) {
 
     private val random = java.util.Random()
 
-    // The position tapped by the player, used in MATCHING phase
-    private var tappedRow: Int = -1
-    private var tappedCol: Int = -1
+    // Selection state for swap
+    var selectedRow: Int = -1
+        private set
+    var selectedCol: Int = -1
+        private set
 
-    // Initial match found at the tapped position (chainLevel 0)
+    // Swap coordinates for swap-back animation
+    private var swapR1 = -1
+    private var swapC1 = -1
+    private var swapR2 = -1
+    private var swapC2 = -1
+
+    // Match results accumulated for the turn
     private var initialMatch: List<MatchResult> = emptyList()
-
-    // Cascade rounds collected after initial match (chainLevel 1+)
     private var cascadeRounds: List<List<MatchResult>> = emptyList()
-
-    // All match results accumulated for the turn (initial + cascade), used in PLAYER_ATTACK
     private var allTurnMatches: List<MatchResult> = emptyList()
 
     fun onPlayerSelectBlock(row: Int, col: Int): Boolean {
         if (state.phase != BattleTurnPhase.PLAYER_INPUT) return false
+        val block = state.grid.get(row, col) ?: return false
 
-        val validTargets = GridEngine.getValidTapTargets(state.grid)
-        if ((row to col) !in validTargets) return false
+        if (selectedRow < 0) {
+            // First selection
+            selectedRow = row
+            selectedCol = col
+            eventListener?.onBlockSelected(row, col)
+            return true
+        }
 
-        tappedRow = row
-        tappedCol = col
+        // Same block tapped — deselect
+        if (selectedRow == row && selectedCol == col) {
+            clearSelection()
+            return true
+        }
 
-        transitionTo(BattleTurnPhase.MATCHING)
+        // Check if adjacent (up/down/left/right)
+        val dr = Math.abs(selectedRow - row)
+        val dc = Math.abs(selectedCol - col)
+        if (dr + dc != 1) {
+            // Not adjacent — change selection
+            selectedRow = row
+            selectedCol = col
+            eventListener?.onBlockSelected(row, col)
+            return true
+        }
+
+        // Adjacent — attempt swap
+        swapR1 = selectedRow
+        swapC1 = selectedCol
+        swapR2 = row
+        swapC2 = col
+        clearSelection()
+
+        GridEngine.swapBlocks(state.grid, swapR1, swapC1, swapR2, swapC2)
+        eventListener?.onSwapStarted(swapR1, swapC1, swapR2, swapC2)
+
+        val matches = GridEngine.findMatches(state.grid)
+        if (matches.isEmpty()) {
+            // No match — swap back
+            transitionTo(BattleTurnPhase.SWAP_BACK)
+        } else {
+            transitionTo(BattleTurnPhase.MATCHING)
+        }
         return true
+    }
+
+    fun clearSelection() {
+        selectedRow = -1
+        selectedCol = -1
+    }
+
+    fun requestShuffle(): Boolean {
+        if (!state.canShuffle) return false
+        state.shufflesUsed++
+        GridEngine.shuffle(state.grid, random)
+        eventListener?.onShuffle()
+        transitionTo(BattleTurnPhase.PLAYER_INPUT)
+        return true
+    }
+
+    fun declineShuffle() {
+        transitionTo(BattleTurnPhase.DEFEAT)
     }
 
     fun advancePhase() {
         when (state.phase) {
+            BattleTurnPhase.SWAP_BACK -> handleSwapBack()
             BattleTurnPhase.MATCHING -> handleMatching()
             BattleTurnPhase.CASCADING -> handleCascading()
             BattleTurnPhase.PLAYER_ATTACK -> handlePlayerAttack()
             BattleTurnPhase.ENEMY_ATTACK -> handleEnemyAttack()
+            BattleTurnPhase.NO_MOVES -> { /* waiting for user choice (shuffle or give up) */ }
             BattleTurnPhase.VICTORY -> eventListener?.onVictory()
             BattleTurnPhase.DEFEAT -> eventListener?.onDefeat()
-            BattleTurnPhase.PLAYER_INPUT -> { /* waiting for input, nothing to advance */ }
+            BattleTurnPhase.PLAYER_INPUT -> { /* waiting for input */ }
         }
     }
 
-    private fun handleMatching() {
-        // Find the match group containing the tapped block
-        val allMatches = GridEngine.findMatches(state.grid)
-        val matchAtTap = allMatches.firstOrNull { match ->
-            (tappedRow to tappedCol) in match.positions
-        }
+    private fun handleSwapBack() {
+        GridEngine.swapBlocks(state.grid, swapR1, swapC1, swapR2, swapC2)
+        eventListener?.onSwapFailed(swapR1, swapC1, swapR2, swapC2)
+        transitionTo(BattleTurnPhase.PLAYER_INPUT)
+    }
 
-        if (matchAtTap == null) {
-            // No valid match at tap position; return to player input
+    private fun handleMatching() {
+        val allMatches = GridEngine.findMatches(state.grid)
+        if (allMatches.isEmpty()) {
             transitionTo(BattleTurnPhase.PLAYER_INPUT)
             return
         }
 
-        // Tag as chainLevel 0 and remove from grid
-        val taggedMatch = matchAtTap.copy(chainLevel = 0)
-        initialMatch = listOf(taggedMatch)
+        val taggedMatches = allMatches.map { it.copy(chainLevel = 0) }
+        initialMatch = taggedMatches
 
         val gridAfterRemoval = GridEngine.removeMatches(state.grid, initialMatch)
         val gridAfterGravity = GridEngine.applyGravity(gridAfterRemoval)
         val gridAfterRefill = GridEngine.refillEmpty(gridAfterGravity, random)
-
-        // Apply the updated grid back to state
         applyGrid(gridAfterRefill)
 
         eventListener?.onMatchFound(initialMatch)
-
         transitionTo(BattleTurnPhase.CASCADING)
     }
 
     private fun handleCascading() {
-        // Replay cascade manually using our shared random so the grid state stays in sync.
-        // Each round is tagged starting at chainLevel 1 (initial match was 0).
         val rounds = mutableListOf<List<MatchResult>>()
         var current = state.grid.copy()
         var chainLevel = 1
@@ -107,21 +166,17 @@ class BattleEngine(val state: BattleState) {
             current = GridEngine.removeMatches(current, taggedMatches)
             current = GridEngine.applyGravity(current)
             current = GridEngine.refillEmpty(current, random)
-
             chainLevel++
         }
 
         cascadeRounds = rounds
         applyGrid(current)
 
-        // Fire cascade events
         cascadeRounds.forEachIndexed { index, roundMatches ->
             eventListener?.onCascade(index + 1, roundMatches)
         }
 
-        // Collect all matches for PLAYER_ATTACK phase
         allTurnMatches = initialMatch + cascadeRounds.flatten()
-
         transitionTo(BattleTurnPhase.PLAYER_ATTACK)
     }
 
@@ -133,7 +188,6 @@ class BattleEngine(val state: BattleState) {
             enemies = state.enemies
         )
 
-        // Apply damage to enemies
         for (result in damageResults) {
             val enemy = state.enemies.find { it.id == result.enemyId } ?: continue
             enemy.currentHp = maxOf(0, enemy.currentHp - result.damage)
@@ -143,7 +197,6 @@ class BattleEngine(val state: BattleState) {
             eventListener?.onDamageDealt(damageResults)
         }
 
-        // Apply healing to player
         val healAmount = DamageCalculator.calculateHeal(
             matches = allTurnMatches,
             buffs = state.catBuffs,
@@ -157,7 +210,6 @@ class BattleEngine(val state: BattleState) {
             }
         }
 
-        // Fire defeated events
         for (result in damageResults) {
             val enemy = state.enemies.find { it.id == result.enemyId } ?: continue
             if (!enemy.isAlive) {
@@ -192,7 +244,6 @@ class BattleEngine(val state: BattleState) {
                     enemy.currentHp = minOf(enemy.currentHp + effect.healAmount, enemy.maxHp)
                 }
                 is EnemyAI.AttackEffect.BuffSelf -> {
-                    // Enemy.attack is val; replace the entry with a copy that has the boosted value.
                     val boost = (enemy.attack * effect.attackBoostPercent / 100f).toInt()
                     val idx = state.enemies.indexOf(enemy)
                     if (idx >= 0) {
@@ -207,7 +258,16 @@ class BattleEngine(val state: BattleState) {
         if (!state.isPlayerAlive) {
             transitionTo(BattleTurnPhase.DEFEAT)
         } else {
+            checkForDeadlock()
+        }
+    }
+
+    private fun checkForDeadlock() {
+        if (GridEngine.hasValidSwaps(state.grid)) {
             transitionTo(BattleTurnPhase.PLAYER_INPUT)
+        } else {
+            transitionTo(BattleTurnPhase.NO_MOVES)
+            eventListener?.onNoValidMoves(state.canShuffle)
         }
     }
 

@@ -64,6 +64,7 @@ class BattleActivity : AppCompatActivity() {
         battleView.battleEngine = battleEngine
         setContentView(battleView)
 
+        battleView.tutorialOverlay.init(chapter, stage)
         battleView.post { battleView.setupGrid() }
 
         gameLoop = GameLoop(battleEngine, battleView)
@@ -129,6 +130,45 @@ class BattleActivity : AppCompatActivity() {
                 runOnUiThread {
                     battleView.showDefeat()
                 }
+            }
+
+            override fun onSwapFailed(r1: Int, c1: Int, r2: Int, c2: Int) {
+                SoundManager.playButtonTap()
+            }
+
+            override fun onBlockSelected(row: Int, col: Int) {
+                SoundManager.playButtonTap()
+            }
+
+            override fun onNoValidMoves(canShuffle: Boolean) {
+                runOnUiThread {
+                    if (canShuffle) {
+                        android.app.AlertDialog.Builder(this@BattleActivity)
+                            .setTitle("No Moves!")
+                            .setMessage("No valid swaps available.\nShuffle the board? (1 chance)")
+                            .setPositiveButton("Shuffle") { _, _ ->
+                                battleEngine.requestShuffle()
+                            }
+                            .setNegativeButton("Give Up") { _, _ ->
+                                battleEngine.declineShuffle()
+                            }
+                            .setCancelable(false)
+                            .show()
+                    } else {
+                        android.app.AlertDialog.Builder(this@BattleActivity)
+                            .setTitle("No Moves!")
+                            .setMessage("No valid swaps and no shuffles remaining.")
+                            .setPositiveButton("OK") { _, _ ->
+                                battleEngine.declineShuffle()
+                            }
+                            .setCancelable(false)
+                            .show()
+                    }
+                }
+            }
+
+            override fun onShuffle() {
+                SoundManager.playCascade()
             }
         }
 

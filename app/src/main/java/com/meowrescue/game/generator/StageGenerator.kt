@@ -42,7 +42,7 @@ object StageGenerator {
             )
         }
 
-        val templates = EnemyTemplate.ALL
+        val templates = EnemyTemplate.getTemplatesForChapter(stats.chapter)
         return (0 until stats.count).map {
             val template = templates[random.nextInt(templates.size)]
             EnemyTemplate.createEnemy(template, stats.hpScale, stats.attackScale)

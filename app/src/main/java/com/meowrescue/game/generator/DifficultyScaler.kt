@@ -8,7 +8,8 @@ object DifficultyScaler {
         val count: Int,
         val hpScale: Float,
         val attackScale: Float,
-        val isBoss: Boolean = false
+        val isBoss: Boolean = false,
+        val chapter: Int = 1
     )
 
     data class GridConstraints(
@@ -30,7 +31,8 @@ object DifficultyScaler {
                 count = 1,
                 hpScale = baseScale * 2f,
                 attackScale = baseScale * 1.5f,
-                isBoss = true
+                isBoss = true,
+                chapter = chapter
             )
         } else {
             val enemyCount = when {
@@ -41,7 +43,8 @@ object DifficultyScaler {
             EnemyStatRange(
                 count = enemyCount,
                 hpScale = baseScale,
-                attackScale = baseScale
+                attackScale = baseScale,
+                chapter = chapter
             )
         }
     }

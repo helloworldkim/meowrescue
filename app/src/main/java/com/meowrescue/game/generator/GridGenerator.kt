@@ -49,7 +49,25 @@ object GridGenerator {
         val grid = GridState(width, height, blocks)
 
         // Safety check: if flood-fill still finds matches (L/T shapes), regenerate those cells
-        return ensureNoMatches(grid, allowedTypes, random)
+        val cleanGrid = ensureNoMatches(grid, allowedTypes, random)
+
+        // Ensure at least one valid swap exists
+        return ensureValidSwaps(cleanGrid, allowedTypes, random)
+    }
+
+    private fun ensureValidSwaps(
+        grid: GridState,
+        allowedTypes: List<BlockType>,
+        random: Random
+    ): GridState {
+        var attempts = 0
+        var current = grid
+        while (!com.meowrescue.game.engine.GridEngine.hasValidSwaps(current) && attempts < 50) {
+            com.meowrescue.game.engine.GridEngine.shuffle(current, random)
+            current = ensureNoMatches(current, allowedTypes, random)
+            attempts++
+        }
+        return current
     }
 
     private fun ensureNoMatches(
@@ -92,7 +110,7 @@ object GridGenerator {
                 visited[row][col] = true
 
                 while (queue.isNotEmpty()) {
-                    val (r, c) = queue.poll()
+                    val (r, c) = queue.poll() ?: break
                     group.add(r to c)
                     for ((dr, dc) in dirs) {
                         val nr = r + dr

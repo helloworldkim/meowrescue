@@ -12,8 +12,10 @@ data class BattleState(
     val relics: MutableList<Relic>,
     var phase: BattleTurnPhase,
     val chapter: Int,
-    val stage: Int
+    val stage: Int,
+    var shufflesUsed: Int = 0
 ) {
     val isPlayerAlive: Boolean get() = playerCurrentHp > 0
     val allEnemiesDead: Boolean get() = enemies.none { it.isAlive }
+    val canShuffle: Boolean get() = shufflesUsed < 1
 }

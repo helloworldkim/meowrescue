@@ -83,12 +83,13 @@ class GameLoop(
         val elapsed = System.currentTimeMillis() - phaseStartTime
 
         val delay = when (phase) {
+            BattleTurnPhase.SWAP_BACK -> GridConstants.MATCH_ANIM_MS
             BattleTurnPhase.MATCHING -> GridConstants.MATCH_ANIM_MS
             BattleTurnPhase.CASCADING -> GridConstants.CASCADE_ANIM_MS
             BattleTurnPhase.PLAYER_ATTACK -> GridConstants.ATTACK_ANIM_MS
             BattleTurnPhase.ENEMY_ATTACK -> GridConstants.ATTACK_ANIM_MS
             BattleTurnPhase.VICTORY, BattleTurnPhase.DEFEAT -> 500L
-            BattleTurnPhase.PLAYER_INPUT -> {
+            BattleTurnPhase.PLAYER_INPUT, BattleTurnPhase.NO_MOVES -> {
                 autoAdvanceScheduled = false
                 return
             }

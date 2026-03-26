@@ -58,6 +58,14 @@ object EnemyTemplate {
     val ALL = listOf(SLIME, RAT, CROW, SNAKE)
     val BOSSES = listOf(BOSS_WOLF)
 
+    fun getTemplatesForChapter(chapter: Int): List<Template> {
+        return when (chapter) {
+            1 -> listOf(SLIME, RAT)
+            2 -> listOf(SLIME, RAT, CROW)
+            else -> ALL
+        }
+    }
+
     fun createEnemy(template: Template, hpScale: Float = 1f, attackScale: Float = 1f): Enemy {
         val hp = (template.baseHp * hpScale).toInt()
         return Enemy(
