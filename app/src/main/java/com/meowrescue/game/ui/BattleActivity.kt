@@ -43,9 +43,7 @@ class BattleActivity : AppCompatActivity() {
         stage = intent.getIntExtra("stage", 1)
         repository = GameRepository(this)
 
-        // Generate stage
         val stageData = StageGenerator.generateStage(chapter, stage)
-
         val playerHp = com.meowrescue.game.generator.DifficultyScaler.getPlayerStartHp(chapter)
 
         val battleState = BattleState(
@@ -66,56 +64,51 @@ class BattleActivity : AppCompatActivity() {
         battleView.battleEngine = battleEngine
         setContentView(battleView)
 
-        // Setup grid layout after view is ready
         battleView.post { battleView.setupGrid() }
 
         gameLoop = GameLoop(battleEngine, battleView)
 
-        // Connect battle events
         battleEngine.eventListener = object : BattleEngine.BattleEventListener {
             override fun onPhaseChanged(phase: BattleTurnPhase) {
                 gameLoop.onPhaseChanged(phase)
             }
 
             override fun onMatchFound(matches: List<MatchResult>) {
-                SoundManager.playButtonTap()
+                SoundManager.playBlockMatch()
                 val positions = matches.flatMap { it.positions }.toSet()
                 battleView.startMatchAnimation(positions)
             }
 
             override fun onCascade(round: Int, matches: List<MatchResult>) {
-                SoundManager.playBallBounce()
+                SoundManager.playCascade()
             }
 
             override fun onDamageDealt(results: List<DamageResult>) {
-                SoundManager.playBallDestroy()
+                SoundManager.playAttackHit()
                 battleView.effectRenderer.triggerScreenShake()
                 for (result in results) {
                     if (result.damage > 0) {
-                        // Position damage numbers at screen center (approximate)
-                        val x = 540f
-                        val y = 300f
-                        battleView.effectRenderer.addDamageNumber(x, y, result.damage, result.isWeakness)
+                        battleView.effectRenderer.addDamageNumber(540f, 300f, result.damage, result.isWeakness)
                     }
                 }
             }
 
             override fun onPlayerHealed(amount: Int) {
-                SoundManager.playCatRescue()
+                SoundManager.playHeal()
                 battleView.effectRenderer.addHealNumber(540f, 1800f, amount)
             }
 
             override fun onEnemyAttack(enemy: Enemy, effect: EnemyAI.AttackEffect) {
                 when (effect) {
                     is EnemyAI.AttackEffect.DamagePlayer -> {
-                        SoundManager.playBombExplode()
+                        SoundManager.playEnemyAttack()
                         battleView.effectRenderer.triggerScreenShake(12f)
                     }
                     is EnemyAI.AttackEffect.HealSelf -> {
-                        SoundManager.playCatRescue()
+                        SoundManager.playHeal()
                     }
                     is EnemyAI.AttackEffect.BuffSelf -> {
-                        SoundManager.playSwitchToggle()
+                        SoundManager.playBlockMatch()
                     }
                 }
             }
@@ -139,24 +132,20 @@ class BattleActivity : AppCompatActivity() {
             }
         }
 
-        // Victory/Defeat callbacks
         battleView.onVictory = {
             runOnUiThread {
                 SoundManager.playButtonTap()
-                val nextStage = stage + 1
                 val goToNext = {
-                    if (nextStage > 10) {
-                        // Chapter complete — go to next chapter
-                        val intent = Intent(this, BattleActivity::class.java)
-                        intent.putExtra("chapter", chapter + 1)
-                        intent.putExtra("stage", 1)
-                        startActivity(intent)
+                    val nextIntent = if (stage >= 10) {
+                        Intent(this, BattleActivity::class.java)
+                            .putExtra("chapter", chapter + 1)
+                            .putExtra("stage", 1)
                     } else {
-                        val intent = Intent(this, BattleActivity::class.java)
-                        intent.putExtra("chapter", chapter)
-                        intent.putExtra("stage", nextStage)
-                        startActivity(intent)
+                        Intent(this, BattleActivity::class.java)
+                            .putExtra("chapter", chapter)
+                            .putExtra("stage", stage + 1)
                     }
+                    startActivity(nextIntent)
                     finish()
                 }
                 if (AdManager.shouldShowInterstitial(stage)) {
@@ -171,10 +160,11 @@ class BattleActivity : AppCompatActivity() {
             runOnUiThread {
                 SoundManager.playButtonTap()
                 val retry = {
-                    val intent = Intent(this, BattleActivity::class.java)
-                    intent.putExtra("chapter", chapter)
-                    intent.putExtra("stage", stage)
-                    startActivity(intent)
+                    startActivity(
+                        Intent(this, BattleActivity::class.java)
+                            .putExtra("chapter", chapter)
+                            .putExtra("stage", stage)
+                    )
                     finish()
                 }
                 if (AdManager.isRewardedReady()) {
@@ -208,7 +198,6 @@ class BattleActivity : AppCompatActivity() {
             }
         }
 
-        // Preload ads
         AdManager.loadInterstitial(this)
         AdManager.loadRewarded(this)
     }
@@ -216,7 +205,8 @@ class BattleActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         gameLoop.start()
-        SoundManager.playBgm("beginner")
+        val bgmKey = if (stage == 10) "battle_boss" else "battle_normal"
+        SoundManager.playBgm(bgmKey)
     }
 
     override fun onPause() {

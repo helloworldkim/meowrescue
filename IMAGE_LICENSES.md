@@ -1,7 +1,6 @@
 # Image Asset Licenses
 
-이 프로젝트에서 사용하는 모든 이미지 에셋(고양이 스프라이트 제외)은 **CC0 1.0 Universal (Public Domain)** 라이센스입니다.
-상업적 사용, 수정, 재배포가 자유롭고 저작자 표기 의무가 없습니다.
+이 프로젝트에서 사용하는 모든 이미지 에셋(고양이 스프라이트 제외)은 **CC0 1.0 Universal (Public Domain)** 라이센스이거나 프로젝트 내에서 자체 생성된 에셋입니다.
 
 > **CC0 1.0 Universal**: https://creativecommons.org/publicdomain/zero/1.0/
 
@@ -12,21 +11,11 @@
 **공식 사이트**: https://kenney.nl
 **라이센스**: CC0 1.0 Universal (Public Domain)
 **라이센스 전문**: https://creativecommons.org/publicdomain/zero/1.0/
-**GitHub Mirror**: https://github.com/iwenzhou/kenney (Complete Asset Pack)
 
 > Kenney의 모든 에셋은 CC0 라이센스로 제공됩니다.
 > "All assets can be used in personal and commercial projects." — kenney.nl
 
 ---
-
-### 공 (Balls)
-
-| 게임 파일 | 원본 팩 | 원본 파일 | 용도 |
-|-----------|---------|-----------|------|
-| `ball_normal.png` | Puzzle Assets | `ballBlue.png` | 일반 공 |
-| `ball_fire.png` | Platformer Base Pack / Items | `fireball.png` | 불 공 |
-| `ball_iron.png` | Puzzle Assets | `ballGrey.png` | 철 공 |
-| `ball_bomb.png` | Platformer Base Pack / Items | `bomb.png` | 폭탄 공 |
 
 ### 배경 (Backgrounds)
 
@@ -35,7 +24,7 @@
 | `bg_tutorial.png` | Platformer Base Pack | `bg.png` | 튜토리얼 배경 |
 | `bg_beginner.png` | Platformer Base Pack | `bg.png` (green tint) | 초급 배경 |
 | `bg_intermediate.png` | Platformer Base Pack | `bg.png` (warm tint) | 중급 배경 |
-| `bg_advanced.png` | Platformer Base Pack | `bg_castle.png` | 고급 배경 |
+| `bg_advanced.png` | Platformer Base Pack | `bg_castle.png` | 고급/보스 배경 |
 
 ### 버튼 (Buttons)
 
@@ -45,36 +34,6 @@
 | `btn_home.png` | Platformer Base Pack / Items | `buttonBlue.png` | 홈 버튼 |
 | `btn_next.png` | Platformer Base Pack / Items | `buttonYellow.png` | 다음 버튼 |
 | `btn_retry.png` | Platformer Base Pack / Items | `buttonRed.png` | 재시작 버튼 |
-
-### 핀 (Pins)
-
-| 게임 파일 | 원본 팩 | 원본 파일 | 용도 |
-|-----------|---------|-----------|------|
-| `pin_normal.png` | Platformer Base Pack / Items | `chain.png` | 일반 핀 |
-| `pin_timer.png` | Platformer Base Pack / Items | `springboardDown.png` | 타이머 핀 |
-| `pin_direction.png` | Platformer Base Pack / Items | `flagRed.png` | 방향 핀 |
-| `pin_locked.png` | Platformer Base Pack / Tiles | `lock_red.png` | 잠긴 핀 |
-| `pin_chain.png` | Platformer Base Pack / Items | `weightChained.png` | 체인 핀 |
-
-### 플랫폼 (Platforms)
-
-| 게임 파일 | 원본 팩 | 원본 파일 | 용도 |
-|-----------|---------|-----------|------|
-| `platform.png` | Platformer Base Pack / Tiles | `grassHalfMid.png` | 기본 플랫폼 |
-| `platform_1.png` | Platformer Base Pack / Tiles | `grassHalfMid.png` | 잔디 플랫폼 |
-| `platform_2.png` | Platformer Base Pack / Tiles | `dirtHalfMid.png` | 흙 플랫폼 |
-| `platform_3.png` | Platformer Base Pack / Tiles | `sandHalfMid.png` | 모래 플랫폼 |
-| `platform_4.png` | Platformer Base Pack / Tiles | `snowHalfMid.png` | 눈 플랫폼 |
-| `platform_5.png` | Platformer Base Pack / Tiles | `stoneHalfMid.png` | 돌 플랫폼 |
-| `platform_6.png` | Platformer Base Pack / Tiles | `castleHalfMid.png` | 성 플랫폼 |
-| `platform_cloud.png` | Platformer Base Pack / Items | `cloud1.png` | 구름 플랫폼 |
-
-### 장애물 (Obstacles)
-
-| 게임 파일 | 원본 팩 | 원본 파일 | 용도 |
-|-----------|---------|-----------|------|
-| `obstacle_fire.png` | Platformer Base Pack / Tiles | `liquidLavaTop.png` | 불 장애물 |
-| `obstacle_spike.png` | Platformer Base Pack / Items | `spikes.png` | 가시 장애물 |
 
 ### 별 (Stars)
 
@@ -90,13 +49,6 @@
 | `popup_clear.png` | UI Pack / Base Pack | `green_panel.png` + text | 클리어 팝업 |
 | `popup_fail.png` | UI Pack / Base Pack | `grey_panel.png` + text | 실패 팝업 |
 
-### 아이콘 (Icons)
-
-| 게임 파일 | 원본 팩 | 원본 파일 | 용도 |
-|-----------|---------|-----------|------|
-| `icon_hint.png` | — | Generated (Pillow) | 힌트 아이콘 |
-| `icon_pause.png` | — | Generated (Pillow) | 일시정지 아이콘 |
-
 ### 레벨 UI (Level UI)
 
 | 게임 파일 | 원본 팩 | 원본 파일 | 용도 |
@@ -110,8 +62,38 @@
 | 게임 파일 | 원본 팩 | 원본 파일 | 용도 |
 |-----------|---------|-----------|------|
 | `path.png` | Platformer Base Pack / Tiles | `bridgeLogs.png` | 경로 |
-| `switch_block.png` | Platformer Base Pack / Items | `switchMid.png` | 스위치 블록 |
-| `teleport.png` | Platformer Base Pack / Tiles | `door_closedMid.png` | 텔레포트 |
+
+---
+
+## 자체 생성 에셋 (Generated)
+
+다음 파일은 Python Pillow로 프로젝트 내에서 자동 생성된 에셋입니다.
+
+### 블록 스프라이트 (Block Sprites)
+
+| 게임 파일 | 설명 | 용도 |
+|-----------|------|------|
+| `block_attack.png` | 빨간 둥근 사각형 + 칼 아이콘 (128x128) | 공격 블록 |
+| `block_fire.png` | 주황 둥근 사각형 + 불꽃 아이콘 (128x128) | 불 블록 |
+| `block_water.png` | 파란 둥근 사각형 + 물방울 아이콘 (128x128) | 물 블록 |
+| `block_heal.png` | 초록 둥근 사각형 + 십자 아이콘 (128x128) | 힐 블록 |
+
+### 적 스프라이트 (Enemy Sprites)
+
+| 게임 파일 | 설명 | 용도 |
+|-----------|------|------|
+| `enemy_slime.png` | 초록 슬라임 형태 (128x128) | 슬라임 적 |
+| `enemy_rat.png` | 갈색 쥐 형태 (128x128) | 쥐 적 |
+| `enemy_crow.png` | 어두운 새 형태 (128x128) | 까마귀 적 |
+| `enemy_snake.png` | 초록 뱀 형태 (128x128) | 뱀 적 |
+| `enemy_boss_wolf.png` | 어두운 늑대 형태 (192x192) | 보스: 늑대 |
+
+### 아이콘 (Icons)
+
+| 게임 파일 | 설명 | 용도 |
+|-----------|------|------|
+| `icon_hint.png` | 생성 (Pillow) | 힌트 아이콘 |
+| `icon_pause.png` | 생성 (Pillow) | 일시정지 아이콘 |
 
 ---
 

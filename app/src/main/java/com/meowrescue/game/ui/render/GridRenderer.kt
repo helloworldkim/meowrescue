@@ -1,49 +1,30 @@
 package com.meowrescue.game.ui.render
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import com.meowrescue.game.R
 import com.meowrescue.game.model.BlockType
 import com.meowrescue.game.model.GridState
-import com.meowrescue.game.model.MatchResult
 import com.meowrescue.game.util.GridConstants
 
-class GridRenderer {
+class GridRenderer(context: Context) {
 
-    private val blockPaints = mapOf(
-        BlockType.ATTACK to Paint().apply { color = Color.parseColor("#FF6B6B"); style = Paint.Style.FILL; isAntiAlias = true },
-        BlockType.FIRE to Paint().apply { color = Color.parseColor("#FF9F43"); style = Paint.Style.FILL; isAntiAlias = true },
-        BlockType.WATER to Paint().apply { color = Color.parseColor("#54A0FF"); style = Paint.Style.FILL; isAntiAlias = true },
-        BlockType.HEAL to Paint().apply { color = Color.parseColor("#5CD85C"); style = Paint.Style.FILL; isAntiAlias = true }
+    private val blockBitmaps = mapOf(
+        BlockType.ATTACK to loadScaled(context, R.drawable.block_attack, 128, 128),
+        BlockType.FIRE to loadScaled(context, R.drawable.block_fire, 128, 128),
+        BlockType.WATER to loadScaled(context, R.drawable.block_water, 128, 128),
+        BlockType.HEAL to loadScaled(context, R.drawable.block_heal, 128, 128)
     )
-
-    private val blockBorderPaint = Paint().apply {
-        color = Color.WHITE
-        style = Paint.Style.STROKE
-        strokeWidth = 3f
-        isAntiAlias = true
-    }
-
-    private val blockIconPaint = Paint().apply {
-        color = Color.WHITE
-        textSize = 36f
-        textAlign = Paint.Align.CENTER
-        isAntiAlias = true
-        isFakeBoldText = true
-    }
 
     private val gridBgPaint = Paint().apply {
         color = Color.argb(60, 0, 0, 0)
         style = Paint.Style.FILL
     }
-
-    private val blockIcons = mapOf(
-        BlockType.ATTACK to "\u2694",  // crossed swords
-        BlockType.FIRE to "\uD83D\uDD25",     // fire
-        BlockType.WATER to "\uD83D\uDCA7",    // droplet
-        BlockType.HEAL to "\u2764"     // heart
-    )
 
     // Animation state
     private var matchingPositions: Set<Pair<Int, Int>> = emptySet()
@@ -54,6 +35,13 @@ class GridRenderer {
     private var gridTop = 0f
     private var cellSize = 0f
     private var gap = 0f
+
+    private fun loadScaled(context: Context, resId: Int, w: Int, h: Int): Bitmap {
+        val raw = BitmapFactory.decodeResource(context.resources, resId)
+        return Bitmap.createScaledBitmap(raw, w, h, true).also {
+            if (it !== raw) raw.recycle()
+        }
+    }
 
     fun computeLayout(designWidth: Float, gridYOffset: Float, grid: GridState) {
         val totalGap = (grid.width + 1) * GridConstants.BLOCK_GAP_DP
@@ -91,15 +79,9 @@ class GridRenderer {
                     rect.set(cx - hw, cy - hh, cx + hw, cy + hh)
                 }
 
-                val paint = blockPaints[block.type] ?: continue
-                canvas.drawRoundRect(rect, 12f, 12f, paint)
-                canvas.drawRoundRect(rect, 12f, 12f, blockBorderPaint)
-
-                // Icon
-                val icon = blockIcons[block.type]
-                if (icon != null) {
-                    val textY = rect.centerY() + blockIconPaint.textSize / 3f
-                    canvas.drawText(icon, rect.centerX(), textY, blockIconPaint)
+                val bmp = blockBitmaps[block.type]
+                if (bmp != null) {
+                    canvas.drawBitmap(bmp, null, rect, null)
                 }
             }
         }
@@ -115,10 +97,6 @@ class GridRenderer {
         matchAnimProgress = 0f
     }
 
-    /**
-     * Convert a screen tap (in design coordinates) to grid row/col.
-     * Returns null if the tap is outside the grid.
-     */
     fun screenToGrid(designX: Float, designY: Float, grid: GridState): Pair<Int, Int>? {
         val relX = designX - gridLeft - gap
         val relY = designY - gridTop - gap
@@ -129,7 +107,6 @@ class GridRenderer {
 
         if (col !in 0 until grid.width || row !in 0 until grid.height) return null
 
-        // Check that tap is within the block cell, not in the gap
         val cellRelX = relX - col * (cellSize + gap)
         val cellRelY = relY - row * (cellSize + gap)
         if (cellRelX > cellSize || cellRelY > cellSize) return null
@@ -139,5 +116,9 @@ class GridRenderer {
 
     fun getGridBottom(grid: GridState): Float {
         return gridTop + grid.height * cellSize + (grid.height + 1) * gap
+    }
+
+    fun cleanup() {
+        blockBitmaps.values.forEach { it.recycle() }
     }
 }

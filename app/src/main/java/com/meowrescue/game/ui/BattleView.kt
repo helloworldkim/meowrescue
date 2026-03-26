@@ -31,21 +31,17 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
     var surfaceReady = false
         private set
 
-    // Virtual coordinate scaling
     private var scale = 1f
     private var offsetX = 0f
     private var offsetY = 0f
 
-    // Sub-renderers
-    val gridRenderer = GridRenderer()
+    val gridRenderer = GridRenderer(context)
     val enemyRenderer = EnemyRenderer(context)
     val effectRenderer = EffectRenderer()
     private val battleHUD = BattleHUD()
 
-    // Background
     private var backgroundBmp: Bitmap = loadScaled(R.drawable.bg_tutorial, 1080, 1920)
 
-    // Overlay popups
     private val overlayPaint = Paint().apply { style = Paint.Style.FILL }
     private val overlayTextPaint = Paint().apply {
         color = Color.WHITE
@@ -72,13 +68,17 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         isAntiAlias = true
         isFakeBoldText = true
     }
+    private val phaseTextPaint = Paint().apply {
+        color = Color.argb(200, 255, 255, 255)
+        textSize = 30f
+        textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+    }
 
-    // Animation state
     private var matchAnimStartTime = 0L
     private var matchAnimPositions: Set<Pair<Int, Int>> = emptySet()
     private var isAnimating = false
 
-    // Overlay state
     private var showingVictory = false
     private var showingDefeat = false
     private var overlayCallbackFired = false
@@ -128,38 +128,28 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         canvas.translate(offsetX, offsetY)
         canvas.scale(scale, scale)
 
-        // Screen shake
         val (shakeX, shakeY) = effectRenderer.applyScreenShake(canvas)
 
-        // Background
-        val bgRect = RectF(0f, 0f, GridConstants.DESIGN_WIDTH, GridConstants.DESIGN_HEIGHT)
-        canvas.drawBitmap(backgroundBmp, null, bgRect, null)
+        canvas.drawBitmap(backgroundBmp, null, RectF(0f, 0f, GridConstants.DESIGN_WIDTH, GridConstants.DESIGN_HEIGHT), null)
 
-        // Enemies (top area)
         enemyRenderer.draw(canvas, state.enemies, 80f, GridConstants.DESIGN_WIDTH)
 
-        // Grid (middle area)
         updateMatchAnimation()
         gridRenderer.draw(canvas, state.grid)
 
-        // Effects (damage numbers, etc)
         effectRenderer.draw(canvas)
 
-        // HUD
         battleHUD.draw(
             canvas, GridConstants.DESIGN_WIDTH,
             state.playerCurrentHp, state.playerMaxHp,
             state.turnCount, state.chapter, state.stage
         )
 
-        // Phase indicator
         drawPhaseIndicator(canvas, state.phase)
 
-        // Victory/Defeat overlay
         if (showingVictory) drawResultOverlay(canvas, true)
         if (showingDefeat) drawResultOverlay(canvas, false)
 
-        // Undo screen shake
         if (shakeX != 0f || shakeY != 0f) {
             canvas.translate(-shakeX, -shakeY)
         }
@@ -174,18 +164,9 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
             BattleTurnPhase.CASCADING -> "Cascade!"
             BattleTurnPhase.PLAYER_ATTACK -> "Attack!"
             BattleTurnPhase.ENEMY_ATTACK -> "Enemy Turn"
-            BattleTurnPhase.VICTORY -> ""
-            BattleTurnPhase.DEFEAT -> ""
+            BattleTurnPhase.VICTORY, BattleTurnPhase.DEFEAT -> return
         }
-        if (text.isNotEmpty()) {
-            val phaseTextPaint = Paint().apply {
-                color = Color.argb(200, 255, 255, 255)
-                textSize = 30f
-                textAlign = Paint.Align.CENTER
-                isAntiAlias = true
-            }
-            canvas.drawText(text, GridConstants.DESIGN_WIDTH / 2f, 730f, phaseTextPaint)
-        }
+        canvas.drawText(text, GridConstants.DESIGN_WIDTH / 2f, 730f, phaseTextPaint)
     }
 
     private fun drawResultOverlay(canvas: Canvas, isVictory: Boolean) {
@@ -195,24 +176,16 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         val centerX = GridConstants.DESIGN_WIDTH / 2f
         val centerY = GridConstants.DESIGN_HEIGHT / 2f
 
-        // Popup background
-        val popupRect = RectF(centerX - 250f, centerY - 200f, centerX + 250f, centerY + 200f)
         overlayPaint.color = Color.parseColor(if (isVictory) "#2E7D32" else "#C62828")
-        canvas.drawRoundRect(popupRect, 24f, 24f, overlayPaint)
+        canvas.drawRoundRect(RectF(centerX - 250f, centerY - 200f, centerX + 250f, centerY + 200f), 24f, 24f, overlayPaint)
 
-        val title = if (isVictory) "Victory!" else "Defeat..."
-        canvas.drawText(title, centerX, centerY - 80f, overlayTextPaint)
+        canvas.drawText(if (isVictory) "Victory!" else "Defeat...", centerX, centerY - 80f, overlayTextPaint)
+        canvas.drawText(if (isVictory) "Cat Rescued!" else "Try Again?", centerX, centerY - 20f, overlaySubTextPaint)
 
-        val subtitle = if (isVictory) "Cat Rescued!" else "Try Again?"
-        canvas.drawText(subtitle, centerX, centerY - 20f, overlaySubTextPaint)
-
-        // Continue button
-        val btnRect = RectF(centerX - 120f, centerY + 40f, centerX + 120f, centerY + 110f)
         overlayBtnPaint.color = Color.parseColor(if (isVictory) "#4CAF50" else "#FF5722")
-        canvas.drawRoundRect(btnRect, 16f, 16f, overlayBtnPaint)
+        canvas.drawRoundRect(RectF(centerX - 120f, centerY + 40f, centerX + 120f, centerY + 110f), 16f, 16f, overlayBtnPaint)
 
-        val btnText = if (isVictory) "Continue" else "Retry"
-        canvas.drawText(btnText, centerX, centerY + 85f, overlayBtnTextPaint)
+        canvas.drawText(if (isVictory) "Continue" else "Retry", centerX, centerY + 85f, overlayBtnTextPaint)
     }
 
     fun showVictory() {
@@ -259,7 +232,6 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         val (x, y) = screenToDesign(event.x, event.y)
         val engine = battleEngine ?: return true
 
-        // Victory/Defeat overlay tap
         if (showingVictory || showingDefeat) {
             if (!overlayCallbackFired) {
                 val centerX = GridConstants.DESIGN_WIDTH / 2f
@@ -272,13 +244,11 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
             return true
         }
 
-        // Pause button
         if (battleHUD.isPauseTapped(x, y)) {
             onPause?.invoke()
             return true
         }
 
-        // Grid tap (only during PLAYER_INPUT)
         if (engine.state.phase == BattleTurnPhase.PLAYER_INPUT && !isAnimating) {
             val gridPos = gridRenderer.screenToGrid(x, y, engine.state.grid)
             if (gridPos != null) {
@@ -298,6 +268,7 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
     }
 
     fun cleanup() {
+        gridRenderer.cleanup()
         enemyRenderer.cleanup()
         effectRenderer.clear()
         backgroundBmp.recycle()
