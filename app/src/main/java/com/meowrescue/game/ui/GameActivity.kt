@@ -51,6 +51,7 @@ class GameActivity : AppCompatActivity() {
         gameEngine.loadLevel(levelData)
         levelDifficulty = levelData.difficulty
         gameView.setBackgroundForLevel(levelDifficulty)
+        gameView.hintText = levelData.hint
         gameView.resetCallbackState()
 
         // Sound: connect game events to SFX

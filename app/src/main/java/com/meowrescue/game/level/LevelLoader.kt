@@ -84,7 +84,8 @@ object LevelLoader {
             cats = cats,
             pins = pins,
             obstacles = obstacles,
-            platforms = platforms
+            platforms = platforms,
+            hint = obj.optString("hint", "")
         )
     }
 }

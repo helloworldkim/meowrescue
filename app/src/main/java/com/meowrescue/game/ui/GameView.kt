@@ -13,6 +13,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import com.meowrescue.game.R
 import com.meowrescue.game.game.GameEngine
+import com.meowrescue.game.util.SoundManager
 import com.meowrescue.game.model.Ball
 import com.meowrescue.game.model.Obstacle
 import com.meowrescue.game.model.Pin
@@ -30,9 +31,11 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     var onLevelComplete: (() -> Unit)? = null
     var onLevelFailed: (() -> Unit)? = null
     var onNavigateHome: (() -> Unit)? = null
+    var hintText: String = ""
 
     private var surfaceReady = false
     private var callbackFired = false
+    private var showingHint = false
 
     // Virtual coordinate scaling (computed in surfaceChanged)
     private var scale = 1f
@@ -47,6 +50,12 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         isAntiAlias = true
     }
     private val overlayPaint = Paint().apply { style = Paint.Style.FILL }
+    private val hintTextPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 48f
+        textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+    }
     private val rescuedCatOverlayPaint = Paint().apply {
         color = Color.argb(100, 0, 200, 0)
         style = Paint.Style.FILL
@@ -101,6 +110,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     private val starFullBmp = loadScaled(R.drawable.star_full, 36, 48)
     private val starEmptyBmp = loadScaled(R.drawable.star_empty, 36, 48)
     private val pauseBmp = loadScaled(R.drawable.icon_pause, 50, 50)
+    private val hintBmp = loadScaled(R.drawable.icon_hint, 50, 50)
     // Buttons: actual 384x512 (3:4 portrait) — sized to fit overlay popup
     private val btnNextBmp = loadScaled(R.drawable.btn_next, 90, 120)
     private val btnRetryBmp = loadScaled(R.drawable.btn_retry, 90, 120)
@@ -183,6 +193,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         starFullBmp.recycle()
         starEmptyBmp.recycle()
         pauseBmp.recycle()
+        hintBmp.recycle()
         btnNextBmp.recycle()
         btnRetryBmp.recycle()
         btnHomeBmp.recycle()
@@ -311,6 +322,28 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         // Pause button (top-right)
         canvas.drawBitmap(pauseBmp, DESIGN_WIDTH - pauseBmp.width - 20f, hudY - pauseBmp.height / 2f - 10f, null)
 
+        // Hint button (left of pause)
+        if (hintText.isNotEmpty()) {
+            canvas.drawBitmap(
+                hintBmp,
+                DESIGN_WIDTH - pauseBmp.width - 20f - hintBmp.width - 10f,
+                hudY - hintBmp.height / 2f - 10f,
+                null
+            )
+        }
+
+        // Hint overlay
+        if (showingHint && hintText.isNotEmpty()) {
+            overlayPaint.color = Color.argb(180, 0, 0, 0)
+            canvas.drawRect(0f, 0f, DESIGN_WIDTH, DESIGN_HEIGHT, overlayPaint)
+            val lines = hintText.split("\n")
+            val lineHeight = 60f
+            val startY = DESIGN_HEIGHT / 2f - (lines.size - 1) * lineHeight / 2f
+            for ((i, line) in lines.withIndex()) {
+                canvas.drawText(line, DESIGN_WIDTH / 2f, startY + i * lineHeight, hintTextPaint)
+            }
+        }
+
         // State overlays
         when (engine.gameState) {
             GameEngine.GameState.SUCCESS -> {
@@ -345,8 +378,23 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
                 GameEngine.GameState.FAILED ->
                     handleOverlayTouch(x, y, popupFailBmp, btnRetryBmp, onLevelFailed)
                 GameEngine.GameState.PLAYING -> {
-                    val pin = engine.getPinAt(x, y)
-                    if (pin != null) engine.requestPinRemoval(pin)
+                    if (showingHint) {
+                        showingHint = false
+                    } else {
+                        // Hint button bounds (same as HUD draw position)
+                        val hintBtnX = DESIGN_WIDTH - pauseBmp.width - 20f - hintBmp.width - 10f
+                        val hintBtnY = 60f - hintBmp.height / 2f - 10f
+                        if (hintText.isNotEmpty() &&
+                            x in hintBtnX..(hintBtnX + hintBmp.width) &&
+                            y in hintBtnY..(hintBtnY + hintBmp.height)
+                        ) {
+                            showingHint = true
+                            SoundManager.playButtonTap()
+                        } else {
+                            val pin = engine.getPinAt(x, y)
+                            if (pin != null) engine.requestPinRemoval(pin)
+                        }
+                    }
                 }
                 else -> {}
             }

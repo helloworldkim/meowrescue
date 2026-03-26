@@ -10,7 +10,8 @@ data class LevelData(
     val cats: List<CatData>,
     val pins: List<PinData>,
     val obstacles: List<ObstacleData>,
-    val platforms: List<PlatformData>
+    val platforms: List<PlatformData>,
+    val hint: String = ""
 )
 
 data class StarThresholds(
