@@ -3,24 +3,109 @@
   "name": "가시 협곡",
   "difficulty": "medium",
   "maxPins": 3,
-  "stars": { "one": 999, "two": 4, "three": 3 },
-  "balls": [{ "type": "normal", "x": 540, "y": 180 }],
-  "cats": [{ "x": 540, "y": 1700, "catId": "cat_053" }],
+  "stars": {
+    "one": 999,
+    "two": 4,
+    "three": 3
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 180
+    }
+  ],
+  "cats": [
+    {
+      "x": 540,
+      "y": 1700,
+      "catId": "cat_053",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 540, "y": 460 },
-    { "type": "normal", "x": 800, "y": 870 },
-    { "type": "normal", "x": 260, "y": 1270 }
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 460
+    },
+    {
+      "type": "normal",
+      "x": 800,
+      "y": 870
+    },
+    {
+      "type": "normal",
+      "x": 260,
+      "y": 1270
+    }
   ],
   "obstacles": [
-    { "type": "spike", "x": 150, "y": 620, "width": 160, "height": 40 },
-    { "type": "spike", "x": 700, "y": 1030, "width": 160, "height": 40 },
-    { "type": "moving_platform", "x": 450, "y": 1160, "width": 200, "height": 30 },
-    { "type": "fire", "x": 580, "y": 1430, "width": 150, "height": 40 }
+    {
+      "type": "spike",
+      "x": 150,
+      "y": 620,
+      "width": 160,
+      "height": 40
+    },
+    {
+      "type": "spike",
+      "x": 700,
+      "y": 1030,
+      "width": 160,
+      "height": 40
+    },
+    {
+      "type": "moving_platform",
+      "x": 450,
+      "y": 1160,
+      "width": 200,
+      "height": 30
+    },
+    {
+      "type": "fire",
+      "x": 580,
+      "y": 1430,
+      "width": 150,
+      "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 490,
+      "y": 1650,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 340, "y": 510, "width": 400, "height": 20, "angle": 0 },
-    { "x": 650, "y": 920, "width": 300, "height": 20, "angle": -25 },
-    { "x": 110, "y": 1320, "width": 340, "height": 20, "angle": 25 },
-    { "x": 300, "y": 1490, "width": 480, "height": 20, "angle": 0 }
+    {
+      "x": 340,
+      "y": 510,
+      "width": 400,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 650,
+      "y": 920,
+      "width": 300,
+      "height": 20,
+      "angle": -25
+    },
+    {
+      "x": 110,
+      "y": 1320,
+      "width": 340,
+      "height": 20,
+      "angle": 25
+    },
+    {
+      "x": 300,
+      "y": 1490,
+      "width": 480,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

@@ -3,22 +3,95 @@
   "name": "불꽃 공",
   "difficulty": "hard",
   "maxPins": 3,
-  "stars": { "one": 999, "two": 4, "three": 3 },
-  "balls": [{ "type": "fire", "x": 540, "y": 200 }],
-  "cats": [{ "x": 540, "y": 1600, "catId": "cat_071" }],
+  "stars": {
+    "one": 999,
+    "two": 4,
+    "three": 3
+  },
+  "balls": [
+    {
+      "type": "fire",
+      "x": 540,
+      "y": 200
+    }
+  ],
+  "cats": [
+    {
+      "x": 540,
+      "y": 1600,
+      "catId": "cat_071",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 540, "y": 500 },
-    { "type": "normal", "x": 300, "y": 850 },
-    { "type": "normal", "x": 700, "y": 1200 }
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 500
+    },
+    {
+      "type": "normal",
+      "x": 300,
+      "y": 850
+    },
+    {
+      "type": "normal",
+      "x": 700,
+      "y": 1200
+    }
   ],
   "obstacles": [
-    { "type": "fire", "x": 350, "y": 680, "width": 300, "height": 40 },
-    { "type": "fire", "x": 450, "y": 1050, "width": 250, "height": 40 },
-    { "type": "spike", "x": 550, "y": 1380, "width": 200, "height": 40 }
+    {
+      "type": "fire",
+      "x": 350,
+      "y": 680,
+      "width": 300,
+      "height": 40
+    },
+    {
+      "type": "fire",
+      "x": 450,
+      "y": 1050,
+      "width": 250,
+      "height": 40
+    },
+    {
+      "type": "spike",
+      "x": 550,
+      "y": 1380,
+      "width": 200,
+      "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 490,
+      "y": 1550,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 390, "y": 520, "width": 300, "height": 20, "angle": 0 },
-    { "x": 150, "y": 870, "width": 300, "height": 20, "angle": 0 },
-    { "x": 550, "y": 1220, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 390,
+      "y": 520,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 150,
+      "y": 870,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 550,
+      "y": 1220,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

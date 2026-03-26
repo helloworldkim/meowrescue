@@ -28,7 +28,8 @@ data class BallData(
 data class CatData(
     val x: Float,
     val y: Float,
-    val catId: String
+    val catId: String,
+    val cageId: String = ""
 )
 
 data class PinData(
@@ -42,7 +43,8 @@ data class ObstacleData(
     val x: Float,
     val y: Float,
     val width: Float,
-    val height: Float
+    val height: Float,
+    val id: String = ""
 )
 
 data class PlatformData(

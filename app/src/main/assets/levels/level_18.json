@@ -3,19 +3,76 @@
   "name": "가시 벽",
   "difficulty": "easy",
   "maxPins": 2,
-  "stars": { "one": 999, "two": 3, "three": 2 },
-  "balls": [{ "type": "normal", "x": 750, "y": 180 }],
-  "cats": [{ "x": 200, "y": 1700, "catId": "cat_018" }],
+  "stars": {
+    "one": 999,
+    "two": 3,
+    "three": 2
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 750,
+      "y": 180
+    }
+  ],
+  "cats": [
+    {
+      "x": 200,
+      "y": 1700,
+      "catId": "cat_018",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 700, "y": 650 },
-    { "type": "normal", "x": 350, "y": 1100 }
+    {
+      "type": "normal",
+      "x": 700,
+      "y": 650
+    },
+    {
+      "type": "normal",
+      "x": 350,
+      "y": 1100
+    }
   ],
   "obstacles": [
-    { "type": "spike", "x": 750, "y": 900, "width": 150, "height": 40 }
+    {
+      "type": "spike",
+      "x": 750,
+      "y": 900,
+      "width": 150,
+      "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 150,
+      "y": 1650,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 480, "y": 700, "width": 400, "height": 20, "angle": -18 },
-    { "x": 180, "y": 1150, "width": 380, "height": 20, "angle": -12 },
-    { "x": 100, "y": 1450, "width": 280, "height": 20, "angle": 0 }
+    {
+      "x": 480,
+      "y": 700,
+      "width": 400,
+      "height": 20,
+      "angle": -18
+    },
+    {
+      "x": 180,
+      "y": 1150,
+      "width": 380,
+      "height": 20,
+      "angle": -12
+    },
+    {
+      "x": 100,
+      "y": 1450,
+      "width": 280,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

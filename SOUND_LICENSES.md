@@ -27,6 +27,7 @@
 | `sfx_level_clear.wav` | `maximize_008.wav` | 레벨 클리어 |
 | `sfx_level_fail.wav` | `error_004.wav` | 레벨 실패 |
 | `sfx_star_earn.wav` | `pluck_001.wav` | 별 획득 |
+| `sfx_cage_destroy.wav` | `glass_005.wav` | 케이지 파괴 |
 
 > Kenney의 모든 에셋은 CC0 라이센스로 제공됩니다.
 > "All assets can be used in personal and commercial projects." — kenney.nl

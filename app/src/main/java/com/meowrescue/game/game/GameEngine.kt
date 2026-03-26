@@ -21,6 +21,7 @@ class GameEngine {
         fun onBallDestroyed(isBomb: Boolean) {}
         fun onBallBounce() {}
         fun onCatRescued() {}
+        fun onCageDestroyed() {}
         fun onTeleport() {}
         fun onLevelSuccess() {}
         fun onLevelFailed() {}
@@ -106,7 +107,7 @@ class GameEngine {
         }
 
         for (catData in data.cats) {
-            val cat = Cat(position = Vector2D(catData.x, catData.y), catId = catData.catId)
+            val cat = Cat(position = Vector2D(catData.x, catData.y), catId = catData.catId, cageId = catData.cageId)
             cats.add(cat)
             // Cats are not added to physics world; collisions checked manually
         }
@@ -123,6 +124,8 @@ class GameEngine {
                     Obstacle.Teleport(pos, size, target = Vector2D(pos.x + 200f, pos.y))
                 "switchblock", "switch_block" ->
                     Obstacle.SwitchBlock(pos, size, isOn = true)
+                "cage" ->
+                    Obstacle.Cage(pos, size, id = obstacleData.id)
                 else -> Obstacle.Spike(pos, size)
             }
             obstacles.add(obstacle)
@@ -130,6 +133,7 @@ class GameEngine {
             when (obstacle) {
                 is Obstacle.MovingPlatform -> physics.addMovingPlatform(obstacle)
                 is Obstacle.SwitchBlock -> physics.addSwitchBlock(obstacle)
+                is Obstacle.Cage -> physics.addCage(obstacle)
                 else -> {} // Fire, Spike, Teleport checked manually each frame
             }
         }
@@ -231,10 +235,33 @@ class GameEngine {
             eventListener?.onBallDestroyed(ball is Ball.Bomb)
         }
 
-        // Ball vs cat rescue
+        // Ball vs cage collision — destroy cage and rescue linked cats
+        for (ball in balls) {
+            for (obstacle in obstacles) {
+                if (obstacle is Obstacle.Cage && !obstacle.isDestroyed) {
+                    if (isCircleRectOverlap(
+                            ball.position, ball.radius + 5f,
+                            obstacle.position, obstacle.size.x, obstacle.size.y
+                        )
+                    ) {
+                        obstacle.isDestroyed = true
+                        physics.removeCage(obstacle)
+                        eventListener?.onCageDestroyed()
+                        for (cat in cats) {
+                            if (!cat.isRescued && cat.cageId == obstacle.id) {
+                                cat.isRescued = true
+                                eventListener?.onCatRescued()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ball vs cat rescue (only for cats without a cage — backward compatibility)
         for (ball in balls) {
             for (cat in cats) {
-                if (!cat.isRescued) {
+                if (!cat.isRescued && cat.cageId.isEmpty()) {
                     val dx = ball.position.x - cat.position.x
                     val dy = ball.position.y - cat.position.y
                     val dist = sqrt(dx * dx + dy * dy)

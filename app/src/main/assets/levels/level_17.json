@@ -3,19 +3,76 @@
   "name": "가시밭을 돌아서",
   "difficulty": "easy",
   "maxPins": 2,
-  "stars": { "one": 999, "two": 3, "three": 2 },
-  "balls": [{ "type": "normal", "x": 200, "y": 200 }],
-  "cats": [{ "x": 820, "y": 1650, "catId": "cat_017" }],
+  "stars": {
+    "one": 999,
+    "two": 3,
+    "three": 2
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 200,
+      "y": 200
+    }
+  ],
+  "cats": [
+    {
+      "x": 820,
+      "y": 1650,
+      "catId": "cat_017",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 250, "y": 620 },
-    { "type": "normal", "x": 620, "y": 1050 }
+    {
+      "type": "normal",
+      "x": 250,
+      "y": 620
+    },
+    {
+      "type": "normal",
+      "x": 620,
+      "y": 1050
+    }
   ],
   "obstacles": [
-    { "type": "spike", "x": 100, "y": 850, "width": 130, "height": 40 }
+    {
+      "type": "spike",
+      "x": 100,
+      "y": 850,
+      "width": 130,
+      "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 770,
+      "y": 1600,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 150, "y": 670, "width": 300, "height": 20, "angle": 15 },
-    { "x": 430, "y": 1100, "width": 380, "height": 20, "angle": 0 },
-    { "x": 600, "y": 1400, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 150,
+      "y": 670,
+      "width": 300,
+      "height": 20,
+      "angle": 15
+    },
+    {
+      "x": 430,
+      "y": 1100,
+      "width": 380,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 600,
+      "y": 1400,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

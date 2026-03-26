@@ -26,6 +26,7 @@ object SoundManager {
     private var sfxLevelFail = 0
     private var sfxStarEarn = 0
     private var sfxButtonTap = 0
+    private var sfxCageDestroy = 0
 
     // BGM resource mapping
     private val bgmMap = mapOf(
@@ -63,6 +64,7 @@ object SoundManager {
         sfxLevelFail = sp.load(ctx, R.raw.sfx_level_fail, 1)
         sfxStarEarn = sp.load(ctx, R.raw.sfx_star_earn, 1)
         sfxButtonTap = sp.load(ctx, R.raw.sfx_button_tap, 1)
+        sfxCageDestroy = sp.load(ctx, R.raw.sfx_cage_destroy, 1)
 
         initialized = true
     }
@@ -92,6 +94,7 @@ object SoundManager {
     fun playLevelFail() = playSfx(sfxLevelFail)
     fun playStarEarn() = playSfx(sfxStarEarn)
     fun playButtonTap() = playSfx(sfxButtonTap)
+    fun playCageDestroy() = playSfx(sfxCageDestroy)
 
     // --- BGM playback ---
 

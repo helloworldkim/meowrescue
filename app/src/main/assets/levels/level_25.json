@@ -3,22 +3,95 @@
   "name": "갈림길의 선택",
   "difficulty": "easy",
   "maxPins": 3,
-  "stars": { "one": 999, "two": 4, "three": 3 },
-  "balls": [{ "type": "normal", "x": 540, "y": 160 }],
-  "cats": [{ "x": 750, "y": 1700, "catId": "cat_025" }],
+  "stars": {
+    "one": 999,
+    "two": 4,
+    "three": 3
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 160
+    }
+  ],
+  "cats": [
+    {
+      "x": 750,
+      "y": 1700,
+      "catId": "cat_025",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 540, "y": 500 },
-    { "type": "normal", "x": 280, "y": 900 },
-    { "type": "normal", "x": 680, "y": 1250 }
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 500
+    },
+    {
+      "type": "normal",
+      "x": 280,
+      "y": 900
+    },
+    {
+      "type": "normal",
+      "x": 680,
+      "y": 1250
+    }
   ],
   "obstacles": [
-    { "type": "fire", "x": 600, "y": 700, "width": 200, "height": 40 },
-    { "type": "spike", "x": 100, "y": 1100, "width": 130, "height": 40 }
+    {
+      "type": "fire",
+      "x": 600,
+      "y": 700,
+      "width": 200,
+      "height": 40
+    },
+    {
+      "type": "spike",
+      "x": 100,
+      "y": 1100,
+      "width": 130,
+      "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 700,
+      "y": 1650,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 340, "y": 550, "width": 400, "height": 20, "angle": -12 },
-    { "x": 130, "y": 950, "width": 360, "height": 20, "angle": 15 },
-    { "x": 480, "y": 1300, "width": 380, "height": 20, "angle": 10 },
-    { "x": 580, "y": 1500, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 340,
+      "y": 550,
+      "width": 400,
+      "height": 20,
+      "angle": -12
+    },
+    {
+      "x": 130,
+      "y": 950,
+      "width": 360,
+      "height": 20,
+      "angle": 15
+    },
+    {
+      "x": 480,
+      "y": 1300,
+      "width": 380,
+      "height": 20,
+      "angle": 10
+    },
+    {
+      "x": 580,
+      "y": 1500,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

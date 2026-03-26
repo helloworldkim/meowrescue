@@ -3,10 +3,50 @@
   "name": "첫 번째 구출",
   "difficulty": "tutorial",
   "maxPins": 1,
-  "stars": { "one": 999, "two": 2, "three": 1 },
-  "balls": [{ "type": "normal", "x": 540, "y": 200 }],
-  "cats": [{ "x": 540, "y": 1600, "catId": "cat_001" }],
-  "pins": [{ "type": "normal", "x": 540, "y": 700 }],
-  "obstacles": [],
-  "platforms": [{ "x": 340, "y": 720, "width": 400, "height": 20, "angle": 0 }]
+  "stars": {
+    "one": 999,
+    "two": 2,
+    "three": 1
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 200
+    }
+  ],
+  "cats": [
+    {
+      "x": 540,
+      "y": 1600,
+      "catId": "cat_001",
+      "cageId": "cage_1"
+    }
+  ],
+  "pins": [
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 700
+    }
+  ],
+  "obstacles": [
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 490,
+      "y": 1550,
+      "width": 100,
+      "height": 100
+    }
+  ],
+  "platforms": [
+    {
+      "x": 340,
+      "y": 720,
+      "width": 400,
+      "height": 20,
+      "angle": 0
+    }
+  ]
 }

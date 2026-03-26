@@ -3,25 +3,114 @@
   "name": "불꽃 통과",
   "difficulty": "hard",
   "maxPins": 4,
-  "stars": { "one": 999, "two": 5, "three": 4 },
-  "balls": [{ "type": "fire", "x": 540, "y": 200 }],
-  "cats": [{ "x": 540, "y": 1580, "catId": "cat_074" }],
+  "stars": {
+    "one": 999,
+    "two": 5,
+    "three": 4
+  },
+  "balls": [
+    {
+      "type": "fire",
+      "x": 540,
+      "y": 200
+    }
+  ],
+  "cats": [
+    {
+      "x": 540,
+      "y": 1580,
+      "catId": "cat_074",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 540, "y": 470 },
-    { "type": "normal", "x": 200, "y": 750 },
-    { "type": "normal", "x": 800, "y": 1020 },
-    { "type": "normal", "x": 430, "y": 1300 }
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 470
+    },
+    {
+      "type": "normal",
+      "x": 200,
+      "y": 750
+    },
+    {
+      "type": "normal",
+      "x": 800,
+      "y": 1020
+    },
+    {
+      "type": "normal",
+      "x": 430,
+      "y": 1300
+    }
   ],
   "obstacles": [
-    { "type": "fire", "x": 300, "y": 580, "width": 300, "height": 40 },
-    { "type": "fire", "x": 150, "y": 860, "width": 250, "height": 40 },
-    { "type": "spike", "x": 600, "y": 1130, "width": 200, "height": 40 },
-    { "type": "fire", "x": 280, "y": 1410, "width": 300, "height": 40 }
+    {
+      "type": "fire",
+      "x": 300,
+      "y": 580,
+      "width": 300,
+      "height": 40
+    },
+    {
+      "type": "fire",
+      "x": 150,
+      "y": 860,
+      "width": 250,
+      "height": 40
+    },
+    {
+      "type": "spike",
+      "x": 600,
+      "y": 1130,
+      "width": 200,
+      "height": 40
+    },
+    {
+      "type": "fire",
+      "x": 280,
+      "y": 1410,
+      "width": 300,
+      "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 490,
+      "y": 1530,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 390, "y": 490, "width": 300, "height": 20, "angle": 0 },
-    { "x": 100, "y": 770, "width": 200, "height": 20, "angle": 0 },
-    { "x": 650, "y": 1040, "width": 300, "height": 20, "angle": 0 },
-    { "x": 280, "y": 1320, "width": 300, "height": 20, "angle": 0 }
+    {
+      "x": 390,
+      "y": 490,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 100,
+      "y": 770,
+      "width": 200,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 650,
+      "y": 1040,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 280,
+      "y": 1320,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

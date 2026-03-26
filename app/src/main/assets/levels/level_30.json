@@ -3,23 +3,102 @@
   "name": "초보자의 졸업",
   "difficulty": "easy",
   "maxPins": 3,
-  "stars": { "one": 999, "two": 4, "three": 3 },
-  "balls": [{ "type": "normal", "x": 540, "y": 160 }],
-  "cats": [{ "x": 540, "y": 1730, "catId": "cat_030" }],
+  "stars": {
+    "one": 999,
+    "two": 4,
+    "three": 3
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 540,
+      "y": 160
+    }
+  ],
+  "cats": [
+    {
+      "x": 540,
+      "y": 1730,
+      "catId": "cat_030",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 280, "y": 510 },
-    { "type": "normal", "x": 720, "y": 910 },
-    { "type": "normal", "x": 420, "y": 1310 }
+    {
+      "type": "normal",
+      "x": 280,
+      "y": 510
+    },
+    {
+      "type": "normal",
+      "x": 720,
+      "y": 910
+    },
+    {
+      "type": "normal",
+      "x": 420,
+      "y": 1310
+    }
   ],
   "obstacles": [
-    { "type": "fire", "x": 530, "y": 710, "width": 200, "height": 40 },
-    { "type": "spike", "x": 130, "y": 1110, "width": 140, "height": 40 },
-    { "type": "fire", "x": 650, "y": 1490, "width": 180, "height": 40 }
+    {
+      "type": "fire",
+      "x": 530,
+      "y": 710,
+      "width": 200,
+      "height": 40
+    },
+    {
+      "type": "spike",
+      "x": 130,
+      "y": 1110,
+      "width": 140,
+      "height": 40
+    },
+    {
+      "type": "fire",
+      "x": 650,
+      "y": 1490,
+      "width": 180,
+      "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 490,
+      "y": 1680,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 130, "y": 560, "width": 360, "height": 20, "angle": 15 },
-    { "x": 520, "y": 960, "width": 380, "height": 20, "angle": -15 },
-    { "x": 270, "y": 1360, "width": 360, "height": 20, "angle": 12 },
-    { "x": 360, "y": 1560, "width": 360, "height": 20, "angle": 0 }
+    {
+      "x": 130,
+      "y": 560,
+      "width": 360,
+      "height": 20,
+      "angle": 15
+    },
+    {
+      "x": 520,
+      "y": 960,
+      "width": 380,
+      "height": 20,
+      "angle": -15
+    },
+    {
+      "x": 270,
+      "y": 1360,
+      "width": 360,
+      "height": 20,
+      "angle": 12
+    },
+    {
+      "x": 360,
+      "y": 1560,
+      "width": 360,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }

@@ -19,7 +19,8 @@
     {
       "x": 750,
       "y": 1680,
-      "catId": "cat_007"
+      "catId": "cat_007",
+      "cageId": "cage_1"
     }
   ],
   "pins": [
@@ -34,7 +35,16 @@
       "y": 980
     }
   ],
-  "obstacles": [],
+  "obstacles": [
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 700,
+      "y": 1630,
+      "width": 100,
+      "height": 100
+    }
+  ],
   "platforms": [
     {
       "x": 160,

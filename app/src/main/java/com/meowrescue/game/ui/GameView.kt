@@ -73,6 +73,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
     private val teleportBmp = loadScaled(R.drawable.teleport, 90, 60)
     private val platformCloudBmp = loadScaled(R.drawable.platform_cloud, 200, 200)
     private val switchBlockBmp = loadScaled(R.drawable.switch_block, 120, 80)
+    private val cageBmp = loadScaled(R.drawable.cage, 100, 100)
 
     // Platforms: actual 768x341 (2.25:1)
     private val platformBitmaps = listOf(
@@ -176,6 +177,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
         teleportBmp.recycle()
         platformCloudBmp.recycle()
         switchBlockBmp.recycle()
+        cageBmp.recycle()
         platformBitmaps.forEach { it.recycle() }
         catBitmaps.forEach { it.recycle() }
         starFullBmp.recycle()
@@ -250,6 +252,7 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
                 is Obstacle.SwitchBlock -> {
                     canvas.drawBitmap(switchBlockBmp, null, obstacle.toRectF(), if (!obstacle.isOn) switchOffPaint else null)
                 }
+                is Obstacle.Cage -> {} // Drawn after cats
             }
         }
 
@@ -283,6 +286,13 @@ class GameView(context: Context, attrs: AttributeSet? = null) :
             canvas.drawBitmap(bmp, cat.position.x - bmp.width / 2f, cat.position.y - bmp.height / 2f, null)
             if (cat.isRescued) {
                 canvas.drawCircle(cat.position.x, cat.position.y, bmp.width / 2f, rescuedCatOverlayPaint)
+            }
+        }
+
+        // Cages (drawn on top of cats so they appear to enclose them)
+        for (obstacle in engine.obstacles) {
+            if (obstacle is Obstacle.Cage && !obstacle.isDestroyed) {
+                canvas.drawBitmap(cageBmp, null, obstacle.toRectF(), null)
             }
         }
 

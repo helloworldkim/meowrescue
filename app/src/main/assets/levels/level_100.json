@@ -19,17 +19,20 @@
     {
       "x": 871,
       "y": 705,
-      "catId": "cat_100"
+      "catId": "cat_100",
+      "cageId": "cage_1"
     },
     {
       "x": 681,
       "y": 1195,
-      "catId": "cat_100b"
+      "catId": "cat_100b",
+      "cageId": "cage_2"
     },
     {
       "x": 660,
       "y": 1530,
-      "catId": "cat_100c"
+      "catId": "cat_100c",
+      "cageId": "cage_3"
     }
   ],
   "pins": [
@@ -94,6 +97,30 @@
       "y": 1475,
       "width": 200,
       "height": 30
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 821,
+      "y": 655,
+      "width": 100,
+      "height": 100
+    },
+    {
+      "type": "cage",
+      "id": "cage_2",
+      "x": 631,
+      "y": 1145,
+      "width": 100,
+      "height": 100
+    },
+    {
+      "type": "cage",
+      "id": "cage_3",
+      "x": 610,
+      "y": 1480,
+      "width": 100,
+      "height": 100
     }
   ],
   "platforms": [

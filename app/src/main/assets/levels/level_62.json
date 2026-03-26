@@ -19,7 +19,8 @@
     {
       "x": 750,
       "y": 1550,
-      "catId": "cat_062"
+      "catId": "cat_062",
+      "cageId": "cage_1"
     }
   ],
   "pins": [
@@ -53,6 +54,14 @@
       "y": 1400,
       "width": 250,
       "height": 40
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 700,
+      "y": 1500,
+      "width": 100,
+      "height": 100
     }
   ],
   "platforms": [

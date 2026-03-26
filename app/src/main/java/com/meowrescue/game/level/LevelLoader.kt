@@ -34,7 +34,8 @@ object LevelLoader {
             CatData(
                 x = c.getDouble("x").toFloat(),
                 y = c.getDouble("y").toFloat(),
-                catId = c.getString("catId")
+                catId = c.getString("catId"),
+                cageId = c.optString("cageId", "")
             )
         }
 
@@ -56,7 +57,8 @@ object LevelLoader {
                 x = o.getDouble("x").toFloat(),
                 y = o.getDouble("y").toFloat(),
                 width = o.getDouble("width").toFloat(),
-                height = o.getDouble("height").toFloat()
+                height = o.getDouble("height").toFloat(),
+                id = o.optString("id", "")
             )
         }
 

@@ -28,4 +28,11 @@ sealed class Obstacle(
         size: Vector2D,
         var isOn: Boolean
     ) : Obstacle(position, size)
+
+    class Cage(
+        position: Vector2D,
+        size: Vector2D,
+        val id: String,
+        var isDestroyed: Boolean = false
+    ) : Obstacle(position, size)
 }

@@ -111,6 +111,19 @@ class Dyn4jPhysicsEngine {
         return body
     }
 
+    fun addCage(obstacle: Obstacle.Cage): Body {
+        val cx = pxToM(obstacle.position.x + obstacle.size.x / 2f)
+        val cy = pxToM(obstacle.position.y + obstacle.size.y / 2f)
+        val body = createStaticRectBody(cx, cy, obstacle.size.x, obstacle.size.y)
+        obstacleBodies[obstacle] = body
+        return body
+    }
+
+    fun removeCage(obstacle: Obstacle.Cage) {
+        val body = obstacleBodies.remove(obstacle) ?: return
+        world.removeBody(body)
+    }
+
     fun removePin(pin: Pin) {
         val body = pinBodies.remove(pin) ?: return
         world.removeBody(body)

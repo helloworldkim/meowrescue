@@ -3,20 +3,83 @@
   "name": "가시밭 통과",
   "difficulty": "medium",
   "maxPins": 2,
-  "stars": { "one": 999, "two": 3, "three": 2 },
-  "balls": [{ "type": "normal", "x": 200, "y": 200 }],
-  "cats": [{ "x": 540, "y": 1600, "catId": "cat_034" }],
+  "stars": {
+    "one": 999,
+    "two": 3,
+    "three": 2
+  },
+  "balls": [
+    {
+      "type": "normal",
+      "x": 200,
+      "y": 200
+    }
+  ],
+  "cats": [
+    {
+      "x": 540,
+      "y": 1600,
+      "catId": "cat_034",
+      "cageId": "cage_1"
+    }
+  ],
   "pins": [
-    { "type": "normal", "x": 200, "y": 600 },
-    { "type": "normal", "x": 700, "y": 1050 }
+    {
+      "type": "normal",
+      "x": 200,
+      "y": 600
+    },
+    {
+      "type": "normal",
+      "x": 700,
+      "y": 1050
+    }
   ],
   "obstacles": [
-    { "type": "spike", "x": 350, "y": 850, "width": 130, "height": 40 },
-    { "type": "moving_platform", "x": 380, "y": 1250, "width": 200, "height": 30 }
+    {
+      "type": "spike",
+      "x": 350,
+      "y": 850,
+      "width": 130,
+      "height": 40
+    },
+    {
+      "type": "moving_platform",
+      "x": 380,
+      "y": 1250,
+      "width": 200,
+      "height": 30
+    },
+    {
+      "type": "cage",
+      "id": "cage_1",
+      "x": 490,
+      "y": 1550,
+      "width": 100,
+      "height": 100
+    }
   ],
   "platforms": [
-    { "x": 100, "y": 650, "width": 300, "height": 20, "angle": 15 },
-    { "x": 550, "y": 1100, "width": 300, "height": 20, "angle": 0 },
-    { "x": 300, "y": 1420, "width": 480, "height": 20, "angle": 0 }
+    {
+      "x": 100,
+      "y": 650,
+      "width": 300,
+      "height": 20,
+      "angle": 15
+    },
+    {
+      "x": 550,
+      "y": 1100,
+      "width": 300,
+      "height": 20,
+      "angle": 0
+    },
+    {
+      "x": 300,
+      "y": 1420,
+      "width": 480,
+      "height": 20,
+      "angle": 0
+    }
   ]
 }
