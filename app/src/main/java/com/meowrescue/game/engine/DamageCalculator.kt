@@ -47,6 +47,8 @@ object DamageCalculator {
         val damagePerEnemy = mutableMapOf<String, Float>()
         val weaknessHit = mutableMapOf<String, Boolean>()
         val resistedHit = mutableMapOf<String, Boolean>()
+        // Track the dominant (first non-HEAL) match type for visual coloring
+        val dominantMatchType: BlockType? = matches.firstOrNull { it.type != BlockType.HEAL }?.type
 
         aliveEnemies.forEach { enemy ->
             damagePerEnemy[enemy.id] = 0f
@@ -104,7 +106,8 @@ object DamageCalculator {
                 damage = (damagePerEnemy[enemy.id] ?: 0f).roundToInt(),
                 isWeakness = weaknessHit[enemy.id] ?: false,
                 isResisted = resistedHit[enemy.id] ?: false,
-                healAmount = 0
+                healAmount = 0,
+                matchType = dominantMatchType
             )
         }
     }

@@ -7,6 +7,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import com.meowrescue.game.model.BlockType
 import com.meowrescue.game.model.Enemy
 
 class EnemyRenderer(private val context: Context) {
@@ -74,6 +75,19 @@ class EnemyRenderer(private val context: Context) {
         isFakeBoldText = true
     }
 
+    // Weakness / resistance info
+    private val infoPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 16f
+        textAlign = Paint.Align.LEFT
+        isAntiAlias = true
+    }
+
+    private val infoDotPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
     // Hit flash overlay
     private val hitFlashPaint = Paint().apply {
         color = Color.argb(160, 255, 255, 255)
@@ -125,7 +139,7 @@ class EnemyRenderer(private val context: Context) {
                 drawX - spriteHalfW - cardPadding,
                 cy - spriteHalfH - 40f,
                 drawX + spriteHalfW + cardPadding,
-                cy + spriteHalfH + 80f
+                cy + spriteHalfH + 100f
             )
             canvas.drawRoundRect(cardRect, 14f, 14f, cardPaint)
             canvas.drawRoundRect(cardRect, 14f, 14f, cardBorderPaint)
@@ -200,7 +214,44 @@ class EnemyRenderer(private val context: Context) {
                 hpBarTop + hpBarHeight + 20f,
                 hpTextPaint
             )
+
+            // ── Weakness / Resistance indicators ──
+            var infoY = hpBarTop + hpBarHeight + 38f
+            val dotRadius = 7f
+            val dotTextGap = 4f
+            val infoLineHeight = 22f
+
+            enemy.weakness?.let { weak ->
+                val dotColor = blockTypeColor(weak)
+                val label = "Weak: ${weak.name}"
+                val totalWidth = dotRadius * 2 + dotTextGap + infoPaint.measureText(label)
+                val startX = drawX - totalWidth / 2f
+                infoDotPaint.color = dotColor
+                canvas.drawCircle(startX + dotRadius, infoY - dotRadius * 0.4f, dotRadius, infoDotPaint)
+                infoPaint.color = Color.parseColor("#FFDD44")
+                canvas.drawText(label, startX + dotRadius * 2 + dotTextGap, infoY, infoPaint)
+                infoY += infoLineHeight
+            }
+
+            enemy.resistance?.let { resist ->
+                val dotColor = blockTypeColor(resist)
+                val label = "Resist: ${resist.name}"
+                val totalWidth = dotRadius * 2 + dotTextGap + infoPaint.measureText(label)
+                val startX = drawX - totalWidth / 2f
+                infoDotPaint.color = dotColor
+                canvas.drawCircle(startX + dotRadius, infoY - dotRadius * 0.4f, dotRadius, infoDotPaint)
+                infoPaint.color = Color.parseColor("#AADDFF")
+                canvas.drawText(label, startX + dotRadius * 2 + dotTextGap, infoY, infoPaint)
+            }
         }
+    }
+
+    private fun blockTypeColor(type: BlockType): Int = when (type) {
+        BlockType.FIRE -> Color.parseColor("#FF6B35")
+        BlockType.WATER -> Color.parseColor("#4FC3F7")
+        BlockType.ATTACK -> Color.parseColor("#FF5252")
+        BlockType.HEAL -> Color.parseColor("#66BB6A")
+        BlockType.EMPTY -> Color.GRAY
     }
 
     fun setAttackAnimation(enemyId: String, progress: Float) {

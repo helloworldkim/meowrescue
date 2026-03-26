@@ -63,6 +63,8 @@ class GridRenderer(context: Context) {
         isAntiAlias = true
     }
 
+    private val alphaPaint = Paint()
+
     // Selection state
     private var selectedRow = -1
     private var selectedCol = -1
@@ -159,7 +161,7 @@ class GridRenderer(context: Context) {
                 val bmp = blockBitmaps[block.type]
                 if (bmp != null) {
                     val bitmapPaint = if (blockAlpha < 255) {
-                        Paint().apply { alpha = blockAlpha }
+                        alphaPaint.also { it.alpha = blockAlpha }
                     } else null
                     canvas.drawBitmap(bmp, null, rect, bitmapPaint)
                 }

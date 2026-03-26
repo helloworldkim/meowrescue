@@ -9,6 +9,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.engine.BattleEngine
@@ -62,6 +63,15 @@ class BattleActivity : AppCompatActivity() {
         battleEngine = BattleEngine(battleState)
         battleView = BattleView(this)
         battleView.battleEngine = battleEngine
+
+        // Use existing cat_1~8 images for the HUD portrait based on stage
+        val catSprites = intArrayOf(
+            R.drawable.cat_1, R.drawable.cat_2, R.drawable.cat_3, R.drawable.cat_4,
+            R.drawable.cat_5, R.drawable.cat_6, R.drawable.cat_7, R.drawable.cat_8
+        )
+        val catIndex = ((chapter - 1) * 10 + (stage - 1)) % catSprites.size
+        battleView.setCatPortrait(catSprites[catIndex])
+
         setContentView(battleView)
 
         battleView.tutorialOverlay.init(chapter, stage)
@@ -82,14 +92,21 @@ class BattleActivity : AppCompatActivity() {
 
             override fun onCascade(round: Int, matches: List<MatchResult>) {
                 SoundManager.playCascade()
+                battleView.effectRenderer.triggerScreenShake(8f, round)
+                if (round >= 2) {
+                    battleView.effectRenderer.addComboText(540f, 500f, round)
+                }
             }
 
             override fun onDamageDealt(results: List<DamageResult>) {
                 SoundManager.playAttackHit()
-                battleView.effectRenderer.triggerScreenShake()
+                battleView.effectRenderer.triggerScreenShake(8f, 0)
                 for (result in results) {
                     if (result.damage > 0) {
-                        battleView.effectRenderer.addDamageNumber(540f, 300f, result.damage, result.isWeakness)
+                        battleView.effectRenderer.addDamageNumber(540f, 300f, result.damage, result.isWeakness, result.matchType)
+                        result.matchType?.let { type ->
+                            battleView.effectRenderer.addElementBurst(540f, 300f, type)
+                        }
                     }
                 }
             }

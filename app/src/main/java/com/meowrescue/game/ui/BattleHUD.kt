@@ -1,14 +1,36 @@
 package com.meowrescue.game.ui
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
+import com.meowrescue.game.R
+import com.meowrescue.game.model.Relic
 
-class BattleHUD {
+class BattleHUD(context: Context, catSpriteResId: Int = R.drawable.cat_1) {
+
+    // --- Cat portrait (uses existing high-quality cat_1~8 images) ---
+
+    private val catPortrait: Bitmap = run {
+        val raw = BitmapFactory.decodeResource(context.resources, catSpriteResId)
+        Bitmap.createScaledBitmap(raw, 64, 64, true).also {
+            if (it !== raw) raw.recycle()
+        }
+    }
+
+    private val portraitBorderPaint = Paint().apply {
+        color = Color.parseColor("#FFD700")
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        isAntiAlias = true
+    }
 
     // --- HP section ---
 
@@ -127,6 +149,52 @@ class BattleHUD {
         isAntiAlias = true
     }
 
+    // --- Shuffle indicator ---
+
+    private val shuffleBgPaint = Paint().apply {
+        color = Color.argb(160, 30, 30, 60)
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val shuffleTextPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 20f
+        textAlign = Paint.Align.LEFT
+        isAntiAlias = true
+    }
+
+    private val shuffleActivePaint = Paint().apply {
+        color = Color.parseColor("#FFD700")
+        textSize = 20f
+        textAlign = Paint.Align.LEFT
+        isAntiAlias = true
+        isFakeBoldText = true
+    }
+
+    // --- Relic slots ---
+
+    private val relicSlotPaint = Paint().apply {
+        color = Color.argb(60, 200, 200, 255)
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val relicSlotBorderPaint = Paint().apply {
+        color = Color.argb(140, 200, 200, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+        isAntiAlias = true
+        pathEffect = DashPathEffect(floatArrayOf(6f, 4f), 0f)
+    }
+
+    private val relicLabelPaint = Paint().apply {
+        color = Color.argb(160, 200, 200, 255)
+        textSize = 14f
+        textAlign = Paint.Align.LEFT
+        isAntiAlias = true
+    }
+
     private var pauseBtnRect = RectF()
 
     fun draw(
@@ -136,11 +204,13 @@ class BattleHUD {
         playerMaxHp: Int,
         turnCount: Int,
         chapter: Int,
-        stage: Int
+        stage: Int,
+        shufflesRemaining: Int,
+        relics: List<Relic>
     ) {
         val padding = 20f
 
-        // ── Chapter / Stage banner (top center) ──
+        // ── Chapter / Stage banner (top center) – roguelike "Floor X-Y" format ──
         val bannerHeight = 52f
         val bannerRect = RectF(0f, 0f, designWidth, bannerHeight)
         canvas.drawRoundRect(
@@ -153,11 +223,26 @@ class BattleHUD {
             12f, 12f, bannerPaint
         )
         canvas.drawText(
-            "Chapter $chapter - Stage $stage",
+            "Floor $chapter-$stage",
             designWidth / 2f,
             bannerHeight / 2f + 10f,
             chapterPaint
         )
+
+        // ── Relic slots (below banner) ──
+        val relicSlotSize = 28f
+        val relicSlotSpacing = 10f
+        val relicSlotsY = bannerHeight + 8f
+        val totalRelicSlots = 3
+        val relicSlotsStartX = padding
+
+        canvas.drawText("Relics", relicSlotsStartX, relicSlotsY + relicSlotSize + 14f, relicLabelPaint)
+        for (i in 0 until totalRelicSlots) {
+            val slotLeft = relicSlotsStartX + i * (relicSlotSize + relicSlotSpacing)
+            val slotRect = RectF(slotLeft, relicSlotsY, slotLeft + relicSlotSize, relicSlotsY + relicSlotSize)
+            canvas.drawRoundRect(slotRect, 5f, 5f, relicSlotPaint)
+            canvas.drawRoundRect(slotRect, 5f, 5f, relicSlotBorderPaint)
+        }
 
         // ── Turn counter badge (right of banner area) ──
         val turnBadgeRadius = 26f
@@ -169,6 +254,16 @@ class BattleHUD {
         canvas.drawCircle(turnBadgeCx, turnBadgeCy, turnBadgeRadius, turnBadgeBorderPaint)
         canvas.drawText("$turnCount", turnBadgeCx, turnBadgeCy + 8f, turnTextPaint)
         canvas.drawText("TURN", turnBadgeCx, turnBadgeCy + turnBadgeRadius + 16f, turnLabelPaint)
+
+        // ── Shuffle indicator (below turn badge) ──
+        val shuffleY = turnBadgeCy + turnBadgeRadius + 32f
+        val shuffleRect = RectF(turnBadgeCx - turnBadgeRadius, shuffleY, turnBadgeCx + turnBadgeRadius, shuffleY + 28f)
+        canvas.drawRoundRect(shuffleRect, 8f, 8f, shuffleBgPaint)
+        val shuffleLabel = "SHF:$shufflesRemaining"
+        val shufflePaint = if (shufflesRemaining > 0) shuffleActivePaint else shuffleTextPaint
+        shufflePaint.textAlign = Paint.Align.CENTER
+        canvas.drawText(shuffleLabel, turnBadgeCx, shuffleY + 20f, shufflePaint)
+        shufflePaint.textAlign = Paint.Align.LEFT
 
         // ── Pause button (top right) ──
         val pauseSize = 50f
@@ -196,25 +291,42 @@ class BattleHUD {
         // ── Player HP bar (bottom area) ──
         val hpBarY = 1830f
         val hpBarHeight = 30f
-        val hpBarWidth = designWidth - padding * 2
+        // Portrait is 64x64, placed at x=padding, vertically centered on the panel
+        val portraitX = padding
+        val portraitY = hpBarY - 38f
+        val portraitSize = 64f
+        val portraitRight = portraitX + portraitSize + 10f  // gap after portrait
+
+        val hpBarWidth = designWidth - portraitRight - padding
         val panelPadding = 12f
         val panelRect = RectF(
             padding - panelPadding,
-            hpBarY - 42f,
-            padding + hpBarWidth + panelPadding,
+            hpBarY - 46f,
+            padding + (portraitSize + 10f) + hpBarWidth + panelPadding,
             hpBarY + hpBarHeight + panelPadding + 4f
         )
         canvas.drawRoundRect(panelRect, 16f, 16f, hpPanelPaint)
 
-        // Heart icon
-        drawHeartIcon(canvas, padding + 2f, hpBarY - 32f, 18f)
+        // Cat portrait (circular clip + gold border)
+        val pCx = portraitX + portraitSize / 2f
+        val pCy = portraitY + portraitSize / 2f
+        val pRadius = portraitSize / 2f
+        canvas.save()
+        val clipPath = Path().apply { addCircle(pCx, pCy, pRadius, Path.Direction.CW) }
+        canvas.clipPath(clipPath)
+        canvas.drawBitmap(catPortrait, null, RectF(portraitX, portraitY, portraitX + portraitSize, portraitY + portraitSize), null)
+        canvas.restore()
+        canvas.drawCircle(pCx, pCy, pRadius, portraitBorderPaint)
 
-        // HP text
+        // Heart icon (shifted right of portrait)
+        drawHeartIcon(canvas, portraitRight + 2f, hpBarY - 32f, 18f)
+
+        // HP text (shifted right of portrait)
         hpTextPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText("HP: $playerHp/$playerMaxHp", padding + 26f, hpBarY - 14f, hpTextPaint)
+        canvas.drawText("HP: $playerHp/$playerMaxHp", portraitRight + 26f, hpBarY - 14f, hpTextPaint)
 
         // Bar background
-        val hpBarRect = RectF(padding, hpBarY, padding + hpBarWidth, hpBarY + hpBarHeight)
+        val hpBarRect = RectF(portraitRight, hpBarY, portraitRight + hpBarWidth, hpBarY + hpBarHeight)
         canvas.drawRoundRect(hpBarRect, 12f, 12f, hpBarBgPaint)
 
         // HP fill – gradient style (brighter top, darker bottom)
@@ -226,20 +338,17 @@ class BattleHUD {
         }
 
         if (hpRatio > 0f) {
-            val fillRight = padding + hpBarWidth * hpRatio
-            val hpFillRect = RectF(padding, hpBarY, fillRight, hpBarY + hpBarHeight / 2f)
+            val fillRight = portraitRight + hpBarWidth * hpRatio
             hpBarTopPaint.color = topColor
             canvas.drawRoundRect(
-                RectF(padding, hpBarY, fillRight, hpBarY + hpBarHeight),
+                RectF(portraitRight, hpBarY, fillRight, hpBarY + hpBarHeight),
                 12f, 12f, hpBarTopPaint
             )
             hpBarBottomPaint.color = bottomColor
             canvas.drawRoundRect(
-                RectF(padding, hpBarY + hpBarHeight * 0.45f, fillRight, hpBarY + hpBarHeight),
+                RectF(portraitRight, hpBarY + hpBarHeight * 0.45f, fillRight, hpBarY + hpBarHeight),
                 0f, 0f, hpBarBottomPaint
             )
-            // Re-draw bottom corners rounded by overlaying the bottom portion clipped
-            // Simple approach: draw full bar with bottom color, then top half with top color
         }
 
         // Border
@@ -258,5 +367,9 @@ class BattleHUD {
 
     fun isPauseTapped(designX: Float, designY: Float): Boolean {
         return pauseBtnRect.contains(designX, designY)
+    }
+
+    fun cleanup() {
+        catPortrait.recycle()
     }
 }

@@ -5,5 +5,6 @@ data class DamageResult(
     val damage: Int,
     val isWeakness: Boolean,
     val isResisted: Boolean,
-    val healAmount: Int = 0
+    val healAmount: Int = 0,
+    val matchType: BlockType? = null
 )

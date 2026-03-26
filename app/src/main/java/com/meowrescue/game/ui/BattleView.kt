@@ -38,8 +38,15 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
     val gridRenderer = GridRenderer(context)
     val enemyRenderer = EnemyRenderer(context)
     val effectRenderer = EffectRenderer()
-    private val battleHUD = BattleHUD()
+    @Volatile
+    private var battleHUD: BattleHUD = BattleHUD(context)
     val tutorialOverlay = TutorialOverlay(context)
+
+    fun setCatPortrait(catSpriteResId: Int) {
+        val old = battleHUD
+        battleHUD = BattleHUD(context, catSpriteResId)
+        old.cleanup()
+    }
 
     private var backgroundBmp: Bitmap = loadScaled(R.drawable.bg_tutorial, 1080, 1920)
 
@@ -139,6 +146,23 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         setShadowLayer(3f, 1f, 1f, Color.argb(120, 0, 0, 0))
     }
 
+    // Block legend strip
+    private val legendBgPaint = Paint().apply {
+        color = Color.argb(140, 10, 10, 30)
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val legendSquarePaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val legendTextPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 22f
+        textAlign = Paint.Align.LEFT
+        isAntiAlias = true
+    }
+
     // Phase indicator
     private val phaseBgPaint = Paint().apply {
         style = Paint.Style.FILL
@@ -223,8 +247,12 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         battleHUD.draw(
             canvas, GridConstants.DESIGN_WIDTH,
             state.playerCurrentHp, state.playerMaxHp,
-            state.turnCount, state.chapter, state.stage
+            state.turnCount, state.chapter, state.stage,
+            if (state.canShuffle) 1 else 0,
+            state.relics
         )
+
+        drawBlockLegend(canvas)
 
         drawPhaseIndicator(canvas, state.phase)
 
@@ -240,6 +268,57 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         }
 
         canvas.restore()
+    }
+
+    private fun drawBlockLegend(canvas: Canvas) {
+        val engine = battleEngine ?: return
+        val gridBottom = gridRenderer.getGridBottom(engine.state.grid) + 10f
+
+        data class LegendEntry(val label: String, val color: Int)
+        val entries = listOf(
+            LegendEntry("ATK",   Color.parseColor("#FF5252")),
+            LegendEntry("FIRE",  Color.parseColor("#FF6B35")),
+            LegendEntry("WATER", Color.parseColor("#4FC3F7")),
+            LegendEntry("HEAL",  Color.parseColor("#66BB6A"))
+        )
+
+        val squareSize = 20f
+        val squareTextGap = 6f
+        val itemSpacing = 16f
+        val vertPad = 8f
+        val horizPad = 12f
+
+        // Measure total width to center the strip
+        var totalW = horizPad * 2f
+        for (entry in entries) {
+            totalW += squareSize + squareTextGap + legendTextPaint.measureText(entry.label) + itemSpacing
+        }
+        totalW -= itemSpacing  // remove trailing spacing
+
+        val stripLeft = (GridConstants.DESIGN_WIDTH - totalW) / 2f
+        val stripRight = stripLeft + totalW
+        val stripTop = gridBottom
+        val stripBottom = stripTop + squareSize + vertPad * 2f
+
+        // Semi-transparent background
+        canvas.drawRoundRect(RectF(stripLeft, stripTop, stripRight, stripBottom), 10f, 10f, legendBgPaint)
+
+        var curX = stripLeft + horizPad
+        val textY = stripTop + vertPad + squareSize * 0.78f  // baseline aligned with square center
+
+        for (entry in entries) {
+            // Colored square
+            legendSquarePaint.color = entry.color
+            canvas.drawRoundRect(
+                RectF(curX, stripTop + vertPad, curX + squareSize, stripTop + vertPad + squareSize),
+                4f, 4f, legendSquarePaint
+            )
+            curX += squareSize + squareTextGap
+
+            // Label
+            canvas.drawText(entry.label, curX, textY, legendTextPaint)
+            curX += legendTextPaint.measureText(entry.label) + itemSpacing
+        }
     }
 
     private fun drawPhaseIndicator(canvas: Canvas, phase: BattleTurnPhase) {
@@ -454,5 +533,6 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
         enemyRenderer.cleanup()
         effectRenderer.clear()
         backgroundBmp.recycle()
+        battleHUD.cleanup()
     }
 }
