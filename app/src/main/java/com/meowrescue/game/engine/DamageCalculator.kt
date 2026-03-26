@@ -56,6 +56,16 @@ object DamageCalculator {
             resistedHit[enemy.id] = false
         }
 
+        // Calculate total damage per match first, then distribute to enemies one at a time.
+        // Each match targets the first alive enemy (focus fire). If overkill, excess
+        // carries over to the next enemy.
+        data class MatchDamageInfo(
+            val damage: Float,
+            val type: BlockType
+        )
+
+        val matchDamages = mutableListOf<MatchDamageInfo>()
+
         for (match in matches) {
             if (match.type == BlockType.HEAL) continue
 
@@ -82,22 +92,34 @@ object DamageCalculator {
 
             matchDamage += matchBonusDamage
 
-            for (enemy in aliveEnemies) {
-                var enemyDamage = matchDamage
+            matchDamages.add(MatchDamageInfo(matchDamage, match.type))
+        }
 
-                when {
-                    match.type == enemy.weakness -> {
-                        enemyDamage *= GridConstants.WEAKNESS_MULTIPLIER
-                        weaknessHit[enemy.id] = true
-                    }
-                    match.type == enemy.resistance -> {
-                        enemyDamage *= GridConstants.RESISTANCE_MULTIPLIER
-                        resistedHit[enemy.id] = true
-                    }
+        // Apply damage sequentially: focus fire on first alive enemy, overflow to next
+        val remainingHp = mutableMapOf<String, Float>()
+        aliveEnemies.forEach { remainingHp[it.id] = it.currentHp.toFloat() }
+
+        for (info in matchDamages) {
+            // Find the first enemy still standing (based on tracked remaining HP)
+            val target = aliveEnemies.firstOrNull { (remainingHp[it.id] ?: 0f) > 0f } ?: break
+
+            var enemyDamage = info.damage
+
+            when {
+                info.type == target.weakness -> {
+                    enemyDamage *= GridConstants.WEAKNESS_MULTIPLIER
+                    weaknessHit[target.id] = true
                 }
-
-                damagePerEnemy[enemy.id] = (damagePerEnemy[enemy.id] ?: 0f) + enemyDamage
+                info.type == target.resistance -> {
+                    enemyDamage *= GridConstants.RESISTANCE_MULTIPLIER
+                    resistedHit[target.id] = true
+                }
             }
+
+            damagePerEnemy[target.id] = (damagePerEnemy[target.id] ?: 0f) + enemyDamage
+            remainingHp[target.id] = (remainingHp[target.id] ?: 0f) - enemyDamage
+
+            // If this enemy is dead from accumulated damage, next match will target next enemy
         }
 
         return aliveEnemies.map { enemy ->
