@@ -43,9 +43,9 @@ object StageGenerator {
         }
 
         val templates = EnemyTemplate.getTemplatesForChapter(stats.chapter)
-        return (0 until stats.count).map {
+        return (0 until stats.count).mapIndexed { index, _ ->
             val template = templates[random.nextInt(templates.size)]
-            EnemyTemplate.createEnemy(template, stats.hpScale, stats.attackScale)
+            EnemyTemplate.createEnemy(template, stats.hpScale, stats.attackScale, index)
         }
     }
 }

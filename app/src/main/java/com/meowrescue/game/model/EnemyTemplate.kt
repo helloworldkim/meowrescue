@@ -66,10 +66,10 @@ object EnemyTemplate {
         }
     }
 
-    fun createEnemy(template: Template, hpScale: Float = 1f, attackScale: Float = 1f): Enemy {
+    fun createEnemy(template: Template, hpScale: Float = 1f, attackScale: Float = 1f, index: Int = 0): Enemy {
         val hp = (template.baseHp * hpScale).toInt()
         return Enemy(
-            id = template.id,
+            id = "${template.id}_$index",
             name = template.name,
             maxHp = hp,
             currentHp = hp,
