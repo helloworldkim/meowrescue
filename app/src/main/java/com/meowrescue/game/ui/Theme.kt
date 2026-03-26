@@ -16,4 +16,14 @@ object Theme {
     const val COLOR_RARITY_RARE = "#C8B8E8"
     const val COLOR_RARITY_COMMON = "#B5EAD7"
     const val COLOR_CARD_BACKGROUND = "#FFFFFF"
+
+    // Battle colors
+    const val COLOR_HP_BAR = "#4CAF50"
+    const val COLOR_HP_BAR_BG = "#333333"
+    const val COLOR_BLOCK_ATTACK = "#FF6B6B"
+    const val COLOR_BLOCK_FIRE = "#FF9F43"
+    const val COLOR_BLOCK_WATER = "#54A0FF"
+    const val COLOR_BLOCK_HEAL = "#5CD85C"
+    const val COLOR_DAMAGE_TEXT = "#FF4444"
+    const val COLOR_HEAL_TEXT = "#5CD85C"
 }

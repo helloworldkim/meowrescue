@@ -61,6 +61,4 @@ dependencies {
     // JSON parsing
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // dyn4j physics engine
-    implementation("org.dyn4j:dyn4j:5.0.2")
 }

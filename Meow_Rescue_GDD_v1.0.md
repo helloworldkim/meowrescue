@@ -1,6 +1,6 @@
-# 🐱 Meow Rescue — Game Design Document (GDD) v1.1
+# Meow Rescue — Game Design Document (GDD) v2.0
 
-> **핀을 빼서 공을 굴려 고양이를 구출하는 물리 퍼즐 게임**
+> **그리드 매칭 퍼즐 + 턴제 전투가 결합된 로그라이크 게임. 귀여운 고양이들을 구출하며 점점 강해지는 적들을 무찌르세요.**
 
 ---
 
@@ -9,150 +9,219 @@
 | 항목 | 내용 |
 |------|------|
 | **게임명** | Meow Rescue |
-| **장르** | 하이퍼캐주얼 퍼즐 (Hyper-Casual Puzzle) |
+| **장르** | 하이브리드 퍼즐 + 턴제 전투 (Hybrid Matching Puzzle + Turn-Based Combat) |
 | **플랫폼** | Android (Kotlin Native) |
-| **타겟 유저** | 전연령, 캐주얼 퍼즐 애호가 |
+| **타겟 유저** | 전연령, 캐주얼 퍼즐/전술 게임 애호가 |
 | **수익 모델** | 광고 기반 (AdMob 전면/보상형 광고) |
-| **핵심 한 줄 요약** | 핀을 빼서 공을 굴려 고양이를 구출하는 물리 퍼즐 게임 |
+| **핵심 한 줄 요약** | 그리드에서 같은 타입의 블록 3개 이상을 맞춰 적에게 피해를 주고, 턴제 전투로 모든 적을 무찌르면 고양이를 구출하는 로그라이크 게임 |
 
 ### 1.1 게임 컨셉
 
-귀여운 고양이들이 위험에 빠져 있습니다! 플레이어는 핀을 올바른 순서와 타이밍에 맞춰 빼서, 공이 장애물을 피해 고양이에게 도달하도록 경로를 만들어야 합니다.
+플레이어는 5x5 또는 5x6 그리드에서 같은 타입의 블록 3개 이상을 터치로 맞춰 조합을 만듭니다. 매칭된 블록들은 사라지고, 중력으로 인해 위의 블록들이 떨어지며, 빈 공간은 새로운 블록으로 채워집니다. 연쇄 매칭이 일어나면 보너스 피해가 발생합니다.
 
-단순한 조작(핀 터치)에 물리 기반 공 굴림 + 논리적 순서 퍼즐이 결합된 형태로, 누구나 쉽게 배울 수 있지만 레벨이 올라갈수록 전략적 사고가 필요합니다.
+매칭에서 나온 피해로 적들을 무찌르되, 적들도 턴을 번갈아 플레이어를 공격합니다. 모든 적을 처치하면 고양이를 구출하고, 다음 스테이지로 진행합니다. 게임은 로그라이크 구조를 따르며, 10개 스테이지마다 챕터가 완성되고, 각 스테이지를 클리어할 때마다 해당 고양이로부터 버프를 받습니다.
 
 ### 1.2 게임의 차별점
 
-- **핀 빼기 + 경로 만들기**: 기존 Pull the Pin 장르에 경로 설계 퍼즐 요소를 추가
-- **물리 기반 공 굴림**: 단순 낙하가 아닌 경사면, 바운스, 마찰을 활용한 물리 시뮬레이션
-- **고양이 컬렉션**: 스테이지를 클리어할 때마다 새로운 고양이를 구출/수집하여 리텐션 강화
-- **점진적 요소 해금**: 새로운 핀, 장애물, 특수 공이 레벨 진행에 따라 등장하여 지루함 방지
+- **매칭 + 전투의 결합**: 단순 퍼즐 게임을 넘어 전술적 의사결정이 필요한 턴제 전투 시스템
+- **요소 약점 시스템**: 각 적이 특정 블록 타입에 약해하고, 다른 타입에는 저항하여 전략성 강화
+- **연쇄 보너스**: 매칭 후 중력으로 인한 추가 매칭이 일어날 때마다 피해가 +25% 증가
+- **로그라이크 진행**: 챕터 단위의 플레이, 고양이 버프 축적, 릭 수집을 통한 메타 진행
+- **절차적 생성 + 검증**: 매 스테이지마다 새로운 그리드와 적 조합이 생성되며, 모두 풀이 가능함이 보장됨
+- **고양이 컬렉션**: 게임 진행 중 만나는 고양이들이 고유한 버프를 제공하여 회차 플레이 장려
 
 ---
 
 ## 🎮 2. 핵심 게임플레이 (Core Gameplay)
 
-### 2.1 기본 메카니즘
+### 2.1 기본 메커니즘
 
-- **핀 (Pin)**: 화면에 배치된 핀을 터치하면 빠집니다. 핀이 빠지면 공이 중력에 의해 굴러갑니다.
-- **공 (Ball)**: 물리 엔진에 의해 굴러가며, 경사면을 따라 이동합니다. 장애물에 닿으면 파괴됩니다.
-- **고양이 (Cat)**: 공이 고양이에게 도달하면 구출 성공! 스테이지 클리어입니다.
-- **장애물 (Obstacles)**: 불, 가시, 움직이는 바닥 등 공을 파괴하는 요소들입니다.
+#### 2.1.1 블록 매칭
 
-### 2.2 플레이 플로우
+- **그리드**: 5x5 또는 5x6 크기의 칸
+- **블록 타입**: ATTACK (물리 공격), FIRE (불 속성), WATER (물 속성), HEAL (회복)
+- **매칭 조건**: 같은 타입의 블록 3개 이상이 상하좌우로 인접하면 매칭됨
+- **플레이어 입력**: 유효한 매칭 그룹에 속한 블록을 터치하면, 그 그룹에 연결된 모든 같은 타입 블록이 한 번에 제거됨
+
+#### 2.1.2 중력 및 캐스케이드
+
+- **중력**: 블록이 제거된 후 위의 블록들이 아래로 떨어짐
+- **리필**: 빈 공간은 위에서 새로운 랜덤 블록으로 채워짐
+- **자동 연쇄**: 중력과 리필 과정에서 새로운 매칭이 자동으로 발생하면 "캐스케이드"라고 부르며, 매 레벨마다 +25% 피해 보너스 적용
+
+#### 2.1.3 피해 계산
+
+- **기본 피해**: 매칭된 블록 개수 × 블록 가치
+- **속성 상성**:
+  - **약점** (1.5배): FIRE 블록은 불 약점 적에게, WATER 블록은 물 약점 적에게 추가 피해
+  - **저항** (0.5배): 적의 저항 속성 블록은 피해 감소
+- **연쇄 보너스**: 캐스케이드 깊이가 N일 때, (1 + N × 0.25)배 곱함 (최대 1.5배)
+- **버프 적용**: 보유 중인 고양이 버프와 릭 효과가 피해 계산에 반영됨
+
+#### 2.1.4 회복
+
+- **HEAL 블록**: 플레이어 체력을 회복함
+- **회복량**: HEAL 블록 개수 × 블록 가치 + 관련 버프/릭 보정
+
+### 2.2 턴제 전투 플로우
 
 ```
-스테이지 시작
-    ↓
-화면에 핀, 공, 고양이, 장애물 배치
-    ↓
-플레이어가 핀을 터치하여 순서대로 빼기
-    ↓
-공이 중력에 의해 굴러가며 경로를 따라 이동
-    ↓
-┌─────────────────────────────┐
-│  공이 고양이에 도달 → 성공!  │
-│  장애물 충돌/화면 이탈 → 실패 │
-└─────────────────────────────┘
-    ↓
-성공 시: 별점 표시 → 다음 레벨 (클리어 사이 광고 노출)
-실패 시: 이어하기(광고) 또는 다시하기
+┌──────────────────────────┐
+│   PLAYER_INPUT 단계      │
+│ 플레이어가 블록 선택      │
+└──────────────────────────┘
+           ↓
+┌──────────────────────────┐
+│  MATCHING 단계           │
+│ 선택된 블록 제거         │
+└──────────────────────────┘
+           ↓
+┌──────────────────────────┐
+│  CASCADING 단계          │
+│ 중력 적용, 리필, 재매칭  │
+└──────────────────────────┘
+           ↓
+┌──────────────────────────┐
+│  PLAYER_ATTACK 단계      │
+│ 피해를 모든 적에 적용    │
+└──────────────────────────┘
+           ↓
+┌──────────────────────────┐
+│  ENEMY_ATTACK 단계       │
+│ 살아있는 각 적이 공격    │
+└──────────────────────────┘
+           ↓
+      플레이어 HP > 0 ?
+      ↙          ↖
+    NO            YES
+     ↓             ↓
+  DEFEAT      PLAYER_INPUT으로
+             돌아가 다음 턴 시작
+
+       모든 적 처치 시 VICTORY
 ```
 
 ### 2.3 조작 방식
 
 | 조작 | 동작 |
 |------|------|
-| **핀 터치** | 핀을 터치하면 해당 핀이 빠짐 |
-| **드래그** | 핀을 드래그하여 원하는 방향으로 빼기 (고급 스테이지) |
-| **장기 프레스** | 공에 힘을 가하여 방향 조정 (특수 스테이지) |
+| **블록 터치** | 유효한 매칭 그룹에 속한 블록을 터치하면 그 그룹 전체가 매칭됨 |
+| **일시정지** | 화면 상단 일시정지 버튼으로 게임 중지 |
+| **전투 정보** | 화면 터치로 적의 약점/저항 정보 확인 가능 |
 
 ---
 
 ## 🧩 3. 게임 요소 상세 (Game Elements)
 
-### 3.1 핀 종류
+### 3.1 블록 타입
 
-| 핀 타입 | 설명 | 등장 시점 |
-|---------|------|-----------|
-| **일반 핀** | 빼면 공이 그냥 떨어짐 | 레벨 1~ |
-| **타이머 핀** | 빼면 N초 후 다시 나타남 | 레벨 15~ |
-| **방향 핀** | 빼는 방향에 따라 공의 경로가 바뀜 | 레벨 30~ |
-| **연쇄 핀** | 빼면 연결된 다른 핀도 함께 빠짐 | 레벨 50~ |
-| **잠금 핀** | 특정 조건 충족 시에만 빼기 가능 | 레벨 70~ |
+| 타입 | 설명 | 피해 타입 | 특징 |
+|------|------|----------|------|
+| **ATTACK** | 물리 공격 블록 | 기본 피해 | 모든 적에게 같은 피해 |
+| **FIRE** | 불 속성 블록 | 속성 피해 | 불 약점 적에게 1.5배 |
+| **WATER** | 물 속성 블록 | 속성 피해 | 물 약점 적에게 1.5배 |
+| **HEAL** | 회복 블록 | 회복 | 플레이어 체력 회복 |
 
-### 3.2 장애물 종류
+### 3.2 적 타입
 
-| 장애물 | 효과 | 등장 시점 |
-|--------|------|-----------|
-| **불 (Fire)** | 공이 닿으면 파괴 | 레벨 1~ |
-| **가시 (Spike)** | 공이 닿으면 파괴 | 레벨 5~ |
-| **움직이는 바닥** | 좌우로 움직이며 공의 경로를 방해 | 레벨 20~ |
-| **텔레포트** | 공을 다른 위치로 이동시킴 | 레벨 40~ |
-| **스위치 블록** | 핀을 빼면 ON/OFF 전환 | 레벨 60~ |
+| 적 이름 | 약점 | 저항 | 체력 | 공격력 | 공격 패턴 | 등장 시점 |
+|--------|------|------|------|--------|-----------|----------|
+| **Slime** | FIRE | WATER | 낮음 | 낮음 | NORMAL, NORMAL | Ch1 Stage 1~ |
+| **Rat** | WATER | - | 중간 | 중간 | NORMAL, HEAVY | Ch1 Stage 5~ |
+| **Crow** | ATTACK | - | 중간 | 높음 | NORMAL, BUFF_SELF | Ch2 Stage 1~ |
+| **Snake** | FIRE | ATTACK | 높음 | 중간 | HEAVY, HEAL_SELF | Ch3 Stage 1~ |
+| **Boss Wolf** | - | - | 매우 높음 | 높음 | HEAVY, HEAVY, BUFF_SELF, HEAL_SELF | 매 챕터 Stage 10 |
 
-### 3.3 특수 공 종류
+#### 공격 패턴
+- **NORMAL**: 기본 공격 (적의 공격력 × 1.0)
+- **HEAVY**: 강공격 (적의 공격력 × 1.5)
+- **HEAL_SELF**: 자신 회복 (최대 체력의 30%)
+- **BUFF_SELF**: 자신 강화 (다음 공격력 × 1.5, 한 턴)
 
-| 공 타입 | 특성 | 등장 시점 |
-|---------|------|-----------|
-| **일반 공** | 기본 물리 적용 | 레벨 1~ |
-| **불공** | 가시를 태워서 통과 가능 | 레벨 25~ |
-| **철공** | 자석에 끌려감 | 레벨 45~ |
-| **폭탄 공** | 장애물에 닿으면 폭발하여 주변 파괴 | 레벨 65~ |
+### 3.3 고양이 버프 시스템
 
----
+각 스테이지에서 고양이를 구출할 때마다, 그 고양이로부터 특정 버프를 획득합니다. 버프는 챕터 전체에 걸쳐 축적되며, 다음 챕터로 진행하면 리셋됩니다.
 
-## 📐 4. 스테이지 설계 (Level Design)
+| 버프 타입 | 설명 | 크기 |
+|----------|------|------|
+| **ATTACK_BOOST** | 모든 공격 피해 +X% | 보통 1.15배 |
+| **HEAL_BOOST** | 회복 효과 +X% | 보통 1.20배 |
+| **FIRE_BOOST** | 불 속성 피해 +X% | 보통 1.25배 |
+| **WATER_BOOST** | 물 속성 피해 +X% | 보통 1.25배 |
+| **MAX_HP_UP** | 최대 체력 +X | 보통 +10 |
+| **DAMAGE_REDUCE** | 받는 피해 -X% | 보통 0.85배 |
 
-### 4.1 난이도 커브
+### 3.4 릭 시스템
 
-| 구간 | 레벨 | 핵심 요소 | 목적 |
-|------|------|-----------|------|
-| **튜토리얼** | 1~10 | 핀 1~2개, 장애물 없음 | 조작법 학습 |
-| **초급** | 11~30 | 핀 2~3개, 불/가시 등장 | 순서 퍼즐 이해 |
-| **중급** | 31~60 | 타이머 핀, 움직이는 바닥 | 타이밍 + 전략 |
-| **상급** | 61~90 | 연쇄 핀, 텔레포트, 특수 공 | 복합 퍼즐 |
-| **보스** | 91~100 | 멀티캣, 스킵-플랫폼 패턴 | 최종 도전 |
+스테이지 클리어 후 특정 지점에서 3개의 릭 중 1개를 선택할 수 있습니다. 선택한 릭은 그 이후 스테이지에서 지속됩니다.
 
-### 4.2 별점 시스템
-
-- ⭐ **1성**: 스테이지 클리어
-- ⭐⭐ **2성**: 제한된 핀 빼기 횟수 이내로 클리어
-- ⭐⭐⭐ **3성**: 최소 핀 빼기로 클리어 (Perfect)
-
-### 4.3 보스 스테이지 (레벨 91~100)
-
-마지막 10레벨은 멀티캣 보스 스테이지입니다:
-- 2~3마리의 고양이를 **하나의 공**으로 순차 구출
-- **스킵-플랫폼 패턴**: 5개 플랫폼 중 Plat1→Plat3→Plat5만 활용하는 경로
-- Plat1(+12°)에서 공이 오른쪽으로 튀어 Cat1 구출, Plat3(-5°)에서 왼쪽으로 튀어 Cat2/Cat3 구출
-- 클리어 시 **희귀/전설 고양이** 획득
-- 레벨 91~98: 고양이 2마리, 레벨 99~100: 고양이 3마리
+| 릭 | 효과 | 설명 |
+|----|------|------|
+| **MATCH_BONUS_DAMAGE** | +X% 피해 | 모든 매칭에서 피해 +20% |
+| **CHAIN_MULTIPLIER** | 연쇄 보너스 강화 | 캐스케이드 레벨당 +30% (기본 +25%) |
+| **HEAL_ON_MATCH** | 매칭 회복 | 매칭할 때마다 플레이어 체력 +5 회복 |
+| **START_SHIELD** | 시작 보호막 | 첫 턴에 피해 -30% 방패 획득 |
+| **EXTRA_TURN_CHANCE** | 추가 턴 기회 | 5% 확률로 추가 턴 획득 |
 
 ---
 
-## 💰 5. 수익화 전략 (Monetization)
+## 📐 4. 스테이지 설계 및 난이도 (Level Design & Difficulty)
 
-### 5.1 광고 삽입 포인트
+### 4.1 챕터 및 스테이지 구조
 
-| 광고 유형 | 삽입 시점 | 빈도 |
-|-----------|-----------|------|
-| **전면 광고 (Interstitial)** | 스테이지 클리어 후 (매 3레벨마다) | 높음 |
-| **보상형 광고 (Rewarded)** | 실패 시 이어하기 / 힌트 받기 / 추가 공 받기 | 중간 |
-| **배너 광고 (Banner)** | 메인 화면 하단 (플레이 중 없음) | 상시 |
+- **총 10개 챕터** (각 챕터 10개 스테이지)
+- **스테이지 1~9**: 일반 스테이지 (1~3마리 적)
+- **스테이지 10**: 보스 스테이지 (1마리 보스 적)
 
-### 5.2 광고 정책 (유저 경험 보호)
+#### 난이도 커브
 
-- 처음 5레벨은 광고 없이 플레이 (신규 유저 이탈 방지)
-- 전면 광고는 최소 3레벨 간격으로 제한
-- 보상형 광고는 항상 선택적 (강제 시청 금지)
-- 한 세션당 최대 광고 노출 횟수 제한 (피로감 방지)
+| 챕터 | 스테이지 | 적 개수 | 체력 스케일 | 공격력 스케일 | 목적 |
+|------|---------|--------|-----------|-------------|------|
+| **Ch1** | 1~3 | 1 | 1.0x | 1.0x | 기본 매커니즘 학습 |
+| **Ch1** | 4~6 | 2 | 1.15x | 1.15x | 복수 적 전술 |
+| **Ch1** | 7~9 | 3 | 1.30x | 1.30x | 멀티태스킹 |
+| **Ch1** | 10 (Boss) | 1 | 2.0x | 1.5x | 1회차 챕터 완성 |
+| **Ch2~3** | 1~3 | 1 | scale(ch,st) | scale(ch,st) | 난이도 증가 |
+| **Ch4+** | - | - | scale(ch,st) | scale(ch,st) | 고난이도 챌린지 |
 
-### 5.3 선택적 IAP (인앱 결제)
+스케일 공식:
+```
+baseScale = 1.0 + (chapter - 1) × 0.3 + (stage - 1) × 0.05
+bossDamageScale = baseScale × 2.0 (체력), baseScale × 1.5 (공격)
+```
 
-- **광고 제거**: 일회성 결제로 모든 광고 제거
-- **힌트 팩**: 힌트 아이템 N개 묶음
-- **특수 공 팩**: 불공/철공 등 특수 공 해금
+### 4.2 그리드 제약
+
+| 챕터 | 그리드 크기 | 허용 블록 타입 | 목적 |
+|------|-----------|-------------|------|
+| **Ch1** | 5x5 | ATTACK, FIRE, HEAL | 3가지 속성만 |
+| **Ch2** | 5x5 | ATTACK, FIRE, WATER, HEAL | 4가지 모두 |
+| **Ch3+** | 5x6 | ATTACK, FIRE, WATER, HEAL | 더 큰 그리드 |
+
+### 4.3 해결 가능성 (Solvability)
+
+모든 절차적으로 생성된 스테이지는 **사전 검증**을 거칩니다:
+
+- **SolvabilityVerifier**: BFS/greedy 알고리즘으로 주어진 상황에서 모든 적을 처치할 수 있는 최소 1가지 경로가 존재하는지 확인
+- **검증 조건**: 플레이어 체력, 적 체력 및 공격력, 그리드 상태를 고려하여 최악의 경우에도 승리 가능 여부 판단
+- **재생성**: 검증 실패 시 새로운 그리드와 적 조합을 생성하여 재검증
+
+---
+
+## 💬 5. 고양이 컬렉션 및 스토리 (Cat Collection)
+
+게임 진행 중 만나는 고양이들:
+
+| 고양이 | 버프 | 레어도 | 획득 방법 |
+|--------|------|--------|---------|
+| **Tabby** | ATTACK_BOOST | 일반 | Ch1 Stage 1 클리어 |
+| **Calico** | FIRE_BOOST | 일반 | Ch1 Stage 2 클리어 |
+| **Siamese** | WATER_BOOST | 일반 | Ch1 Stage 3 클리어 |
+| **Maine Coon** | HEAL_BOOST | 일반 | Ch1 Stage 4 클리어 |
+| **British Blue** | MAX_HP_UP | 일반 | Ch1 Stage 5 클리어 |
+| **Ragdoll** | DAMAGE_REDUCE | 일반 | Ch1 Stage 6 클리어 |
+| **Persian** | ATTACK_BOOST | 희귀 | Ch1 보스 클리어 |
+| **Bengal** | FIRE_BOOST + WATER_BOOST | 전설 | Ch10 최종 보스 클리어 |
 
 ---
 
@@ -162,186 +231,139 @@
 
 | 구분 | 기술 |
 |------|------|
-| **언어** | Kotlin |
-| **렌더링** | Android Canvas / SurfaceView |
-| **물리 엔진** | dyn4j 5.0.2 (2D 물리 라이브러리) |
-| **데이터 저장** | Room DB + SharedPreferences |
-| **광고** | Google AdMob SDK (전면/보상형/배너 광고 구현 완료) |
-| **분석** | Firebase Analytics (미구현, 추후 연동 예정) |
-| **앱 보안** | Google Play Integrity API (미구현, 추후 연동 예정) |
-| **최소 버전** | Android API 24 (Android 7.0) |
-| **컴파일/타겟 SDK** | API 36 (Android 16) |
+| **언어** | Kotlin 2.2.0 |
+| **렌더링** | Android SurfaceView + Canvas |
+| **데이터 저장** | Room 2.6.1 DB |
+| **광고** | Google AdMob SDK |
+| **빌드** | Gradle 9.0.0 + AGP 8.7.3 |
+| **최소 SDK** | API 24 (Android 7.0) |
+| **타겟 SDK** | API 35 (Android 15) |
 
-### 6.2 프로젝트 패키지 구조
+### 6.2 패키지 구조
 
 ```
 com.meowrescue.game
-├── MeowRescueApp.kt              // Application 클래스 (초기화, AdMob SDK 초기화)
+├── MeowRescueApp.kt                    // 앱 초기화
 ├── ads/
-│   └── AdManager.kt              // AdMob 광고 중앙 관리 (전면/보상형/배너, 빈도 제어)
-├── game/
-│   ├── GameEngine.kt              // 게임 상태 관리 + GameEventListener
-│   ├── GameLoop.kt                // 60 FPS 게임 스레드
-│   └── Dyn4jPhysicsEngine.kt     // dyn4j 물리 월드 래퍼 (중력, 충돌, 바운스)
+│   └── AdManager.kt                    // AdMob 광고 관리
 ├── model/
-│   ├── Pin.kt                     // 핀 데이터 클래스 (sealed class)
-│   ├── Ball.kt                    // 공 데이터 클래스
-│   ├── Cat.kt                     // 고양이 데이터 클래스
-│   ├── Obstacle.kt                // 장애물 데이터 클래스 (sealed class)
-│   ├── Surface.kt                 // 플랫폼 데이터 (위치, 크기, 각도)
-│   └── util/
-│       └── Vector2D.kt            // 가변 2D 벡터 (연산자 오버로드)
-├── level/
-│   ├── LevelData.kt               // 레벨 데이터 모델
-│   └── LevelLoader.kt             // JSON 기반 레벨 로더
+│   ├── Block.kt                        // 블록 데이터 (타입, 위치, 가치)
+│   ├── Enemy.kt                        // 적 데이터 (HP, 공격력, 약점)
+│   ├── GridState.kt                    // 그리드 전체 상태
+│   ├── BattleState.kt                  // 전투 상태 스냅샷
+│   ├── CatBuff.kt                      // 고양이 버프
+│   ├── Relic.kt                        // 릭 보상
+│   ├── Cat.kt                          // 구출된 고양이 정보
+│   ├── MatchResult.kt                  // 매칭 결과
+│   └── DamageResult.kt                 // 피해 계산 결과
+├── engine/
+│   ├── GridEngine.kt                   // 매칭, 중력, 캐스케이드 로직
+│   ├── BattleEngine.kt                 // 턴 상태 머신, 전투 진행
+│   ├── BattleTurnPhase.kt              // 턴 단계 enum
+│   ├── DamageCalculator.kt             // 피해 계산 (상성, 버프 반영)
+│   └── EnemyAI.kt                      // 적 행동 패턴 선택
+├── generator/
+│   ├── GridGenerator.kt                // 랜덤 그리드 생성
+│   ├── StageGenerator.kt               // 스테이지 생성 (그리드 + 적)
+│   ├── DifficultyScaler.kt             // 난이도별 스케일링
+│   └── SolvabilityVerifier.kt          // 스테이지 풀이 가능성 검증
 ├── ui/
-│   ├── GameActivity.kt            // 게임 화면 Activity
-│   ├── GameView.kt                // SurfaceView 기반 게임 렌더링 + 오버레이
-│   ├── MenuActivity.kt            // 메인 메뉴 + 지그재그 레벨맵
-│   ├── CollectionActivity.kt      // 고양이 컬렉션 화면
-│   └── Theme.kt                   // UI 색상 상수 모음
+│   ├── Theme.kt                        // UI 색상 상수
+│   ├── MenuActivity.kt                 // 메인 메뉴 (챕터 선택)
+│   ├── BattleActivity.kt               // 전투 화면
+│   ├── BattleView.kt                   // 전투 렌더링 (Canvas)
+│   ├── BattleHUD.kt                    // 전투 UI (HP바, 턴 카운터)
+│   ├── RelicSelectActivity.kt          // 릭 선택 화면
+│   ├── RunSummaryActivity.kt           // 회차 결과 화면
+│   ├── CollectionActivity.kt           // 고양이 컬렉션
+│   └── render/
+│       ├── GridRenderer.kt             // 그리드 렌더링
+│       ├── EnemyRenderer.kt            // 적 렌더링
+│       └── EffectRenderer.kt           // 이펙트 렌더링
 ├── data/
-│   ├── GameRepository.kt          // 데이터 접근 레이어
-│   ├── UserProgressDao.kt         // Room DAO (유저 진행도)
-│   └── AppDatabase.kt             // Room Database
+│   ├── AppDatabase.kt                  // Room 데이터베이스
+│   ├── UserProgressDao.kt              // 진행도 DAO
+│   └── GameRepository.kt               // 데이터 접근 계층
+├── game/
+│   └── GameLoop.kt                     // 60 FPS 렌더 루프
 └── util/
-    └── SoundManager.kt            // SoundPool(SFX 11종) + MediaPlayer(BGM 5종) 사운드 관리
+    ├── SoundManager.kt                 // 효과음 및 BGM 관리
+    └── GridConstants.kt                // 그리드 관련 상수
 ```
 
-> **참고**: `ads/AdManager.kt`에 AdMob 전면/보상형/배너 광고가 구현되어 있습니다. 광고 정책(첫 5레벨 광고 없음, 3레벨 간격, 세션당 상한 10회)이 적용되어 있습니다.
-
-### 6.3 핵심 모델 설계 (Kotlin)
+### 6.3 핵심 데이터 구조 (Kotlin)
 
 ```kotlin
-// ── 핀 종류 (sealed class 활용) ──
-sealed class Pin(
-    val position: Vector2D,
-    val isRemoved: Boolean = false
-) {
-    class Normal(pos: Vector2D) : Pin(pos)
-    class Timer(pos: Vector2D, val resetSeconds: Float) : Pin(pos)
-    class Directional(pos: Vector2D, val direction: Vector2D) : Pin(pos)
-    class Chain(pos: Vector2D, val linkedPins: List<Pin>) : Pin(pos)
-    class Locked(pos: Vector2D, val unlockCondition: () -> Boolean) : Pin(pos)
-}
+// ── 블록 ──
+data class Block(
+    val type: BlockType,               // ATTACK, FIRE, WATER, HEAL, EMPTY
+    var row: Int,
+    var col: Int,
+    val value: Int = 1                 // 피해/회복 배수
+)
 
-// ── 공 종류 ──
-sealed class Ball(
-    val position: Vector2D,
-    val velocity: Vector2D,
-    val radius: Float
-) {
-    class Normal(pos: Vector2D) : Ball(pos, Vector2D.ZERO, 15f)
-    class Fire(pos: Vector2D) : Ball(pos, Vector2D.ZERO, 15f)
-    class Iron(pos: Vector2D) : Ball(pos, Vector2D.ZERO, 18f)
-    class Bomb(pos: Vector2D) : Ball(pos, Vector2D.ZERO, 20f)
-}
+// ── 적 ──
+data class Enemy(
+    val id: String,
+    val name: String,
+    val maxHp: Int,
+    var currentHp: Int,
+    val attack: Int,
+    val weakness: BlockType?,           // 약점 속성
+    val resistance: BlockType?,         // 저항 속성
+    val spriteResId: Int,
+    val attackPattern: List<EnemyAttackType>
+)
 
-// ── 장애물 종류 ──
-sealed class Obstacle(val position: Vector2D, val size: Vector2D) {
-    class Fire(pos: Vector2D, s: Vector2D) : Obstacle(pos, s)
-    class Spike(pos: Vector2D, s: Vector2D) : Obstacle(pos, s)
-    class MovingPlatform(pos: Vector2D, s: Vector2D, val speed: Float) : Obstacle(pos, s)
-    class Teleport(pos: Vector2D, s: Vector2D, val target: Vector2D) : Obstacle(pos, s)
-    class SwitchBlock(pos: Vector2D, s: Vector2D, var isOn: Boolean) : Obstacle(pos, s)
-}
+// ── 전투 상태 ──
+data class BattleState(
+    val grid: GridState,
+    val enemies: MutableList<Enemy>,
+    val playerMaxHp: Int,
+    var playerCurrentHp: Int,
+    var turnCount: Int,
+    val catBuffs: MutableList<CatBuff>,
+    val relics: MutableList<Relic>,
+    var phase: BattleTurnPhase,
+    val chapter: Int,
+    val stage: Int
+)
+
+// ── 고양이 버프 ──
+data class CatBuff(
+    val catId: String,
+    val buffType: BuffType,            // ATTACK_BOOST, HEAL_BOOST 등
+    val magnitude: Float                // 1.15 = +15%
+)
+
+// ── 릭 ──
+data class Relic(
+    val id: String,
+    val name: String,
+    val description: String,
+    val effect: RelicEffect,           // MATCH_BONUS_DAMAGE 등
+    val magnitude: Float
+)
 ```
 
-### 6.4 물리 엔진 (dyn4j 5.0.2)
-
-dyn4j 2D 물리 라이브러리를 사용하여 정확한 물리 시뮬레이션을 구현합니다:
+### 6.4 게임 루프
 
 ```kotlin
-class Dyn4jPhysicsEngine {
-    private val world = World<Body>()
-
-    companion object {
-        const val PIXELS_PER_METER = 100.0   // 100px = 1m 좌표 변환
-        const val RESTITUTION = 0.4          // 반발 계수
-        const val FRICTION = 0.3             // 마찰 계수
-    }
-
-    init {
-        world.gravity = Vector2(0.0, 9.8)    // Y-down 중력
-        world.settings.isContinuousDetectionEnabled = true  // 터널링 방지
-    }
-
-    fun step(deltaTime: Double) {
-        world.update(deltaTime)
-        // 물리 바디 → 게임 엔티티 위치 동기화
-    }
-}
+// 게임 루프는 다음 프레임에서 실행됨:
+// 1. PLAYER_INPUT 단계: 낮은 FPS (유휴), 사용자 입력 대기
+// 2. 애니메이션 단계 (MATCHING, CASCADING, ATTACK): 60 FPS, 애니메이션 진행
+// 3. 이벤트 콜백: 애니메이션 완료 시 다음 단계로 진행
+// 4. 조건 체크: 승리/패배 조건 확인 후 게임 상태 업데이트
 ```
 
-**주요 특성:**
-- **좌표 변환**: 100px = 1m (화면 좌표 ↔ 물리 좌표)
-- **중력**: 9.8 m/s² (Y-down 좌표계)
-- **연속 충돌 감지**: 고속 공의 터널링 방지
-- **경사면 물리**: 각도에 따른 자연스러운 슬라이딩
-- **플랫폼 각도**: 양수 = 시계방향(공이 오른쪽으로), 음수 = 반시계방향(공이 왼쪽으로)
+### 6.5 저장 및 로드
 
-**충돌 및 경계 상수:**
+Room Database를 사용하여 다음 정보를 저장합니다:
 
-| 상수 | 값 | 설명 |
-|------|-----|------|
-| `CAT_COLLISION_RADIUS` | 30px | 고양이 구출 판정 반경 |
-| `Ball.Normal.radius` | 15px | 일반 공 반지름 |
-| `Ball.Fire.radius` | 15px | 불공 반지름 |
-| `Ball.Iron.radius` | 18px | 철공 반지름 |
-| `Ball.Bomb.radius` | 20px | 폭탄 공 반지름 |
-| `OUT_RIGHT` | 1200px | 오른쪽 화면 밖 경계 |
-| `OUT_LEFT` | -100px | 왼쪽 화면 밖 경계 |
-| `OUT_BOTTOM` | 2200px | 아래쪽 화면 밖 경계 |
-| 텔레포트 타겟 | `pos.x + 200, pos.y` | 텔레포트 시 X +200px 이동 |
-| 무빙 플랫폼 | speed=100, range=150 | 좌우 ±150px 진동 |
+- **UserProgress**: 최고 챕터, 획득한 고양이 목록, 전체 통계
+- **RunProgress**: 현재 진행 중인 회차 (챕터, 스테이지, 플레이어 체력, 보유 릭/버프)
 
-### 6.5 레벨 데이터 형식 (JSON)
-
-```json
-{
-  "levelId": 5,
-  "name": "지그재그 낙하",
-  "difficulty": "tutorial",
-  "maxPins": 2,
-  "stars": { "one": 999, "two": 3, "three": 2 },
-  "balls": [{ "type": "normal", "x": 300, "y": 200 }],
-  "cats": [{ "x": 700, "y": 1650, "catId": "cat_005" }],
-  "pins": [
-    { "type": "normal", "x": 350, "y": 580 },
-    { "type": "normal", "x": 650, "y": 1020 }
-  ],
-  "obstacles": [],
-  "platforms": [
-    { "x": 180, "y": 600, "width": 380, "height": 20, "angle": 8 },
-    { "x": 480, "y": 1040, "width": 380, "height": 20, "angle": 5 }
-  ]
-}
-```
-
-**필드 설명:**
-
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `levelId` | int | 레벨 번호 (1~100) |
-| `difficulty` | string | `tutorial`, `easy`, `medium`, `hard` |
-| `maxPins` | int | 최대 핀 빼기 횟수 |
-| `stars.one/two/three` | int | 별점 기준 (핀 빼기 횟수) |
-| `balls[].type` | string | `normal`, `fire`, `iron`, `bomb` |
-| `cats[].catId` | string | 고양이 고유 ID (`cat_001` ~ `cat_100c`) |
-| `pins[].type` | string | `normal` (추후 `timer`, `directional` 등 확장) |
-| `obstacles[].type` | string | `fire`, `spike`, `moving_platform`, `teleport`, `switch_block` |
-| `platforms[].angle` | float | 플랫폼 기울기 (양수=오른쪽, 음수=왼쪽, 0=수평) |
-
-### 6.6 레벨 설계 패턴
-
-**싱글캣 레벨 (1~90):** 공 1개 → 플랫폼 경유 → 고양이 1마리 구출
-- 플랫폼 각도를 통해 고양이 방향으로 공을 유도
-- 올-플랫(angle=0) 레벨은 반드시 cat_x ≈ ball_x 로 설계
-
-**멀티캣 보스 레벨 (91~100):** 공 1개 → 여러 고양이 순차 구출
-- **스킵-플랫폼 패턴**: Plat1(+12°) → Plat3(-5°) → Plat5(0°) 경로
-- Cat1: Plat1→Plat3 자유낙하 궤적 위에 배치
-- Cat2/Cat3: 마지막 플랫폼 아래에 배치
+따라서 게임을 종료한 후 다시 진입하면, 진행 중인 회차를 이어서 진행할 수 있습니다.
 
 ---
 
@@ -351,113 +373,67 @@ class Dyn4jPhysicsEngine {
 
 | 화면 | 주요 요소 |
 |------|-----------|
-| **메인 화면** | Meow Rescue 로고, 플레이 버튼, 스테이지 선택, 설정, 고양이 컬렉션 |
-| **스테이지 선택** | 월드 맵 형태, 레벨 번호 + 별점 표시, 잠금/해금 상태 |
-| **게임 화면** | 퍼즐 영역, 핀 터치 영역, 일시정지/힌트 버튼, 남은 공 수 |
-| **클리어 화면** | 별점 표시, 구출한 고양이 애니메이션, 다음 레벨 버튼, 공유 버튼 |
-| **실패 화면** | 이어하기(광고) 버튼, 다시하기 버튼, 힌트(광고) 버튼 |
-| **컬렉션** | 구출한 고양이 목록, 고양이 스킨 미리보기, 도감 달성률 |
+| **메인 메뉴** | Meow Rescue 로고, 새 게임, 계속하기, 고양이 컬렉션, 설정 |
+| **챕터 선택** | 챕터 번호, 진행률, 별점 표시, 잠금/해금 상태 |
+| **전투 화면** | 그리드 (5x5 또는 5x6), 적 HP바, 플레이어 HP바, 턴 카운터 |
+| **클리어 화면** | 구출한 고양이, 획득 버프/릭, 다음 단계 버튼 |
+| **패배 화면** | 재시도, 광고로 부활, 메뉴로 돌아가기 |
+| **릭 선택** | 3개 릭 중 1개 선택 |
+| **회차 결과** | 클리어한 챕터, 구출한 고양이, 수집 통계 |
+| **컬렉션** | 구출한 고양이 목록, 버프 정보, 도감 완성도 |
 
-### 7.2 디자인 톤 & 무드
+### 7.2 디자인 톤 & 색상
 
-- **전체 분위기**: 밝고 따뜻한 파스텔 톤
-- **주요 색상**: 연한 오렌지 (#FFA94D), 하늘색 (#74C0FC), 연한 초록 (#69DB7C)
-- **캐릭터 스타일**: 둥글둥글한 귀여운 2D 일러스트
+- **분위기**: 밝고 따뜻한 파스텔 톤
+- **블록 색상**:
+  - ATTACK: 빨강 (#FF6B6B)
+  - FIRE: 주황 (#FFA94D)
+  - WATER: 파랑 (#74C0FC)
+  - HEAL: 초록 (#69DB7C)
+  - EMPTY: 회색 (#CCCCCC)
 - **폰트**: 둥근 고딕 계열 (영문: Nunito Bold, 한글: 카페24 써라운드)
-- **사운드**: 경쾌하고 귀여운 효과음 + 잔잔한 BGM
-
-### 7.3 고양이 컬렉션 시스템
-
-리텐션을 높이는 수집 요소로, 스테이지를 클리어할 때마다 새로운 고양이를 구출/수집합니다:
-
-- 🐱 **일반 고양이 (Common)**: 레벨 클리어 시 자동 획득 — 총 50종
-- 🐱 **희귀 고양이 (Rare)**: 별점 3개 달성 시 획득 — 총 30종
-- 🐱 **전설 고양이 (Legendary)**: 보스 스테이지 클리어 등 특정 조건 달성 시 획득 — 총 20종
+- **사운드**: 경쾌한 매칭 효과음 + 긴장감 있는 보스 BGM
 
 ---
 
 ## 📅 8. 개발 로드맵 (Development Roadmap)
 
-| 단계 | 기간 | 목표 | 세부 작업 |
-|------|------|------|-----------|
-| **Phase 1** | 2주 | MVP 프로토타입 | 게임 루프, 물리 엔진, 기본 핀 메카닉 구현 |
-| **Phase 2** | 2주 | 10레벨 완성 | 장애물, UI, 사운드, 튜토리얼 제작 |
-| **Phase 3** | 2주 | 50레벨 + 광고 | AdMob 연동, 레벨 양산, 특수 핀/공 추가 |
-| **Phase 4** | 2주 | 100레벨 + 폴리시 | 테스트, 컬렉션, 성능 최적화, 출시 준비 |
-
-### Phase별 상세 마일스톤
-
-**Phase 1 (MVP)**
-- SurfaceView 기반 게임 루프 구현
-- 간단한 중력 + 충돌 물리 엔진
-- 핀 터치 → 공 굴림 → 고양이 도달 기본 흐름
-- 3~5개 테스트 레벨
-
-**Phase 2 (기본 콘텐츠)**
-- 불, 가시 장애물 추가
-- 메인 메뉴, 스테이지 선택 UI
-- 효과음 및 BGM 적용
-- 튜토리얼 레벨 10개 완성
-
-**Phase 3 (수익화 + 확장)**
-- AdMob 전면/보상형/배너 광고 연동
-- 타이머 핀, 움직이는 바닥 등 새 요소
-- JSON 기반 레벨 로더로 50레벨 양산
-- 별점 시스템 및 진행도 저장 (Room DB)
-
-**Phase 4 (출시 준비)**
-- 100레벨 완성
-- 고양이 컬렉션 시스템
-- 성능 최적화 및 메모리 관리
-- Google Play 스토어 등록 준비 (스크린샷, 설명, 아이콘)
-- 클로즈드 베타 테스트
+| 단계 | 기간 | 목표 | 상태 |
+|------|------|------|------|
+| **Phase 1** | - | MVP 프로토타입 (데이터 모델 + 그리드 엔진) | ✅ 완료 |
+| **Phase 2** | - | 전투 시스템 (턴 머신 + 난이도 생성) | ✅ 완료 |
+| **Phase 3** | - | 렌더링 + UI (화면 구현) | 진행 중 |
+| **Phase 4** | - | 로그라이크 메타 + 폴리시 (릭, 버프, 저장) | 대기 중 |
 
 ---
 
-## 📊 9. KPI 목표
+## 💰 9. 수익화 전략 (Monetization)
 
-| 지표 | 목표값 | 설명 |
-|------|--------|------|
-| **D1 리텐션** | 40%+ | 첫날 재방문률 |
-| **D7 리텐션** | 15%+ | 7일 후 재방문률 |
-| **평균 세션 시간** | 5분+ | 한 번 접속 시 플레이 시간 |
-| **eCPM** | $5~15 | 광고 1,000회 노출당 수익 |
-| **CPI** | $0.5 이하 | 설치당 획득 비용 |
-| **레벨 완료율** | 레벨 10 기준 70%+ | 초반 이탈 방지 지표 |
+### 9.1 광고 삽입 포인트
+
+| 광고 유형 | 삽입 시점 | 빈도 |
+|-----------|-----------|------|
+| **전면 광고** | 스테이지 클리어 후 (매 3 스테이지마다) | 중간 |
+| **보상형 광고** | 패배 시 부활 / 힌트 획득 | 낮음 |
+| **배너 광고** | 메뉴 화면 하단 | 상시 |
+
+### 9.2 광고 정책
+
+- 게임 시작 후 처음 몇 스테이지는 광고 없음 (신규 유저 이탈 방지)
+- 보상형 광고는 항상 선택적 (강제 시청 금지)
+- 한 세션당 광고 노출 횟수 제한
 
 ---
 
 ## 🚀 10. 향후 확장 계획
 
 - **데일리 챌린지**: 매일 새로운 특수 스테이지 제공
-- **이벤트 스테이지**: 시즌별 테마 스테이지 (할로윈, 크리스마스 등)
-- **레벨 에디터**: 유저가 직접 레벨을 만들고 공유하는 기능
-- **리더보드**: 최소 핀 빼기 횟수 기록 경쟁
-- **iOS 확장**: Kotlin Multiplatform을 활용한 iOS 버전 출시 검토
+- **시즌 이벤트**: 테마별 특수 적 및 보상
+- **리더보드**: 최소 턴 클리어 경쟁
+- **iOS 확장**: Kotlin Multiplatform 활용한 iOS 출시
 - **소셜 기능**: 친구와 기록 비교, 스테이지 공유
 
 ---
 
-## 📎 부록
-
-### A. 경쟁작 분석
-
-| 게임 | 장점 | Meow Rescue 차별점 |
-|------|------|---------------------|
-| Pull the Pin | 심플한 조작 | 물리 기반 공 굴림으로 깊이 추가 |
-| Cat Defenders | 색상 매칭 + 주차장 퍼즐 | 핀 빼기 + 경로 설계로 직관성 강화 |
-| Brain Out | 트릭 퍼즐 | 일관된 메커니즘으로 학습 곡선 완만 |
-| Save the Girl | 선택형 퍼즐 | 물리 시뮬레이션으로 리플레이 가치 |
-
-### B. 핵심 성공 요인
-
-1. **30초 안에 재미를 느낄 수 있는 직관적 조작**
-2. **레벨마다 새로운 요소 등장으로 지루함 방지**
-3. **고양이 컬렉션으로 장기 플레이 동기 부여**
-4. **유저 경험을 해치지 않는 절제된 광고 정책**
-5. **가벼운 용량과 빠른 로딩 (오프라인 플레이 지원)**
-
----
-
-*Meow Rescue GDD v1.1 — 2026.03*
-*Platform: Android (Kotlin) | Genre: Hyper-Casual Puzzle*
+*Meow Rescue GDD v2.0 — 2026.03*
+*Platform: Android (Kotlin) | Genre: Hybrid Matching Puzzle + Turn-Based Combat | Style: Roguelike*
