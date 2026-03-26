@@ -167,7 +167,7 @@ class MenuActivity : AppCompatActivity() {
         val pathSize  = (80 * density).toInt()   // path connector (512x512 = 1:1 square)
 
         for ((levelId, progress) in progressList) {
-            val isUnlocked = levelId == 1 || levelId <= maxCompleted + 1
+            val isUnlocked = true // TODO: restore lock — levelId == 1 || levelId <= maxCompleted + 1
             val stars = if (isUnlocked) progress?.stars ?: 0 else 0
             val isCompleted = isUnlocked && stars > 0
             val isLeftAligned = (levelId % 2 == 1)
