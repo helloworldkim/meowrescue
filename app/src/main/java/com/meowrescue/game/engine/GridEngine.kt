@@ -9,58 +9,56 @@ import com.meowrescue.game.util.GridConstants
 
 object GridEngine {
 
-    private val DIRECTIONS = listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
-
     fun findMatches(grid: GridState): List<MatchResult> {
-        val visited = Array(grid.height) { BooleanArray(grid.width) }
         val matches = mutableListOf<MatchResult>()
 
+        // Scan horizontal lines
         for (row in 0 until grid.height) {
-            for (col in 0 until grid.width) {
-                if (visited[row][col]) continue
-                val block = grid.get(row, col) ?: continue
-                if (block.type == BlockType.EMPTY) continue
-
-                val group = bfsGroup(grid, row, col, block.type, visited)
-                if (group.size >= GridConstants.MIN_MATCH_SIZE) {
-                    matches.add(MatchResult(type = block.type, positions = group))
+            var col = 0
+            while (col < grid.width) {
+                val block = grid.get(row, col)
+                if (block == null || block.type == BlockType.EMPTY) {
+                    col++
+                    continue
                 }
+                val type = block.type
+                var end = col + 1
+                while (end < grid.width) {
+                    val next = grid.get(row, end)
+                    if (next == null || next.type != type) break
+                    end++
+                }
+                if (end - col >= GridConstants.MIN_MATCH_SIZE) {
+                    matches.add(MatchResult(type = type, positions = (col until end).map { c -> row to c }))
+                }
+                col = end
+            }
+        }
+
+        // Scan vertical lines
+        for (col in 0 until grid.width) {
+            var row = 0
+            while (row < grid.height) {
+                val block = grid.get(row, col)
+                if (block == null || block.type == BlockType.EMPTY) {
+                    row++
+                    continue
+                }
+                val type = block.type
+                var end = row + 1
+                while (end < grid.height) {
+                    val next = grid.get(end, col)
+                    if (next == null || next.type != type) break
+                    end++
+                }
+                if (end - row >= GridConstants.MIN_MATCH_SIZE) {
+                    matches.add(MatchResult(type = type, positions = (row until end).map { r -> r to col }))
+                }
+                row = end
             }
         }
 
         return matches
-    }
-
-    private fun bfsGroup(
-        grid: GridState,
-        startRow: Int,
-        startCol: Int,
-        type: BlockType,
-        visited: Array<BooleanArray>
-    ): List<Pair<Int, Int>> {
-        val queue = ArrayDeque<Pair<Int, Int>>()
-        val group = mutableListOf<Pair<Int, Int>>()
-
-        queue.add(startRow to startCol)
-        visited[startRow][startCol] = true
-
-        while (queue.isNotEmpty()) {
-            val (r, c) = queue.removeFirst()
-            group.add(r to c)
-
-            for ((dr, dc) in DIRECTIONS) {
-                val nr = r + dr
-                val nc = c + dc
-                if (nr !in 0 until grid.height || nc !in 0 until grid.width) continue
-                if (visited[nr][nc]) continue
-                val neighbor = grid.get(nr, nc) ?: continue
-                if (neighbor.type != type) continue
-                visited[nr][nc] = true
-                queue.add(nr to nc)
-            }
-        }
-
-        return group
     }
 
     fun removeMatches(grid: GridState, matches: List<MatchResult>): GridState {
@@ -156,20 +154,19 @@ object GridEngine {
     }
 
     fun hasValidSwaps(grid: GridState): Boolean {
-        for (row in 0 until grid.height) {
-            for (col in 0 until grid.width) {
-                // Try swap right
-                if (col + 1 < grid.width) {
-                    swapBlocks(grid, row, col, row, col + 1)
-                    val hasMatch = findMatches(grid).isNotEmpty()
-                    swapBlocks(grid, row, col, row, col + 1)
+        val testGrid = grid.copy()
+        for (row in 0 until testGrid.height) {
+            for (col in 0 until testGrid.width) {
+                if (col + 1 < testGrid.width) {
+                    swapBlocks(testGrid, row, col, row, col + 1)
+                    val hasMatch = findMatches(testGrid).isNotEmpty()
+                    swapBlocks(testGrid, row, col, row, col + 1)
                     if (hasMatch) return true
                 }
-                // Try swap down
-                if (row + 1 < grid.height) {
-                    swapBlocks(grid, row, col, row + 1, col)
-                    val hasMatch = findMatches(grid).isNotEmpty()
-                    swapBlocks(grid, row, col, row + 1, col)
+                if (row + 1 < testGrid.height) {
+                    swapBlocks(testGrid, row, col, row + 1, col)
+                    val hasMatch = findMatches(testGrid).isNotEmpty()
+                    swapBlocks(testGrid, row, col, row + 1, col)
                     if (hasMatch) return true
                 }
             }

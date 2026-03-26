@@ -13,40 +13,81 @@ class EnemyRenderer(private val context: Context) {
 
     private val enemySprites = mutableMapOf<Int, Bitmap>()
 
-    private val hpBarBgPaint = Paint().apply {
-        color = Color.parseColor("#333333")
+    // Card panel behind each enemy
+    private val cardPaint = Paint().apply {
+        color = Color.argb(140, 20, 20, 40)
         style = Paint.Style.FILL
+        isAntiAlias = true
     }
 
-    private val hpBarPaint = Paint().apply {
-        color = Color.parseColor("#FF4444")
-        style = Paint.Style.FILL
-    }
-
-    private val hpBarBorderPaint = Paint().apply {
-        color = Color.WHITE
+    private val cardBorderPaint = Paint().apply {
+        color = Color.argb(80, 180, 180, 220)
         style = Paint.Style.STROKE
         strokeWidth = 2f
+        isAntiAlias = true
+    }
+
+    // Name label
+    private val nameBannerPaint = Paint().apply {
+        color = Color.argb(180, 30, 30, 50)
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
 
     private val namePaint = Paint().apply {
         color = Color.WHITE
-        textSize = 28f
+        textSize = 24f
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
         isFakeBoldText = true
     }
 
+    // HP bar
+    private val hpBarBgPaint = Paint().apply {
+        color = Color.parseColor("#1A1A2E")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val hpBarFillPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val hpBarTopPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val hpBarBorderPaint = Paint().apply {
+        color = Color.argb(200, 255, 255, 255)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+        isAntiAlias = true
+    }
+
     private val hpTextPaint = Paint().apply {
         color = Color.WHITE
-        textSize = 22f
+        textSize = 18f
         textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+        isFakeBoldText = true
+    }
+
+    // Hit flash overlay
+    private val hitFlashPaint = Paint().apply {
+        color = Color.argb(160, 255, 255, 255)
+        style = Paint.Style.FILL
         isAntiAlias = true
     }
 
     // Attack animation state
     private var attackingEnemyId: String? = null
     private var attackAnimProgress = 0f
+
+    // Damage flash state
+    private var damagedEnemyId: String? = null
+    private var damageFlashProgress = 0f
 
     private fun getSprite(resId: Int): Bitmap {
         return enemySprites.getOrPut(resId) {
@@ -74,43 +115,89 @@ class EnemyRenderer(private val context: Context) {
                 drawX += shake
             }
 
-            // Enemy sprite
             val sprite = getSprite(enemy.spriteResId)
+            val spriteHalfW = sprite.width / 2f
+            val spriteHalfH = sprite.height / 2f
+
+            // ── Card panel ──
+            val cardPadding = 16f
+            val cardRect = RectF(
+                drawX - spriteHalfW - cardPadding,
+                cy - spriteHalfH - 40f,
+                drawX + spriteHalfW + cardPadding,
+                cy + spriteHalfH + 80f
+            )
+            canvas.drawRoundRect(cardRect, 14f, 14f, cardPaint)
+            canvas.drawRoundRect(cardRect, 14f, 14f, cardBorderPaint)
+
+            // ── Name banner (above sprite) ──
+            val nameWidth = namePaint.measureText(enemy.name) + 24f
+            val nameBannerRect = RectF(
+                drawX - nameWidth / 2f,
+                cy - spriteHalfH - 34f,
+                drawX + nameWidth / 2f,
+                cy - spriteHalfH - 8f
+            )
+            canvas.drawRoundRect(nameBannerRect, 8f, 8f, nameBannerPaint)
+            canvas.drawText(enemy.name, drawX, cy - spriteHalfH - 14f, namePaint)
+
+            // ── Enemy sprite ──
             canvas.drawBitmap(
                 sprite,
-                drawX - sprite.width / 2f,
-                cy - sprite.height / 2f,
+                drawX - spriteHalfW,
+                cy - spriteHalfH,
                 null
             )
 
-            // Name
-            canvas.drawText(enemy.name, drawX, cy + sprite.height / 2f + 30f, namePaint)
+            // ── Hit flash overlay ──
+            if (enemy.id == damagedEnemyId && damageFlashProgress > 0f) {
+                val flashAlpha = (180 * (1f - damageFlashProgress)).toInt().coerceIn(0, 255)
+                hitFlashPaint.color = Color.argb(flashAlpha, 255, 255, 255)
+                canvas.drawRoundRect(
+                    RectF(drawX - spriteHalfW, cy - spriteHalfH, drawX + spriteHalfW, cy + spriteHalfH),
+                    8f, 8f, hitFlashPaint
+                )
+            }
 
-            // HP bar
-            val hpBarWidth = 100f
-            val hpBarHeight = 12f
+            // ── HP bar ──
+            val hpBarWidth = 120f
+            val hpBarHeight = 14f
             val hpBarLeft = drawX - hpBarWidth / 2f
-            val hpBarTop = cy + sprite.height / 2f + 40f
+            val hpBarTop = cy + spriteHalfH + 10f
             val hpBarRect = RectF(hpBarLeft, hpBarTop, hpBarLeft + hpBarWidth, hpBarTop + hpBarHeight)
 
-            canvas.drawRoundRect(hpBarRect, 4f, 4f, hpBarBgPaint)
+            canvas.drawRoundRect(hpBarRect, 6f, 6f, hpBarBgPaint)
 
             val hpRatio = (enemy.currentHp.toFloat() / enemy.maxHp).coerceIn(0f, 1f)
-            val hpFillRect = RectF(hpBarLeft, hpBarTop, hpBarLeft + hpBarWidth * hpRatio, hpBarTop + hpBarHeight)
-            // Color changes based on HP
-            hpBarPaint.color = when {
-                hpRatio > 0.5f -> Color.parseColor("#4CAF50")
-                hpRatio > 0.25f -> Color.parseColor("#FF9800")
-                else -> Color.parseColor("#F44336")
-            }
-            canvas.drawRoundRect(hpFillRect, 4f, 4f, hpBarPaint)
-            canvas.drawRoundRect(hpBarRect, 4f, 4f, hpBarBorderPaint)
+            if (hpRatio > 0f) {
+                val (topColor, bottomColor) = when {
+                    hpRatio > 0.5f -> Pair(Color.parseColor("#66BB6A"), Color.parseColor("#2E7D32"))
+                    hpRatio > 0.25f -> Pair(Color.parseColor("#FFB74D"), Color.parseColor("#E65100"))
+                    else -> Pair(Color.parseColor("#EF5350"), Color.parseColor("#B71C1C"))
+                }
+                val fillRight = hpBarLeft + hpBarWidth * hpRatio
 
-            // HP text
+                // Bottom (darker) layer – full bar
+                hpBarFillPaint.color = bottomColor
+                canvas.drawRoundRect(
+                    RectF(hpBarLeft, hpBarTop, fillRight, hpBarTop + hpBarHeight),
+                    6f, 6f, hpBarFillPaint
+                )
+                // Top (brighter) layer – upper half
+                hpBarTopPaint.color = topColor
+                canvas.drawRoundRect(
+                    RectF(hpBarLeft, hpBarTop, fillRight, hpBarTop + hpBarHeight * 0.55f),
+                    6f, 6f, hpBarTopPaint
+                )
+            }
+
+            canvas.drawRoundRect(hpBarRect, 6f, 6f, hpBarBorderPaint)
+
+            // ── HP text ──
             canvas.drawText(
                 "${enemy.currentHp}/${enemy.maxHp}",
                 drawX,
-                hpBarTop + hpBarHeight + 24f,
+                hpBarTop + hpBarHeight + 20f,
                 hpTextPaint
             )
         }
@@ -124,6 +211,16 @@ class EnemyRenderer(private val context: Context) {
     fun clearAttackAnimation() {
         attackingEnemyId = null
         attackAnimProgress = 0f
+    }
+
+    fun setDamageFlash(enemyId: String, progress: Float) {
+        damagedEnemyId = enemyId
+        damageFlashProgress = progress
+    }
+
+    fun clearDamageFlash() {
+        damagedEnemyId = null
+        damageFlashProgress = 0f
     }
 
     fun cleanup() {

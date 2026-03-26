@@ -27,6 +27,7 @@ class BattleEngine(val state: BattleState) {
     var eventListener: BattleEventListener? = null
 
     private val random = java.util.Random()
+    private val lock = Any()
 
     // Selection state for swap
     var selectedRow: Int = -1
@@ -46,52 +47,48 @@ class BattleEngine(val state: BattleState) {
     private var allTurnMatches: List<MatchResult> = emptyList()
 
     fun onPlayerSelectBlock(row: Int, col: Int): Boolean {
-        if (state.phase != BattleTurnPhase.PLAYER_INPUT) return false
-        val block = state.grid.get(row, col) ?: return false
+        synchronized(lock) {
+            if (state.phase != BattleTurnPhase.PLAYER_INPUT) return false
+            val block = state.grid.get(row, col) ?: return false
 
-        if (selectedRow < 0) {
-            // First selection
-            selectedRow = row
-            selectedCol = col
-            eventListener?.onBlockSelected(row, col)
-            return true
-        }
+            if (selectedRow < 0) {
+                selectedRow = row
+                selectedCol = col
+                eventListener?.onBlockSelected(row, col)
+                return true
+            }
 
-        // Same block tapped — deselect
-        if (selectedRow == row && selectedCol == col) {
+            if (selectedRow == row && selectedCol == col) {
+                clearSelection()
+                return true
+            }
+
+            val dr = Math.abs(selectedRow - row)
+            val dc = Math.abs(selectedCol - col)
+            if (dr + dc != 1) {
+                selectedRow = row
+                selectedCol = col
+                eventListener?.onBlockSelected(row, col)
+                return true
+            }
+
+            swapR1 = selectedRow
+            swapC1 = selectedCol
+            swapR2 = row
+            swapC2 = col
             clearSelection()
+
+            GridEngine.swapBlocks(state.grid, swapR1, swapC1, swapR2, swapC2)
+            eventListener?.onSwapStarted(swapR1, swapC1, swapR2, swapC2)
+
+            val matches = GridEngine.findMatches(state.grid)
+            if (matches.isEmpty()) {
+                transitionTo(BattleTurnPhase.SWAP_BACK)
+            } else {
+                transitionTo(BattleTurnPhase.MATCHING)
+            }
             return true
         }
-
-        // Check if adjacent (up/down/left/right)
-        val dr = Math.abs(selectedRow - row)
-        val dc = Math.abs(selectedCol - col)
-        if (dr + dc != 1) {
-            // Not adjacent — change selection
-            selectedRow = row
-            selectedCol = col
-            eventListener?.onBlockSelected(row, col)
-            return true
-        }
-
-        // Adjacent — attempt swap
-        swapR1 = selectedRow
-        swapC1 = selectedCol
-        swapR2 = row
-        swapC2 = col
-        clearSelection()
-
-        GridEngine.swapBlocks(state.grid, swapR1, swapC1, swapR2, swapC2)
-        eventListener?.onSwapStarted(swapR1, swapC1, swapR2, swapC2)
-
-        val matches = GridEngine.findMatches(state.grid)
-        if (matches.isEmpty()) {
-            // No match — swap back
-            transitionTo(BattleTurnPhase.SWAP_BACK)
-        } else {
-            transitionTo(BattleTurnPhase.MATCHING)
-        }
-        return true
     }
 
     fun clearSelection() {
@@ -113,16 +110,18 @@ class BattleEngine(val state: BattleState) {
     }
 
     fun advancePhase() {
-        when (state.phase) {
-            BattleTurnPhase.SWAP_BACK -> handleSwapBack()
-            BattleTurnPhase.MATCHING -> handleMatching()
-            BattleTurnPhase.CASCADING -> handleCascading()
-            BattleTurnPhase.PLAYER_ATTACK -> handlePlayerAttack()
-            BattleTurnPhase.ENEMY_ATTACK -> handleEnemyAttack()
-            BattleTurnPhase.NO_MOVES -> { /* waiting for user choice (shuffle or give up) */ }
-            BattleTurnPhase.VICTORY -> eventListener?.onVictory()
-            BattleTurnPhase.DEFEAT -> eventListener?.onDefeat()
-            BattleTurnPhase.PLAYER_INPUT -> { /* waiting for input */ }
+        synchronized(lock) {
+            when (state.phase) {
+                BattleTurnPhase.SWAP_BACK -> handleSwapBack()
+                BattleTurnPhase.MATCHING -> handleMatching()
+                BattleTurnPhase.CASCADING -> handleCascading()
+                BattleTurnPhase.PLAYER_ATTACK -> handlePlayerAttack()
+                BattleTurnPhase.ENEMY_ATTACK -> handleEnemyAttack()
+                BattleTurnPhase.NO_MOVES -> { /* waiting for user choice */ }
+                BattleTurnPhase.VICTORY -> eventListener?.onVictory()
+                BattleTurnPhase.DEFEAT -> eventListener?.onDefeat()
+                BattleTurnPhase.PLAYER_INPUT -> { /* waiting for input */ }
+            }
         }
     }
 

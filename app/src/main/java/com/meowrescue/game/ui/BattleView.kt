@@ -43,37 +43,114 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
 
     private var backgroundBmp: Bitmap = loadScaled(R.drawable.bg_tutorial, 1080, 1920)
 
-    private val overlayPaint = Paint().apply { style = Paint.Style.FILL }
-    private val overlayTextPaint = Paint().apply {
-        color = Color.WHITE
-        textSize = 64f
+    // ── Overlay paints ──
+
+    private val overlayDimPaint = Paint().apply {
+        color = Color.argb(180, 0, 0, 0)
+        style = Paint.Style.FILL
+    }
+
+    // Victory popup
+    private val victoryPopupPaint = Paint().apply {
+        color = Color.parseColor("#1B3A1B")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val victoryBorderPaint = Paint().apply {
+        color = Color.parseColor("#FFD700")
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+        isAntiAlias = true
+    }
+    private val victoryTitlePaint = Paint().apply {
+        color = Color.parseColor("#FFD700")
+        textSize = 80f
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
         isFakeBoldText = true
+        setShadowLayer(6f, 3f, 3f, Color.argb(160, 0, 0, 0))
     }
-    private val overlaySubTextPaint = Paint().apply {
+    private val victorySubPaint = Paint().apply {
         color = Color.WHITE
+        textSize = 38f
+        textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+    }
+    private val victoryBtnPaint = Paint().apply {
+        color = Color.parseColor("#43A047")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val victoryBtnTopPaint = Paint().apply {
+        color = Color.parseColor("#66BB6A")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val victoryBtnShadowPaint = Paint().apply {
+        color = Color.argb(80, 0, 0, 0)
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    // Defeat popup
+    private val defeatPopupPaint = Paint().apply {
+        color = Color.parseColor("#2A0A0A")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+    private val defeatBorderPaint = Paint().apply {
+        color = Color.parseColor("#8B0000")
+        style = Paint.Style.STROKE
+        strokeWidth = 4f
+        isAntiAlias = true
+    }
+    private val defeatTitlePaint = Paint().apply {
+        color = Color.parseColor("#FF4444")
+        textSize = 76f
+        textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+        isFakeBoldText = true
+        setShadowLayer(6f, 3f, 3f, Color.argb(160, 0, 0, 0))
+    }
+    private val defeatSubPaint = Paint().apply {
+        color = Color.parseColor("#FFCCCC")
         textSize = 36f
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
     }
-    private val overlayBtnPaint = Paint().apply {
-        color = Color.parseColor("#4CAF50")
+    private val defeatBtnPaint = Paint().apply {
+        color = Color.parseColor("#E64A19")
         style = Paint.Style.FILL
         isAntiAlias = true
     }
+    private val defeatBtnTopPaint = Paint().apply {
+        color = Color.parseColor("#FF7043")
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    // Button text (shared)
     private val overlayBtnTextPaint = Paint().apply {
         color = Color.WHITE
-        textSize = 32f
+        textSize = 34f
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
         isFakeBoldText = true
+        setShadowLayer(3f, 1f, 1f, Color.argb(120, 0, 0, 0))
+    }
+
+    // Phase indicator
+    private val phaseBgPaint = Paint().apply {
+        style = Paint.Style.FILL
+        isAntiAlias = true
     }
     private val phaseTextPaint = Paint().apply {
-        color = Color.argb(200, 255, 255, 255)
-        textSize = 30f
+        color = Color.WHITE
+        textSize = 34f
         textAlign = Paint.Align.CENTER
         isAntiAlias = true
+        isFakeBoldText = true
+        setShadowLayer(4f, 2f, 2f, Color.argb(120, 0, 0, 0))
     }
 
     private var matchAnimStartTime = 0L
@@ -83,6 +160,9 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
     private var showingVictory = false
     private var showingDefeat = false
     private var overlayCallbackFired = false
+
+    // Button rect for overlay tap detection
+    private val overlayBtnRect = RectF()
 
     init {
         holder.addCallback(this)
@@ -148,8 +228,8 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
 
         drawPhaseIndicator(canvas, state.phase)
 
-        if (showingVictory) drawResultOverlay(canvas, true)
-        if (showingDefeat) drawResultOverlay(canvas, false)
+        if (showingVictory) drawVictoryOverlay(canvas)
+        if (showingDefeat) drawDefeatOverlay(canvas)
 
         if (tutorialOverlay.isActive) {
             tutorialOverlay.draw(canvas, GridConstants.DESIGN_WIDTH, GridConstants.DESIGN_HEIGHT)
@@ -173,26 +253,113 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
             BattleTurnPhase.NO_MOVES -> "No Moves!"
             BattleTurnPhase.VICTORY, BattleTurnPhase.DEFEAT -> return
         }
-        canvas.drawText(text, GridConstants.DESIGN_WIDTH / 2f, 730f, phaseTextPaint)
+
+        val bgColor = when (phase) {
+            BattleTurnPhase.PLAYER_INPUT -> Color.argb(180, 30, 100, 30)
+            BattleTurnPhase.PLAYER_ATTACK -> Color.argb(180, 180, 80, 0)
+            BattleTurnPhase.ENEMY_ATTACK -> Color.argb(180, 150, 30, 30)
+            BattleTurnPhase.MATCHING, BattleTurnPhase.CASCADING -> Color.argb(180, 40, 80, 160)
+            BattleTurnPhase.SWAP_BACK, BattleTurnPhase.NO_MOVES -> Color.argb(180, 100, 40, 40)
+            else -> Color.argb(180, 60, 60, 60)
+        }
+
+        val centerX = GridConstants.DESIGN_WIDTH / 2f
+        val pillY = 710f
+        val textWidth = phaseTextPaint.measureText(text)
+        val pillPadH = 24f
+        val pillPadV = 10f
+        val pillRect = RectF(
+            centerX - textWidth / 2f - pillPadH,
+            pillY - phaseTextPaint.textSize / 2f - pillPadV,
+            centerX + textWidth / 2f + pillPadH,
+            pillY + phaseTextPaint.textSize / 2f + pillPadV
+        )
+
+        phaseBgPaint.color = bgColor
+        canvas.drawRoundRect(pillRect, 20f, 20f, phaseBgPaint)
+        canvas.drawText(text, centerX, pillY + 12f, phaseTextPaint)
     }
 
-    private fun drawResultOverlay(canvas: Canvas, isVictory: Boolean) {
-        overlayPaint.color = Color.argb(160, 0, 0, 0)
-        canvas.drawRect(0f, 0f, GridConstants.DESIGN_WIDTH, GridConstants.DESIGN_HEIGHT, overlayPaint)
-
+    private fun drawVictoryOverlay(canvas: Canvas) {
         val centerX = GridConstants.DESIGN_WIDTH / 2f
         val centerY = GridConstants.DESIGN_HEIGHT / 2f
 
-        overlayPaint.color = Color.parseColor(if (isVictory) "#2E7D32" else "#C62828")
-        canvas.drawRoundRect(RectF(centerX - 250f, centerY - 200f, centerX + 250f, centerY + 200f), 24f, 24f, overlayPaint)
+        // Dim background
+        canvas.drawRect(0f, 0f, GridConstants.DESIGN_WIDTH, GridConstants.DESIGN_HEIGHT, overlayDimPaint)
 
-        canvas.drawText(if (isVictory) "Victory!" else "Defeat...", centerX, centerY - 80f, overlayTextPaint)
-        canvas.drawText(if (isVictory) "Cat Rescued!" else "Try Again?", centerX, centerY - 20f, overlaySubTextPaint)
+        // Popup card
+        val popupRect = RectF(centerX - 300f, centerY - 260f, centerX + 300f, centerY + 240f)
+        canvas.drawRoundRect(popupRect, 28f, 28f, victoryPopupPaint)
+        canvas.drawRoundRect(popupRect, 28f, 28f, victoryBorderPaint)
 
-        overlayBtnPaint.color = Color.parseColor(if (isVictory) "#4CAF50" else "#FF5722")
-        canvas.drawRoundRect(RectF(centerX - 120f, centerY + 40f, centerX + 120f, centerY + 110f), 16f, 16f, overlayBtnPaint)
+        // Inner gold line
+        val innerRect = RectF(popupRect.left + 8f, popupRect.top + 8f, popupRect.right - 8f, popupRect.bottom - 8f)
+        victoryBorderPaint.strokeWidth = 2f
+        canvas.drawRoundRect(innerRect, 22f, 22f, victoryBorderPaint)
+        victoryBorderPaint.strokeWidth = 5f
 
-        canvas.drawText(if (isVictory) "Continue" else "Retry", centerX, centerY + 85f, overlayBtnTextPaint)
+        // Title
+        canvas.drawText("VICTORY!", centerX, centerY - 120f, victoryTitlePaint)
+
+        // Cat rescued text with emoji
+        canvas.drawText("\uD83D\uDC31 Cat Rescued!", centerX, centerY - 50f, victorySubPaint)
+
+        // Button with shadow + gradient effect
+        val btnRect = RectF(centerX - 140f, centerY + 60f, centerX + 140f, centerY + 140f)
+        overlayBtnRect.set(btnRect)
+
+        // Shadow
+        canvas.drawRoundRect(
+            RectF(btnRect.left + 3f, btnRect.top + 4f, btnRect.right + 3f, btnRect.bottom + 4f),
+            18f, 18f, victoryBtnShadowPaint
+        )
+        // Base button
+        canvas.drawRoundRect(btnRect, 18f, 18f, victoryBtnPaint)
+        // Top highlight
+        canvas.drawRoundRect(
+            RectF(btnRect.left, btnRect.top, btnRect.right, btnRect.centerY()),
+            18f, 18f, victoryBtnTopPaint
+        )
+
+        canvas.drawText("Continue", centerX, centerY + 110f, overlayBtnTextPaint)
+    }
+
+    private fun drawDefeatOverlay(canvas: Canvas) {
+        val centerX = GridConstants.DESIGN_WIDTH / 2f
+        val centerY = GridConstants.DESIGN_HEIGHT / 2f
+
+        // Dim background
+        canvas.drawRect(0f, 0f, GridConstants.DESIGN_WIDTH, GridConstants.DESIGN_HEIGHT, overlayDimPaint)
+
+        // Popup card
+        val popupRect = RectF(centerX - 300f, centerY - 260f, centerX + 300f, centerY + 240f)
+        canvas.drawRoundRect(popupRect, 28f, 28f, defeatPopupPaint)
+        canvas.drawRoundRect(popupRect, 28f, 28f, defeatBorderPaint)
+
+        // Title
+        canvas.drawText("DEFEAT", centerX, centerY - 120f, defeatTitlePaint)
+
+        // Sub text
+        canvas.drawText("Try Again?", centerX, centerY - 50f, defeatSubPaint)
+
+        // Button with gradient effect
+        val btnRect = RectF(centerX - 140f, centerY + 60f, centerX + 140f, centerY + 140f)
+        overlayBtnRect.set(btnRect)
+
+        // Shadow
+        canvas.drawRoundRect(
+            RectF(btnRect.left + 3f, btnRect.top + 4f, btnRect.right + 3f, btnRect.bottom + 4f),
+            18f, 18f, victoryBtnShadowPaint
+        )
+        // Base button
+        canvas.drawRoundRect(btnRect, 18f, 18f, defeatBtnPaint)
+        // Top highlight
+        canvas.drawRoundRect(
+            RectF(btnRect.left, btnRect.top, btnRect.right, btnRect.centerY()),
+            18f, 18f, defeatBtnTopPaint
+        )
+
+        canvas.drawText("Retry", centerX, centerY + 110f, overlayBtnTextPaint)
     }
 
     fun showVictory() {
@@ -246,9 +413,7 @@ class BattleView(context: Context, attrs: AttributeSet? = null) :
 
         if (showingVictory || showingDefeat) {
             if (!overlayCallbackFired) {
-                val centerX = GridConstants.DESIGN_WIDTH / 2f
-                val centerY = GridConstants.DESIGN_HEIGHT / 2f
-                if (x in (centerX - 120f)..(centerX + 120f) && y in (centerY + 40f)..(centerY + 110f)) {
+                if (overlayBtnRect.contains(x, y)) {
                     overlayCallbackFired = true
                     if (showingVictory) onVictory?.invoke() else onDefeat?.invoke()
                 }

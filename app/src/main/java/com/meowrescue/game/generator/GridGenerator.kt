@@ -4,7 +4,6 @@ import com.meowrescue.game.model.Block
 import com.meowrescue.game.model.BlockType
 import com.meowrescue.game.model.GridState
 import com.meowrescue.game.util.GridConstants
-import java.util.LinkedList
 import java.util.Random
 
 object GridGenerator {
@@ -48,7 +47,7 @@ object GridGenerator {
 
         val grid = GridState(width, height, blocks)
 
-        // Safety check: if flood-fill still finds matches (L/T shapes), regenerate those cells
+        // Safety check: if line scan still finds matches, regenerate those cells
         val cleanGrid = ensureNoMatches(grid, allowedTypes, random)
 
         // Ensure at least one valid swap exists
@@ -94,42 +93,54 @@ object GridGenerator {
     }
 
     private fun findMatchGroups(grid: GridState): List<List<Pair<Int, Int>>> {
-        val visited = Array(grid.height) { BooleanArray(grid.width) }
         val groups = mutableListOf<List<Pair<Int, Int>>>()
-        val dirs = arrayOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
 
+        // Scan horizontal lines
         for (row in 0 until grid.height) {
-            for (col in 0 until grid.width) {
-                if (visited[row][col]) continue
-                val block = grid.get(row, col) ?: continue
-                if (block.type == BlockType.EMPTY) continue
-
-                val group = mutableListOf<Pair<Int, Int>>()
-                val queue = LinkedList<Pair<Int, Int>>()
-                queue.add(row to col)
-                visited[row][col] = true
-
-                while (queue.isNotEmpty()) {
-                    val (r, c) = queue.poll() ?: break
-                    group.add(r to c)
-                    for ((dr, dc) in dirs) {
-                        val nr = r + dr
-                        val nc = c + dc
-                        if (nr !in 0 until grid.height || nc !in 0 until grid.width) continue
-                        if (visited[nr][nc]) continue
-                        val neighbor = grid.get(nr, nc) ?: continue
-                        if (neighbor.type == block.type) {
-                            visited[nr][nc] = true
-                            queue.add(nr to nc)
-                        }
-                    }
+            var col = 0
+            while (col < grid.width) {
+                val block = grid.get(row, col)
+                if (block == null || block.type == BlockType.EMPTY) {
+                    col++
+                    continue
                 }
-
-                if (group.size >= GridConstants.MIN_MATCH_SIZE) {
-                    groups.add(group)
+                val type = block.type
+                var end = col + 1
+                while (end < grid.width) {
+                    val next = grid.get(row, end)
+                    if (next == null || next.type != type) break
+                    end++
                 }
+                if (end - col >= GridConstants.MIN_MATCH_SIZE) {
+                    groups.add((col until end).map { c -> row to c })
+                }
+                col = end
             }
         }
+
+        // Scan vertical lines
+        for (col in 0 until grid.width) {
+            var row = 0
+            while (row < grid.height) {
+                val block = grid.get(row, col)
+                if (block == null || block.type == BlockType.EMPTY) {
+                    row++
+                    continue
+                }
+                val type = block.type
+                var end = row + 1
+                while (end < grid.height) {
+                    val next = grid.get(end, col)
+                    if (next == null || next.type != type) break
+                    end++
+                }
+                if (end - row >= GridConstants.MIN_MATCH_SIZE) {
+                    groups.add((row until end).map { r -> r to col })
+                }
+                row = end
+            }
+        }
+
         return groups
     }
 }

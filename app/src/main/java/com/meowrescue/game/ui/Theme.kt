@@ -1,29 +1,41 @@
 package com.meowrescue.game.ui
 
+import android.graphics.Color
+
 object Theme {
     const val COLOR_BACKGROUND = "#FFF9FB"
     const val COLOR_BACKGROUND_GAME = "#FFF5E6"
-    const val COLOR_TOOLBAR = "#FFB3C6"
-    const val COLOR_TITLE_TEXT = "#E08FA6"
+    const val COLOR_TOOLBAR = "#FF85A1"
+    const val COLOR_TITLE_TEXT = "#E0246A"
     const val COLOR_PRIMARY_TEXT = "#333333"
     const val COLOR_SECONDARY_TEXT = "#555555"
     const val COLOR_MUTED_TEXT = "#999999"
-    const val COLOR_LEVEL_UNLOCKED = "#B5EAD7"
+    const val COLOR_LEVEL_UNLOCKED = "#2ECC71"
     const val COLOR_LEVEL_LOCKED = "#CCCCCC"
-    const val COLOR_BUTTON_COLLECTION = "#C8B8E8"
-    const val COLOR_BUTTON_BACK = "#FFDAC1"
-    const val COLOR_RARITY_LEGENDARY = "#FFB3C6"
-    const val COLOR_RARITY_RARE = "#C8B8E8"
-    const val COLOR_RARITY_COMMON = "#B5EAD7"
+    const val COLOR_BUTTON_COLLECTION = "#9B59B6"
+    const val COLOR_BUTTON_BACK = "#FF7043"
+    const val COLOR_RARITY_LEGENDARY = "#FF85A1"
+    const val COLOR_RARITY_RARE = "#9B59B6"
+    const val COLOR_RARITY_COMMON = "#2ECC71"
     const val COLOR_CARD_BACKGROUND = "#FFFFFF"
+
+    // UI panel colors
+    val COLOR_GOLD = 0xFFFFD700.toInt()
+    val COLOR_PANEL_BG = Color.argb(200, 20, 20, 40)
+    val COLOR_PANEL_BORDER = Color.argb(120, 255, 255, 255)
+
+    // HP bar colors
+    val COLOR_HP_HIGH = 0xFF4CAF50.toInt()
+    val COLOR_HP_MED = 0xFFFF9800.toInt()
+    val COLOR_HP_LOW = 0xFFFF4444.toInt()
 
     // Battle colors
     const val COLOR_HP_BAR = "#4CAF50"
     const val COLOR_HP_BAR_BG = "#333333"
-    const val COLOR_BLOCK_ATTACK = "#FF6B6B"
-    const val COLOR_BLOCK_FIRE = "#FF9F43"
-    const val COLOR_BLOCK_WATER = "#54A0FF"
-    const val COLOR_BLOCK_HEAL = "#5CD85C"
+    const val COLOR_BLOCK_ATTACK = "#FF4444"
+    const val COLOR_BLOCK_FIRE = "#FF7043"
+    const val COLOR_BLOCK_WATER = "#2196F3"
+    const val COLOR_BLOCK_HEAL = "#2ECC71"
     const val COLOR_DAMAGE_TEXT = "#FF4444"
-    const val COLOR_HEAL_TEXT = "#5CD85C"
+    const val COLOR_HEAL_TEXT = "#2ECC71"
 }

@@ -3,6 +3,7 @@ package com.meowrescue.game.ui
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
@@ -30,7 +31,15 @@ class MenuActivity : AppCompatActivity() {
 
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(Theme.COLOR_BACKGROUND))
+            val gradient = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(
+                    Color.parseColor("#1A1A2E"),
+                    Color.parseColor("#16213E"),
+                    Color.parseColor("#0F3460")
+                )
+            )
+            background = gradient
         }
 
         val rootScroll = ScrollView(this).apply {
@@ -67,11 +76,13 @@ class MenuActivity : AppCompatActivity() {
         val catImage = ImageView(this).apply {
             setImageResource(R.drawable.cat_1)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            val dp150 = (150 * resources.displayMetrics.density).toInt()
-            val dp200 = (200 * resources.displayMetrics.density).toInt()
-            val lp = LinearLayout.LayoutParams(dp150, dp200)
+            val dp = resources.displayMetrics.density
+            val dpW = (180 * dp).toInt()
+            val dpH = (240 * dp).toInt()
+            val lp = LinearLayout.LayoutParams(dpW, dpH)
             lp.gravity = Gravity.CENTER_HORIZONTAL
-            lp.bottomMargin = 32
+            lp.topMargin = (24 * dp).toInt()
+            lp.bottomMargin = (40 * dp).toInt()
             layoutParams = lp
         }
         contentLayout.addView(catImage)
@@ -79,21 +90,23 @@ class MenuActivity : AppCompatActivity() {
         // Title
         val title = TextView(this).apply {
             text = "Meow Rescue"
-            textSize = 40f
+            textSize = 52f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor(Theme.COLOR_TITLE_TEXT))
+            setTextColor(Theme.COLOR_GOLD)
             gravity = Gravity.CENTER
+            setShadowLayer(8f, 2f, 2f, Color.parseColor("#AA000000"))
+            val dp = resources.displayMetrics.density
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            lp.bottomMargin = 56
+            lp.bottomMargin = (64 * dp).toInt()
             layoutParams = lp
         }
         contentLayout.addView(title)
 
         // Start Run button
-        val startButton = makeButton("Start Run", Theme.COLOR_LEVEL_UNLOCKED)
+        val startButton = makeButton("Start Run", 0xFF2ECC71.toInt(), 0xFF27AE60.toInt())
         startButton.setOnClickListener {
             SoundManager.playButtonTap()
             val intent = Intent(this, BattleActivity::class.java)
@@ -103,7 +116,7 @@ class MenuActivity : AppCompatActivity() {
         }
         contentLayout.addView(startButton)
 
-        val collectionButton = makeButton("Collection", Theme.COLOR_BUTTON_COLLECTION)
+        val collectionButton = makeButton("Collection", 0xFF9B59B6.toInt(), 0xFF8E44AD.toInt())
         collectionButton.setOnClickListener {
             SoundManager.playButtonTap()
             startActivity(Intent(this, CollectionActivity::class.java))
@@ -111,20 +124,30 @@ class MenuActivity : AppCompatActivity() {
         contentLayout.addView(collectionButton)
     }
 
-    private fun makeButton(text: String, bgColor: String): Button {
+    private fun makeButton(text: String, colorTop: Int, colorBottom: Int): Button {
         return Button(this).apply {
             this.text = text
-            textSize = 20f
-            setTextColor(Color.parseColor(Theme.COLOR_PRIMARY_TEXT))
-            setBackgroundColor(Color.parseColor(bgColor))
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            setShadowLayer(4f, 1f, 1f, Color.parseColor("#66000000"))
+            val shape = GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                intArrayOf(colorTop, colorBottom)
+            ).apply {
+                cornerRadius = 16f * resources.displayMetrics.density
+            }
+            background = shape
+            elevation = 8f * resources.displayMetrics.density
+            val dp = resources.displayMetrics.density
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            lp.topMargin = 24
-            lp.bottomMargin = 24
+            lp.topMargin = (16 * dp).toInt()
+            lp.bottomMargin = (16 * dp).toInt()
             layoutParams = lp
-            setPadding(32, 32, 32, 32)
+            setPadding((48 * dp).toInt(), (20 * dp).toInt(), (48 * dp).toInt(), (20 * dp).toInt())
         }
     }
 

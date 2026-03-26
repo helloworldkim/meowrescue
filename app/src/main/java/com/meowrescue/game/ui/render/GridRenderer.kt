@@ -5,12 +5,16 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
 import com.meowrescue.game.R
 import com.meowrescue.game.model.BlockType
 import com.meowrescue.game.model.GridState
 import com.meowrescue.game.util.GridConstants
+import kotlin.math.pow
+import kotlin.math.sin
 
 class GridRenderer(context: Context) {
 
@@ -22,14 +26,40 @@ class GridRenderer(context: Context) {
     )
 
     private val gridBgPaint = Paint().apply {
-        color = Color.argb(60, 0, 0, 0)
+        color = Color.argb(120, 10, 10, 30)
         style = Paint.Style.FILL
+        isAntiAlias = true
     }
 
-    private val selectionPaint = Paint().apply {
+    private val gridBorderPaint = Paint().apply {
+        color = Color.argb(80, 180, 180, 220)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+        isAntiAlias = true
+    }
+
+    private val blockShadowPaint = Paint().apply {
+        color = Color.argb(90, 0, 0, 0)
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val selectionGlowPaint = Paint().apply {
+        color = Color.argb(60, 255, 255, 100)
+        style = Paint.Style.FILL
+        isAntiAlias = true
+    }
+
+    private val selectionStrokePaint = Paint().apply {
         color = Color.argb(200, 255, 255, 0)
         style = Paint.Style.STROKE
-        strokeWidth = 6f
+        strokeWidth = 5f
+        isAntiAlias = true
+    }
+
+    private val matchFlashPaint = Paint().apply {
+        color = Color.WHITE
+        style = Paint.Style.FILL
         isAntiAlias = true
     }
 
@@ -63,11 +93,23 @@ class GridRenderer(context: Context) {
     }
 
     fun draw(canvas: Canvas, grid: GridState) {
-        // Grid background
+        // Grid background - gradient panel with rounded corners and border
         val totalW = grid.width * cellSize + (grid.width + 1) * gap
         val totalH = grid.height * cellSize + (grid.height + 1) * gap
         val bgRect = RectF(gridLeft, gridTop, gridLeft + totalW, gridTop + totalH)
-        canvas.drawRoundRect(bgRect, 20f, 20f, gridBgPaint)
+
+        gridBgPaint.shader = LinearGradient(
+            bgRect.left, bgRect.top, bgRect.left, bgRect.bottom,
+            Color.argb(130, 15, 15, 45),
+            Color.argb(150, 5, 5, 20),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRoundRect(bgRect, 24f, 24f, gridBgPaint)
+        canvas.drawRoundRect(bgRect, 24f, 24f, gridBorderPaint)
+
+        // Pulsing selection timing
+        val pulseTime = System.currentTimeMillis()
+        val pulseAlpha = (180 + 75 * sin(pulseTime / 200.0)).toInt().coerceIn(0, 255)
 
         // Blocks
         for (row in 0 until grid.height) {
@@ -79,24 +121,62 @@ class GridRenderer(context: Context) {
                 val y = gridTop + gap + row * (cellSize + gap)
                 val rect = RectF(x, y, x + cellSize, y + cellSize)
 
-                // Match animation: scale down matching blocks
+                // Match animation: ease-out shrink with alpha fade
                 val isMatching = (row to col) in matchingPositions
+                var blockAlpha = 255
                 if (isMatching) {
-                    val scale = 1f - matchAnimProgress * 0.5f
+                    val easedProgress = 1f - (1f - matchAnimProgress).pow(2)
+                    val scale = 1f - easedProgress * 0.6f
+                    blockAlpha = ((1f - easedProgress) * 255).toInt().coerceIn(0, 255)
                     val cx = rect.centerX()
                     val cy = rect.centerY()
                     val hw = rect.width() / 2f * scale
                     val hh = rect.height() / 2f * scale
                     rect.set(cx - hw, cy - hh, cx + hw, cy + hh)
+
+                    // White flash overlay at the start of animation
+                    if (matchAnimProgress < 0.3f) {
+                        val flashAlpha = ((1f - matchAnimProgress / 0.3f) * 180).toInt().coerceIn(0, 255)
+                        matchFlashPaint.alpha = flashAlpha
+                        canvas.drawRoundRect(rect, 8f, 8f, matchFlashPaint)
+                    }
                 }
 
+                // Block shadow for 3D depth
+                if (!isMatching || blockAlpha > 50) {
+                    val shadowOffset = cellSize * 0.04f
+                    val shadowRect = RectF(
+                        rect.left + shadowOffset,
+                        rect.top + shadowOffset,
+                        rect.right + shadowOffset,
+                        rect.bottom + shadowOffset
+                    )
+                    blockShadowPaint.alpha = if (isMatching) (blockAlpha * 0.35f).toInt() else 90
+                    canvas.drawRoundRect(shadowRect, 8f, 8f, blockShadowPaint)
+                }
+
+                // Draw block bitmap
                 val bmp = blockBitmaps[block.type]
                 if (bmp != null) {
-                    canvas.drawBitmap(bmp, null, rect, null)
+                    val bitmapPaint = if (blockAlpha < 255) {
+                        Paint().apply { alpha = blockAlpha }
+                    } else null
+                    canvas.drawBitmap(bmp, null, rect, bitmapPaint)
                 }
 
+                // Selection highlight - pulsing glow
                 if (row == selectedRow && col == selectedCol) {
-                    canvas.drawRoundRect(rect, 8f, 8f, selectionPaint)
+                    val glowInset = -4f
+                    val glowRect = RectF(
+                        rect.left + glowInset, rect.top + glowInset,
+                        rect.right - glowInset, rect.bottom - glowInset
+                    )
+                    selectionGlowPaint.alpha = (pulseAlpha * 0.35f).toInt().coerceIn(0, 255)
+                    canvas.drawRoundRect(glowRect, 10f, 10f, selectionGlowPaint)
+
+                    selectionStrokePaint.alpha = pulseAlpha
+                    selectionStrokePaint.strokeWidth = 4f + 2f * sin(pulseTime / 200.0).toFloat()
+                    canvas.drawRoundRect(rect, 8f, 8f, selectionStrokePaint)
                 }
             }
         }

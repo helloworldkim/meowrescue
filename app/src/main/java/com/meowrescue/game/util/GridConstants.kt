@@ -9,11 +9,11 @@ object GridConstants {
     const val GRID_PADDING_DP = 16
 
     // Animation timings (milliseconds)
-    const val MATCH_ANIM_MS = 300L
-    const val CASCADE_ANIM_MS = 200L
-    const val REFILL_ANIM_MS = 250L
-    const val ATTACK_ANIM_MS = 400L
-    const val DAMAGE_NUMBER_MS = 800L
+    const val MATCH_ANIM_MS = 600L
+    const val CASCADE_ANIM_MS = 500L
+    const val REFILL_ANIM_MS = 400L
+    const val ATTACK_ANIM_MS = 700L
+    const val DAMAGE_NUMBER_MS = 1200L
 
     // Damage constants
     const val BASE_DAMAGE_PER_BLOCK = 5
