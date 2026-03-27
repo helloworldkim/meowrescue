@@ -25,7 +25,11 @@ class PuzzleGenerator {
     fun generateWithResult(stage: Int): GenerateResult {
         val params = difficultyFor(stage)
         val size = params.gridSize
-        val exitRow = size / 2
+
+        // Deterministic exit direction and line per stage
+        val dirRng = java.util.Random(stage.toLong() * 7919)
+        val exitDir = ExitDirection.entries[dirRng.nextInt(4)]
+        val exitLine = (1 + dirRng.nextInt(maxOf(1, size - 2))).coerceIn(1, size - 2)
 
         var bestGrid: PuzzleGrid? = null
         var bestMoves = 0
@@ -33,10 +37,9 @@ class PuzzleGenerator {
 
         repeat(30) { attempt ->
             val rng = java.util.Random(stage.toLong() * 1000 + attempt)
-            val grid = tryGenerate(size, exitRow, params, rng) ?: return@repeat
+            val grid = tryGenerate(size, params, rng, exitDir, exitLine) ?: return@repeat
 
-            // Quick pre-filter: skip BFS if cat has clear path to exit
-            if (hasClearPath(grid, exitRow)) return@repeat
+            if (hasClearPath(grid)) return@repeat
 
             val minMoves = solveFast(grid)
             if (minMoves < 0) return@repeat
@@ -45,7 +48,6 @@ class PuzzleGenerator {
                 bestMoves = minMoves
                 bestGrid = grid
             }
-            // Early accept: good enough puzzle
             if (minMoves >= acceptThreshold) {
                 return GenerateResult(grid, minMoves)
             }
@@ -55,49 +57,52 @@ class PuzzleGenerator {
             return GenerateResult(bestGrid!!, bestMoves)
         }
 
-        val fallback = buildFallback(size, exitRow)
+        val fallback = buildFallback(size, exitDir, exitLine)
         return GenerateResult(fallback, solveFast(fallback).coerceAtLeast(1))
     }
 
     fun generate(stage: Int): PuzzleGrid = generateWithResult(stage).grid
 
-    /** Quick O(n) check: does the cat have a clear path to exit? If so, puzzle is trivial. */
-    private fun hasClearPath(grid: PuzzleGrid, exitRow: Int): Boolean {
+    /** Quick check: does the cat have a clear path to exit? If so, puzzle is trivial. */
+    private fun hasClearPath(grid: PuzzleGrid): Boolean {
         val gridArr = grid.getGrid()
         val cat = grid.blocks.firstOrNull { it.isCat } ?: return true
-        val startCol = cat.col + cat.length
-        for (c in startCol until grid.cols) {
-            if (gridArr[exitRow][c] != -1) return false
+        return when (grid.exitDirection) {
+            ExitDirection.RIGHT -> {
+                val startCol = cat.col + cat.length
+                (startCol until grid.cols).all { c -> gridArr[cat.row][c] == -1 }
+            }
+            ExitDirection.LEFT -> {
+                (0 until cat.col).all { c -> gridArr[cat.row][c] == -1 }
+            }
+            ExitDirection.BOTTOM -> {
+                val startRow = cat.row + cat.length
+                (startRow until grid.rows).all { r -> gridArr[r][cat.col] == -1 }
+            }
+            ExitDirection.TOP -> {
+                (0 until cat.row).all { r -> gridArr[r][cat.col] == -1 }
+            }
         }
-        return true // no obstacle between cat and exit
     }
 
     // ── Fast BFS solver using compact state representation ──────────────
 
-    /** Block descriptor: static properties that don't change during solve */
     private class BlockInfo(val length: Int, val isHorizontal: Boolean, val isCat: Boolean)
 
-    /**
-     * Lightweight BFS solver. Instead of cloning PuzzleGrid per state,
-     * represents state as an IntArray of block positions (row*cols+col).
-     * Grid is reconstructed only when needed for move validation.
-     */
     fun solveFast(grid: PuzzleGrid): Int {
         val blocks = grid.blocks.sortedBy { it.id }
         val n = blocks.size
         val rows = grid.rows
         val cols = grid.cols
-        val exitRow = grid.exitRow
+        val exitDir = grid.exitDirection
 
         val infos = Array(n) { BlockInfo(blocks[it].length, blocks[it].isHorizontal, blocks[it].isCat) }
         val catIdx = infos.indexOfFirst { it.isCat }
         if (catIdx < 0) return -1
 
-        // Encode initial state: position of each block as row*cols+col
         val initState = IntArray(n) { blocks[it].row * cols + blocks[it].col }
 
-        // Check if already solved
-        if (isSolvedState(initState, infos, catIdx, cols)) return 0
+        if (isSolvedState(initState, infos, catIdx, rows, cols, exitDir)) return 0
 
         val visited = HashSet<Long>(4096)
         visited.add(hashState(initState))
@@ -112,7 +117,6 @@ class PuzzleGenerator {
             val (state, depth) = queue.poll() ?: break
             if (depth >= maxDepth) continue
 
-            // Build grid from state for move validation
             val g = buildGrid(state, infos, rows, cols)
 
             for (i in 0 until n) {
@@ -121,20 +125,20 @@ class PuzzleGenerator {
                 val bRow = pos / cols
                 val bCol = pos % cols
 
-                if (info.isHorizontal) {
+                // 1-cell blocks can move in both axes
+                val tryHoriz = info.isHorizontal || info.length == 1
+                val tryVert  = !info.isHorizontal || info.length == 1
+
+                if (tryHoriz) {
                     // Try move right
                     for (d in 1..cols) {
                         val nc = bCol + d
                         if (nc + info.length > cols) break
                         if (g[bRow][nc + info.length - 1] != -1 && g[bRow][nc + info.length - 1] != i) break
-                        // Check all intermediate cells
-                        val endCheck = bCol + info.length - 1 + d
-                        if (endCheck >= cols) break
-                        if (g[bRow][endCheck] != -1 && g[bRow][endCheck] != i) break
 
                         val ns = state.copyOf()
                         ns[i] = bRow * cols + nc
-                        if (isSolvedState(ns, infos, catIdx, cols)) return depth + 1
+                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) {
                             visited.add(h)
@@ -149,25 +153,25 @@ class PuzzleGenerator {
 
                         val ns = state.copyOf()
                         ns[i] = bRow * cols + nc
-                        if (isSolvedState(ns, infos, catIdx, cols)) return depth + 1
+                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) {
                             visited.add(h)
                             queue.add(ns to depth + 1)
                         }
                     }
-                } else {
+                }
+                if (tryVert) {
                     // Try move down
                     for (d in 1..rows) {
                         val nr = bRow + d
-                        if (nr + info.length > rows) break
                         val endCheck = bRow + info.length - 1 + d
                         if (endCheck >= rows) break
                         if (g[endCheck][bCol] != -1 && g[endCheck][bCol] != i) break
 
                         val ns = state.copyOf()
                         ns[i] = nr * cols + bCol
-                        if (isSolvedState(ns, infos, catIdx, cols)) return depth + 1
+                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) {
                             visited.add(h)
@@ -182,7 +186,7 @@ class PuzzleGenerator {
 
                         val ns = state.copyOf()
                         ns[i] = nr * cols + bCol
-                        if (isSolvedState(ns, infos, catIdx, cols)) return depth + 1
+                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) {
                             visited.add(h)
@@ -195,10 +199,19 @@ class PuzzleGenerator {
         return -1
     }
 
-    private fun isSolvedState(state: IntArray, infos: Array<BlockInfo>, catIdx: Int, cols: Int): Boolean {
+    private fun isSolvedState(
+        state: IntArray, infos: Array<BlockInfo>, catIdx: Int,
+        rows: Int, cols: Int, exitDir: ExitDirection
+    ): Boolean {
         val catPos = state[catIdx]
+        val catRow = catPos / cols
         val catCol = catPos % cols
-        return catCol + infos[catIdx].length == cols
+        return when (exitDir) {
+            ExitDirection.RIGHT  -> catCol + infos[catIdx].length == cols
+            ExitDirection.LEFT   -> catCol == 0
+            ExitDirection.BOTTOM -> catRow + infos[catIdx].length == rows
+            ExitDirection.TOP    -> catRow == 0
+        }
     }
 
     private fun hashState(state: IntArray): Long {
@@ -224,54 +237,134 @@ class PuzzleGenerator {
         return g
     }
 
-    // Keep old solve() as public API for PuzzleView optimal moves display
     fun solve(grid: PuzzleGrid): Int = solveFast(grid)
 
     // ── Puzzle generation ───────────────────────────────────────────────
 
-    private fun tryGenerate(
-        size: Int, exitRow: Int, params: DifficultyParams, rng: java.util.Random
-    ): PuzzleGrid? {
-        val grid = PuzzleGrid(size, size, exitRow)
+    /** Random block length: 20% → 1, 50% → 2, 30% → 3 */
+    private fun randomLength(rng: java.util.Random): Int {
+        val r = rng.nextInt(10)
+        return when {
+            r < 2 -> 1
+            r < 7 -> 2
+            else  -> 3
+        }
+    }
 
-        val catCol = rng.nextInt(maxOf(1, size / 2 - 1))
-        if (!grid.placeBlock(PuzzleBlock(0, exitRow, catCol, 2, true, true))) return null
+    /** For direct blockers, at least 2 cells to actually block */
+    private fun randomBlockerLength(rng: java.util.Random): Int {
+        return if (rng.nextInt(3) == 0) 3 else 2
+    }
+
+    private fun tryGenerate(
+        size: Int, params: DifficultyParams, rng: java.util.Random,
+        exitDir: ExitDirection, exitLine: Int
+    ): PuzzleGrid? {
+        val catHoriz = (exitDir == ExitDirection.RIGHT || exitDir == ExitDirection.LEFT)
+        val exitPositive = (exitDir == ExitDirection.RIGHT || exitDir == ExitDirection.BOTTOM)
+
+        val grid = PuzzleGrid(
+            size, size,
+            exitRow = if (catHoriz) exitLine else -1,
+            exitCol = if (!catHoriz) exitLine else -1,
+            exitDirection = exitDir
+        )
+
+        // Cat start position (col for horiz, row for vert) — varied
+        val catStart = if (exitPositive) {
+            rng.nextInt(maxOf(1, size / 2))
+        } else {
+            val lo = size / 2
+            val hi = size - 2
+            lo + rng.nextInt(maxOf(1, hi - lo + 1))
+        }
+
+        val catRow = if (catHoriz) exitLine else catStart
+        val catCol = if (catHoriz) catStart else exitLine
+        if (!grid.placeBlock(PuzzleBlock(0, catRow, catCol, 2, catHoriz, true))) return null
 
         var nextId = 1
-        val pathCols = (catCol + 2 until size).toMutableList()
-        pathCols.shuffle(rng)
-        val chainDepth = 1 + rng.nextInt(minOf(3, pathCols.size))
 
-        for (i in 0 until minOf(chainDepth, pathCols.size)) {
-            val col = pathCols[i]
-            val vLen = if (rng.nextInt(3) == 0) 3 else 2
-            val vRow = maxOf(0, exitRow - rng.nextInt(vLen))
-            if (grid.placeBlock(PuzzleBlock(nextId, vRow, col, vLen, false))) {
-                nextId++
-                if (vRow > 0) {
-                    val hLen = if (rng.nextInt(3) == 0) 3 else 2
-                    val hCol = maxOf(0, col - rng.nextInt(hLen))
-                    if (grid.placeBlock(PuzzleBlock(nextId, vRow - 1, hCol, hLen, true))) {
-                        nextId++
-                        if (rng.nextInt(2) == 0) {
-                            val v2Col = hCol + hLen
-                            if (v2Col < size) {
-                                if (grid.placeBlock(PuzzleBlock(nextId, maxOf(0, vRow - 1 - rng.nextInt(2)), v2Col, 2, false)))
-                                    nextId++
+        // Path cells between cat front and exit edge
+        val pathCells = if (exitPositive) {
+            (catStart + 2 until size).toMutableList()
+        } else {
+            (0 until catStart).toMutableList()
+        }
+        pathCells.shuffle(rng)
+
+        val chainDepth = 1 + rng.nextInt(minOf(3, pathCells.size.coerceAtLeast(1)))
+
+        for (i in 0 until minOf(chainDepth, pathCells.size)) {
+            val pathPos = pathCells[i]
+            val blockerLen = randomBlockerLength(rng)
+
+            if (catHoriz) {
+                // Direct blocker: vertical block at column pathPos, crossing exitLine
+                val vRow = maxOf(0, exitLine - rng.nextInt(blockerLen))
+                if (grid.placeBlock(PuzzleBlock(nextId, vRow, pathPos, blockerLen, false))) {
+                    nextId++
+                    // Indirect above: horizontal block restricting vertical blocker upward
+                    if (vRow > 0) {
+                        val hLen = randomLength(rng)
+                        val hCol = maxOf(0, pathPos - rng.nextInt(maxOf(1, hLen)))
+                        if (grid.placeBlock(PuzzleBlock(nextId, vRow - 1, hCol, hLen, true))) {
+                            nextId++
+                            // Tertiary: vertical block blocking the horizontal
+                            if (rng.nextInt(2) == 0) {
+                                val v2Col = hCol + hLen
+                                if (v2Col < size) {
+                                    val v2Len = randomLength(rng)
+                                    if (grid.placeBlock(PuzzleBlock(nextId, maxOf(0, vRow - 1 - rng.nextInt(maxOf(1, v2Len))), v2Col, v2Len, false)))
+                                        nextId++
+                                }
                             }
                         }
                     }
+                    // Indirect below: horizontal block restricting vertical blocker downward
+                    val bottomRow = vRow + blockerLen
+                    if (bottomRow < size) {
+                        val hLen = randomLength(rng)
+                        val hCol = maxOf(0, pathPos - rng.nextInt(maxOf(1, hLen)))
+                        if (grid.placeBlock(PuzzleBlock(nextId, bottomRow, hCol, hLen, true)))
+                            nextId++
+                    }
                 }
-                val bottomRow = vRow + vLen
-                if (bottomRow < size) {
-                    val hLen = if (rng.nextInt(3) == 0) 3 else 2
-                    val hCol = maxOf(0, col - rng.nextInt(hLen))
-                    if (grid.placeBlock(PuzzleBlock(nextId, bottomRow, hCol, hLen, true)))
-                        nextId++
+            } else {
+                // Direct blocker: horizontal block at row pathPos, crossing exitLine
+                val hCol = maxOf(0, exitLine - rng.nextInt(blockerLen))
+                if (grid.placeBlock(PuzzleBlock(nextId, pathPos, hCol, blockerLen, true))) {
+                    nextId++
+                    // Indirect left: vertical block restricting horizontal blocker leftward
+                    if (hCol > 0) {
+                        val vLen = randomLength(rng)
+                        val vRow = maxOf(0, pathPos - rng.nextInt(maxOf(1, vLen)))
+                        if (grid.placeBlock(PuzzleBlock(nextId, vRow, hCol - 1, vLen, false))) {
+                            nextId++
+                            // Tertiary: horizontal block blocking the vertical
+                            if (rng.nextInt(2) == 0) {
+                                val h2Row = vRow + vLen
+                                if (h2Row < size) {
+                                    val h2Len = randomLength(rng)
+                                    if (grid.placeBlock(PuzzleBlock(nextId, h2Row, maxOf(0, hCol - 1 - rng.nextInt(maxOf(1, h2Len))), h2Len, true)))
+                                        nextId++
+                                }
+                            }
+                        }
+                    }
+                    // Indirect right: vertical block restricting horizontal blocker rightward
+                    val rightCol = hCol + blockerLen
+                    if (rightCol < size) {
+                        val vLen = randomLength(rng)
+                        val vRow = maxOf(0, pathPos - rng.nextInt(maxOf(1, vLen)))
+                        if (grid.placeBlock(PuzzleBlock(nextId, vRow, rightCol, vLen, false)))
+                            nextId++
+                    }
                 }
             }
         }
 
+        // Random fill to reach target block count
         val target = params.blockCountMin + rng.nextInt(maxOf(1, params.blockCountMax - params.blockCountMin + 1))
         while (grid.blocks.size < target) {
             if (!tryPlaceRandom(grid, nextId, size, rng)) break
@@ -285,20 +378,52 @@ class PuzzleGenerator {
     private fun tryPlaceRandom(grid: PuzzleGrid, id: Int, size: Int, rng: java.util.Random): Boolean {
         repeat(40) {
             val h = rng.nextBoolean()
-            val len = if (rng.nextInt(4) == 0) 3 else 2
+            val len = randomLength(rng)
             if (grid.placeBlock(PuzzleBlock(id, rng.nextInt(size), rng.nextInt(size), len, h)))
                 return true
         }
         return false
     }
 
-    private fun buildFallback(size: Int, exitRow: Int): PuzzleGrid {
-        val grid = PuzzleGrid(size, size, exitRow)
-        grid.placeBlock(PuzzleBlock(0, exitRow, 0, 2, true, true))
-        grid.placeBlock(PuzzleBlock(1, maxOf(0, exitRow - 1), size / 2, 2, false))
-        grid.placeBlock(PuzzleBlock(2, maxOf(0, exitRow - 2), maxOf(0, size / 2 - 1), 2, true))
-        grid.placeBlock(PuzzleBlock(3, maxOf(0, exitRow - 1), size - 1, 2, false))
-        grid.placeBlock(PuzzleBlock(4, maxOf(0, exitRow - 2), size - 2, 2, true))
+    private fun buildFallback(size: Int, exitDir: ExitDirection, exitLine: Int): PuzzleGrid {
+        val catHoriz = (exitDir == ExitDirection.RIGHT || exitDir == ExitDirection.LEFT)
+        val exitPositive = (exitDir == ExitDirection.RIGHT || exitDir == ExitDirection.BOTTOM)
+
+        val grid = PuzzleGrid(
+            size, size,
+            exitRow = if (catHoriz) exitLine else -1,
+            exitCol = if (!catHoriz) exitLine else -1,
+            exitDirection = exitDir
+        )
+
+        val catStart = if (exitPositive) 0 else size - 2
+        val catRow = if (catHoriz) exitLine else catStart
+        val catCol = if (catHoriz) catStart else exitLine
+        grid.placeBlock(PuzzleBlock(0, catRow, catCol, 2, catHoriz, true))
+
+        val mid = size / 2
+        if (catHoriz) {
+            val bRow = maxOf(0, exitLine - 1)
+            grid.placeBlock(PuzzleBlock(1, bRow, mid, 2, false))
+            if (bRow > 0) {
+                grid.placeBlock(PuzzleBlock(2, bRow - 1, maxOf(0, mid - 1), 2, true))
+            }
+            val bRow2 = minOf(size - 2, exitLine + 1)
+            if (bRow2 != bRow) {
+                grid.placeBlock(PuzzleBlock(3, bRow2, if (exitPositive) size - 2 else 1, 2, false))
+            }
+        } else {
+            val bCol = maxOf(0, exitLine - 1)
+            grid.placeBlock(PuzzleBlock(1, mid, bCol, 2, true))
+            if (bCol > 0) {
+                grid.placeBlock(PuzzleBlock(2, maxOf(0, mid - 1), bCol - 1, 2, false))
+            }
+            val bCol2 = minOf(size - 2, exitLine + 1)
+            if (bCol2 != bCol) {
+                grid.placeBlock(PuzzleBlock(3, if (exitPositive) size - 2 else 1, bCol2, 2, true))
+            }
+        }
+
         grid.resetMoveTracking()
         return grid
     }

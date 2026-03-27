@@ -1,5 +1,7 @@
 package com.meowrescue.game.puzzle
 
+enum class ExitDirection { RIGHT, LEFT, TOP, BOTTOM }
+
 data class PuzzleBlock(
     val id: Int,
     val row: Int,
@@ -9,11 +11,18 @@ data class PuzzleBlock(
     val isCat: Boolean = false
 )
 
-class PuzzleGrid(val rows: Int, val cols: Int, val exitRow: Int) {
+class PuzzleGrid(
+    val rows: Int,
+    val cols: Int,
+    val exitRow: Int,
+    val exitCol: Int = -1,
+    val exitDirection: ExitDirection = ExitDirection.RIGHT
+) {
 
     private val grid: Array<IntArray> = Array(rows) { IntArray(cols) { -1 } }
     private val _blocks: MutableList<PuzzleBlock> = mutableListOf()
-    private val moveHistory: ArrayDeque<Pair<Int, Int>> = ArrayDeque() // blockId to steps
+    data class MoveRecord(val blockId: Int, val steps: Int, val horizontal: Boolean)
+    private val moveHistory: ArrayDeque<MoveRecord> = ArrayDeque()
 
     val blocks: List<PuzzleBlock> get() = _blocks.toList()
 
@@ -73,6 +82,14 @@ class PuzzleGrid(val rows: Int, val cols: Int, val exitRow: Int) {
         }
     }
 
+    /** Direction-explicit variant: 1-cell blocks can move in either axis */
+    fun canMoveInDir(blockId: Int, steps: Int, horizontal: Boolean): Boolean {
+        val block = _blocks.firstOrNull { it.id == blockId } ?: return false
+        if (steps == 0) return false
+        if (block.length >= 2 && horizontal != block.isHorizontal) return false
+        return if (horizontal) canMoveHorizontal(block, steps) else canMoveVertical(block, steps)
+    }
+
     private fun canMoveHorizontal(block: PuzzleBlock, steps: Int): Boolean {
         return if (steps > 0) {
             val endCol = block.col + block.length - 1
@@ -113,49 +130,59 @@ class PuzzleGrid(val rows: Int, val cols: Int, val exitRow: Int) {
         }
     }
 
-    // Returns true if move was successful
+    // Returns true if move was successful (uses block's isHorizontal)
     fun moveBlock(blockId: Int, steps: Int): Boolean {
-        if (!canMove(blockId, steps)) return false
+        val block = _blocks.firstOrNull { it.id == blockId } ?: return false
+        return moveBlockInDir(blockId, steps, block.isHorizontal)
+    }
+
+    /** Direction-explicit move: 1-cell blocks can be moved in either axis */
+    fun moveBlockInDir(blockId: Int, steps: Int, horizontal: Boolean): Boolean {
+        if (!canMoveInDir(blockId, steps, horizontal)) return false
         val idx = _blocks.indexOfFirst { it.id == blockId }
         if (idx == -1) return false
         val block = _blocks[idx]
 
         clearGrid(block)
-        val newBlock = if (block.isHorizontal) {
+        val newBlock = if (horizontal) {
             block.copy(col = block.col + steps)
         } else {
             block.copy(row = block.row + steps)
         }
         _blocks[idx] = newBlock
         markGrid(newBlock, blockId)
-        moveHistory.addLast(blockId to steps)
+        moveHistory.addLast(MoveRecord(blockId, steps, horizontal))
         moveCount++
         return true
     }
 
     fun undoLastMove(): Boolean {
         if (moveHistory.isEmpty()) return false
-        val (blockId, steps) = moveHistory.removeLast()
-        val idx = _blocks.indexOfFirst { it.id == blockId }
+        val record = moveHistory.removeLast()
+        val idx = _blocks.indexOfFirst { it.id == record.blockId }
         if (idx == -1) return false
         val block = _blocks[idx]
 
         clearGrid(block)
-        val restoredBlock = if (block.isHorizontal) {
-            block.copy(col = block.col - steps)
+        val restoredBlock = if (record.horizontal) {
+            block.copy(col = block.col - record.steps)
         } else {
-            block.copy(row = block.row - steps)
+            block.copy(row = block.row - record.steps)
         }
         _blocks[idx] = restoredBlock
-        markGrid(restoredBlock, blockId)
+        markGrid(restoredBlock, record.blockId)
         if (moveCount > 0) moveCount--
         return true
     }
 
-    // Solved when the cat block's right edge is at the last column
     fun isSolved(): Boolean {
         val cat = _blocks.firstOrNull { it.isCat } ?: return false
-        return cat.isHorizontal && cat.row == exitRow && (cat.col + cat.length) == cols
+        return when (exitDirection) {
+            ExitDirection.RIGHT  -> cat.isHorizontal && cat.row == exitRow && (cat.col + cat.length) == cols
+            ExitDirection.LEFT   -> cat.isHorizontal && cat.row == exitRow && cat.col == 0
+            ExitDirection.BOTTOM -> !cat.isHorizontal && cat.col == exitCol && (cat.row + cat.length) == rows
+            ExitDirection.TOP    -> !cat.isHorizontal && cat.col == exitCol && cat.row == 0
+        }
     }
 
     fun getMoveCount(): Int = moveCount
@@ -168,14 +195,14 @@ class PuzzleGrid(val rows: Int, val cols: Int, val exitRow: Int) {
     fun getGrid(): Array<IntArray> = Array(rows) { r -> grid[r].copyOf() }
 
     fun clone(): PuzzleGrid {
-        val clone = PuzzleGrid(rows, cols, exitRow)
+        val clone = PuzzleGrid(rows, cols, exitRow, exitCol, exitDirection)
         for (block in _blocks) {
             clone._blocks.add(block)
             clone.markGrid(block, block.id)
         }
         clone.moveCount = moveCount
-        for (entry in moveHistory) {
-            clone.moveHistory.addLast(entry)
+        for (record in moveHistory) {
+            clone.moveHistory.addLast(record)
         }
         return clone
     }

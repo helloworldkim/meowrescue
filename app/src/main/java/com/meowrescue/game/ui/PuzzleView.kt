@@ -8,6 +8,7 @@ import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.core.content.res.ResourcesCompat
 import com.meowrescue.game.R
+import com.meowrescue.game.puzzle.ExitDirection
 import com.meowrescue.game.puzzle.PuzzleGrid
 import com.meowrescue.game.util.SoundManager
 import kotlin.math.abs
@@ -246,28 +247,36 @@ class PuzzleView @JvmOverloads constructor(
         val dx = x - dragStartX
         val dy = y - dragStartY
 
-        if (block.isHorizontal) {
+        if (block.length == 1) {
+            // 1-cell block: move in dominant drag direction
+            if (abs(dx) >= abs(dy)) {
+                val rawSteps = (dx / cellSize).roundToInt()
+                if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = true)
+            } else {
+                val rawSteps = (dy / cellSize).roundToInt()
+                if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = false)
+            }
+        } else if (block.isHorizontal) {
             val rawSteps = (dx / cellSize).roundToInt()
-            if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps)
+            if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = true)
         } else {
             val rawSteps = (dy / cellSize).roundToInt()
-            if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps)
+            if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = false)
         }
 
         dragBlockId = -1
     }
 
-    private fun attemptMove(g: PuzzleGrid, blockId: Int, steps: Int) {
-        // Clamp steps to maximum valid
+    private fun attemptMove(g: PuzzleGrid, blockId: Int, steps: Int, horizontal: Boolean) {
         val direction = if (steps > 0) 1 else -1
         var validSteps = 0
         for (s in 1..abs(steps)) {
-            if (g.canMove(blockId, direction * s)) validSteps = direction * s
+            if (g.canMoveInDir(blockId, direction * s, horizontal)) validSteps = direction * s
             else break
         }
         if (validSteps == 0) return
 
-        val moved = g.moveBlock(blockId, validSteps)
+        val moved = g.moveBlockInDir(blockId, validSteps, horizontal)
         if (moved) {
             SoundManager.playCageDestroy()
             if (g.isSolved()) triggerVictory(g)
@@ -414,31 +423,51 @@ class PuzzleView @JvmOverloads constructor(
     // ── Exit indicator ────────────────────────────────────────────────────
 
     private fun drawExit(canvas: Canvas, g: PuzzleGrid) {
-        val exitY  = boardTop + g.exitRow * cellSize
         val arrowW = cellSize * 0.5f
         val arrowH = cellSize * 0.6f
-        val cx     = boardLeft + boardSize + arrowW * 0.4f
-        val cy     = exitY + cellSize / 2f
-
-        // Draw a simple right-pointing triangle arrow
         exitPaint.style = Paint.Style.FILL
-        val path = Path().apply {
-            moveTo(cx, cy - arrowH / 2f)
-            lineTo(cx + arrowW, cy)
-            lineTo(cx, cy + arrowH / 2f)
-            close()
-        }
-        canvas.drawPath(path, exitPaint)
-
-        // Highlight exit row gap on board edge
         val gapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = EXIT_COLOR; alpha = 80
         }
-        canvas.drawRect(
-            boardLeft + boardSize - 4f, exitY,
-            boardLeft + boardSize + 4f, exitY + cellSize,
-            gapPaint
-        )
+
+        when (g.exitDirection) {
+            ExitDirection.RIGHT -> {
+                val exitY = boardTop + g.exitRow * cellSize
+                val cx = boardLeft + boardSize + arrowW * 0.4f
+                val cy = exitY + cellSize / 2f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx, cy - arrowH / 2f); lineTo(cx + arrowW, cy); lineTo(cx, cy + arrowH / 2f); close()
+                }, exitPaint)
+                canvas.drawRect(boardLeft + boardSize - 4f, exitY, boardLeft + boardSize + 4f, exitY + cellSize, gapPaint)
+            }
+            ExitDirection.LEFT -> {
+                val exitY = boardTop + g.exitRow * cellSize
+                val cx = boardLeft - arrowW * 0.4f
+                val cy = exitY + cellSize / 2f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx, cy - arrowH / 2f); lineTo(cx - arrowW, cy); lineTo(cx, cy + arrowH / 2f); close()
+                }, exitPaint)
+                canvas.drawRect(boardLeft - 4f, exitY, boardLeft + 4f, exitY + cellSize, gapPaint)
+            }
+            ExitDirection.TOP -> {
+                val exitX = boardLeft + g.exitCol * cellSize
+                val cx = exitX + cellSize / 2f
+                val cy = boardTop - arrowW * 0.4f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx - arrowH / 2f, cy); lineTo(cx, cy - arrowW); lineTo(cx + arrowH / 2f, cy); close()
+                }, exitPaint)
+                canvas.drawRect(exitX, boardTop - 4f, exitX + cellSize, boardTop + 4f, gapPaint)
+            }
+            ExitDirection.BOTTOM -> {
+                val exitX = boardLeft + g.exitCol * cellSize
+                val cx = exitX + cellSize / 2f
+                val cy = boardTop + boardSize + arrowW * 0.4f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx - arrowH / 2f, cy); lineTo(cx, cy + arrowW); lineTo(cx + arrowH / 2f, cy); close()
+                }, exitPaint)
+                canvas.drawRect(exitX, boardTop + boardSize - 4f, exitX + cellSize, boardTop + boardSize + 4f, gapPaint)
+            }
+        }
     }
 
     // ── Blocks ────────────────────────────────────────────────────────────
@@ -459,28 +488,34 @@ class PuzzleView @JvmOverloads constructor(
             if (block.isHorizontal) {
                 right  = boardLeft + (block.col + block.length) * cellSize - padding
                 bottom = boardTop  + (block.row + 1) * cellSize - padding
-                if (isDragging) {
-                    val delta = (dragCurrentX - dragStartX).coerceIn(
-                        -block.col * cellSize,
-                        (g.cols - block.col - block.length) * cellSize
-                    )
-                    left  += delta
-                    // right stays relative to left
-                }
             } else {
                 right  = boardLeft + (block.col + 1) * cellSize - padding
                 bottom = boardTop  + (block.row + block.length) * cellSize - padding
-                if (isDragging) {
-                    val delta = (dragCurrentY - dragStartY).coerceIn(
-                        -block.row * cellSize,
-                        (g.rows - block.row - block.length) * cellSize
-                    )
-                    top += delta
+            }
+
+            if (isDragging) {
+                if (block.length == 1) {
+                    // 1-cell block: follow dominant drag axis
+                    if (abs(dragCurrentX - dragStartX) >= abs(dragCurrentY - dragStartY)) {
+                        left += (dragCurrentX - dragStartX).coerceIn(
+                            -block.col * cellSize, (g.cols - block.col - 1) * cellSize)
+                    } else {
+                        top += (dragCurrentY - dragStartY).coerceIn(
+                            -block.row * cellSize, (g.rows - block.row - 1) * cellSize)
+                    }
+                } else if (block.isHorizontal) {
+                    left += (dragCurrentX - dragStartX).coerceIn(
+                        -block.col * cellSize, (g.cols - block.col - block.length) * cellSize)
+                } else {
+                    top += (dragCurrentY - dragStartY).coerceIn(
+                        -block.row * cellSize, (g.rows - block.row - block.length) * cellSize)
                 }
             }
 
-            val visualRight  = if (block.isHorizontal && isDragging) left + (block.length * cellSize - 2 * padding) else right
-            val visualBottom = if (!block.isHorizontal && isDragging) top  + (block.length * cellSize - 2 * padding) else bottom
+            val widthCells  = if (block.isHorizontal || block.length == 1) block.length else 1
+            val heightCells = if (!block.isHorizontal || block.length == 1) block.length else 1
+            val visualRight  = if (isDragging) left + (widthCells * cellSize - 2 * padding) else right
+            val visualBottom = if (isDragging) top  + (heightCells * cellSize - 2 * padding) else bottom
 
             val color = if (block.isCat) CAT_COLOR
                         else BLOCK_COLORS[(block.id - 1) % BLOCK_COLORS.size]
@@ -521,7 +556,8 @@ class PuzzleView @JvmOverloads constructor(
 
     private fun drawToolbar(canvas: Canvas) {
         val density    = resources.displayMetrics.density
-        val toolbarTop = boardTop + boardSize + cellSize * 0.3f
+        val arrowExtra = if (grid?.exitDirection == ExitDirection.BOTTOM) 48 * density else 0f
+        val toolbarTop = boardTop + boardSize + arrowExtra + cellSize * 0.3f
         val btnH       = 48 * density
         val btnW       = (width * 0.35f)
         val margin     = (width - btnW * 2) / 3f
@@ -639,19 +675,24 @@ class PuzzleView @JvmOverloads constructor(
         val density    = resources.displayMetrics.density
         val hudH       = 56 * density
         val toolbarH   = 80 * density
-        val arrowArea  = 48 * density   // space for exit arrow on right
+        val arrowArea  = 48 * density
 
-        val availableW = w - arrowArea
-        val availableH = h - hudH - toolbarH - (24 * density)
+        // Reserve arrow space based on exit direction
+        val arrowL = if (g.exitDirection == ExitDirection.LEFT) arrowArea else 0f
+        val arrowR = if (g.exitDirection == ExitDirection.RIGHT) arrowArea else 0f
+        val arrowT = if (g.exitDirection == ExitDirection.TOP) arrowArea else 0f
+        val arrowB = if (g.exitDirection == ExitDirection.BOTTOM) arrowArea else 0f
+
+        val availableW = w - arrowL - arrowR
+        val availableH = h - hudH - toolbarH - arrowT - arrowB - (24 * density)
 
         val maxBoard = min(availableW, availableH)
-        // Board occupies 60-70% of screen height, capped by width
         val targetH  = (h * 0.65f).coerceIn(availableH * 0.55f, availableH)
         boardSize    = min(maxBoard, targetH)
 
         cellSize  = boardSize / max(g.rows, g.cols)
-        boardLeft = (availableW - boardSize) / 2f
-        boardTop  = hudH + (availableH - boardSize) / 2f
+        boardLeft = arrowL + (availableW - boardSize) / 2f
+        boardTop  = hudH + arrowT + (availableH - boardSize) / 2f
     }
 
     // ──────────────────────────────────────────────────────────────────────
