@@ -15,8 +15,9 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
-enum class PuzzleState { PLAYING, SOLVED, PAUSED }
+enum class PuzzleState { PLAYING, ESCAPING, SOLVED, PAUSED }
 
 class PuzzleView @JvmOverloads constructor(
     context: Context,
@@ -41,11 +42,19 @@ class PuzzleView @JvmOverloads constructor(
 
         private const val TARGET_FPS = 60L
         private const val FRAME_MS   = 1000L / TARGET_FPS
+        private const val SNAP_DURATION_MS = 120L
+        private const val WALL_OPEN_MS = 200L
+        private const val CAT_SLIDE_MS = 300L
+        private const val PARTICLE_MS  = 500L
     }
 
     // ── Callbacks ──────────────────────────────────────────────────────────
     var onStageClear: ((moves: Int, stars: Int) -> Unit)? = null
+    var onNextStageClicked: (() -> Unit)? = null
     var onPauseClicked: (() -> Unit)? = null
+
+    // ── Lock for thread-safe access between UI thread and render thread ────
+    private val lock = Any()
 
     // ── State ──────────────────────────────────────────────────────────────
     private var state = PuzzleState.PLAYING
@@ -58,12 +67,12 @@ class PuzzleView @JvmOverloads constructor(
     private var cellSize = 0f
     private var boardLeft = 0f
     private var boardTop  = 0f
-    private var boardSize = 0f   // square board
+    private var boardSize = 0f
 
     // ── Victory animation ──────────────────────────────────────────────────
-    private var victoryAlpha  = 0f      // 0..1
+    private var victoryAlpha  = 0f
     private var victoryStars  = 0
-    private var starAnimPhase = 0f      // drives pulsing
+    private var starAnimPhase = 0f
 
     // ── Drag tracking ─────────────────────────────────────────────────────
     private var dragBlockId  = -1
@@ -72,17 +81,42 @@ class PuzzleView @JvmOverloads constructor(
     private var dragCurrentX = 0f
     private var dragCurrentY = 0f
 
-    // ── HUD button rects (for hit-testing) ────────────────────────────────
-    private val pauseRect  = RectF()
-    private val undoRect   = RectF()
-    private val resetRect  = RectF()
+    // ── Snap animation ────────────────────────────────────────────────────
+    private var snapAnimating = false
+    private var snapBlockId   = -1
+    private var snapFromCol   = 0f
+    private var snapFromRow   = 0f
+    private var snapStartTime = 0L
+    private var snapPendingSolveCheck = false
+
+    // ── Cat escape animation ──────────────────────────────────────────────
+    private var escapePhase = 0  // 0=none, 1=wall open, 2=cat slide, 3=particles
+    private var escapeStartTime = 0L
+    private var escapeMoves = 0
+    private var escapeStars = 0
+
+    // ── Particles ─────────────────────────────────────────────────────────
+    private data class Particle(
+        var x: Float, var y: Float,
+        var vx: Float, var vy: Float,
+        var radius: Float, var color: Int, var alpha: Float
+    )
+    private val particles = mutableListOf<Particle>()
+    private var particleStartTime = 0L
+
+    // ── HUD button rects ────────────────────────────────────────────────
+    private val pauseRect      = RectF()
+    private val undoRect       = RectF()
+    private val resetRect      = RectF()
+    private val nextStageRect  = RectF()
 
     // ── Resources ─────────────────────────────────────────────────────────
     private var pauseBitmap: Bitmap? = null
     private var starFullBitmap: Bitmap? = null
     private var starEmptyBitmap: Bitmap? = null
+    private var catBitmap: Bitmap? = null
 
-    // ── Paints (reused across frames) ─────────────────────────────────────
+    // ── Paints ─────────────────────────────────────────────────────────────
     private val gridBgPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = GRID_BG }
     private val linePaint      = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = CELL_LINE; style = Paint.Style.STROKE; strokeWidth = 1.5f
@@ -108,8 +142,8 @@ class PuzzleView @JvmOverloads constructor(
     private val buttonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
     }
-    // glossPaint for block highlight — reused each frame
     private val glossPaint    = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     // ── Render thread ──────────────────────────────────────────────────────
     private var renderThread: Thread? = null
@@ -126,28 +160,53 @@ class PuzzleView @JvmOverloads constructor(
     // ──────────────────────────────────────────────────────────────────────
 
     fun setGrid(grid: PuzzleGrid, stage: Int, optimalMoves: Int) {
-        this.grid         = grid
-        this.initialGrid  = grid.clone()
-        this.stageNumber  = stage
-        this.optimalMoves = optimalMoves
-        this.state        = PuzzleState.PLAYING
-        this.victoryAlpha = 0f
-        this.dragBlockId  = -1
+        synchronized(lock) {
+            this.grid         = grid
+            this.initialGrid  = grid.clone()
+            this.stageNumber  = stage
+            this.optimalMoves = optimalMoves
+            this.state        = PuzzleState.PLAYING
+            this.victoryAlpha = 0f
+            this.dragBlockId  = -1
+            this.snapAnimating = false
+            this.escapePhase  = 0
+            this.particles.clear()
+        }
         recalcLayout()
     }
 
+    fun setCatBitmap(resId: Int) {
+        try {
+            val density = resources.displayMetrics.density
+            val sz = (48 * density).toInt()
+            val drawable = ResourcesCompat.getDrawable(resources, resId, null)
+            drawable?.let {
+                catBitmap?.recycle()
+                catBitmap = Bitmap.createBitmap(sz, sz, Bitmap.Config.ARGB_8888)
+                val c = Canvas(catBitmap!!)
+                it.setBounds(0, 0, sz, sz)
+                it.draw(c)
+            }
+        } catch (_: Exception) { /* fallback to text */ }
+    }
+
     fun undoMove() {
-        if (state != PuzzleState.PLAYING) return
+        if (state != PuzzleState.PLAYING || snapAnimating) return
         val moved = grid?.undoLastMove() ?: false
         if (moved) SoundManager.playButtonTap()
     }
 
     fun resetPuzzle() {
         val init = initialGrid ?: return
-        grid = init.clone()
-        state = PuzzleState.PLAYING
-        victoryAlpha = 0f
-        dragBlockId  = -1
+        synchronized(lock) {
+            grid = init.clone()
+            state = PuzzleState.PLAYING
+            victoryAlpha = 0f
+            dragBlockId  = -1
+            snapAnimating = false
+            escapePhase  = 0
+            particles.clear()
+        }
         SoundManager.playButtonTap()
     }
 
@@ -163,6 +222,7 @@ class PuzzleView @JvmOverloads constructor(
         pauseBitmap?.recycle();   pauseBitmap   = null
         starFullBitmap?.recycle(); starFullBitmap = null
         starEmptyBitmap?.recycle(); starEmptyBitmap = null
+        catBitmap?.recycle(); catBitmap = null
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -188,27 +248,30 @@ class PuzzleView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x; val y = event.y
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> handleDown(x, y)
-            MotionEvent.ACTION_MOVE -> handleMove(x, y)
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> handleUp(x, y)
+        synchronized(lock) {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> handleDown(x, y)
+                MotionEvent.ACTION_MOVE -> handleMove(x, y)
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> handleUp(x, y)
+            }
         }
         return true
     }
 
     private fun handleDown(x: Float, y: Float) {
-        // HUD button hit-test first
         if (pauseRect.contains(x, y)) {
             SoundManager.playButtonTap()
             onPauseClicked?.invoke()
             return
         }
-        if (state != PuzzleState.PLAYING) {
-            if (state == PuzzleState.SOLVED) {
-                if (undoRect.contains(x, y) || resetRect.contains(x, y)) return
+        if (state == PuzzleState.SOLVED) {
+            if (nextStageRect.contains(x, y)) {
+                SoundManager.playButtonTap()
+                onNextStageClicked?.invoke()
             }
             return
         }
+        if (state != PuzzleState.PLAYING || snapAnimating) return
         if (undoRect.contains(x, y)) {
             undoMove(); return
         }
@@ -216,7 +279,6 @@ class PuzzleView @JvmOverloads constructor(
             resetPuzzle(); return
         }
 
-        // Find touched block
         val g = grid ?: return
         val col = ((x - boardLeft) / cellSize).toInt()
         val row = ((y - boardTop)  / cellSize).toInt()
@@ -233,13 +295,13 @@ class PuzzleView @JvmOverloads constructor(
     }
 
     private fun handleMove(x: Float, y: Float) {
-        if (dragBlockId == -1) return
+        if (dragBlockId == -1 || snapAnimating) return
         dragCurrentX = x
         dragCurrentY = y
     }
 
     private fun handleUp(x: Float, y: Float) {
-        if (dragBlockId == -1) return
+        if (dragBlockId == -1 || snapAnimating) return
         val g = grid ?: run { dragBlockId = -1; return }
         val block = g.blocks.firstOrNull { it.id == dragBlockId }
         if (block == null) { dragBlockId = -1; return }
@@ -247,56 +309,94 @@ class PuzzleView @JvmOverloads constructor(
         val dx = x - dragStartX
         val dy = y - dragStartY
 
+        // Determine move direction and steps
+        var moveSteps = 0
+        var moveHorizontal = true
+
         if (block.length == 1) {
-            // 1-cell block: move in dominant drag direction
             if (abs(dx) >= abs(dy)) {
-                val rawSteps = (dx / cellSize).roundToInt()
-                if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = true)
+                moveSteps = (dx / cellSize).roundToInt()
+                moveHorizontal = true
             } else {
-                val rawSteps = (dy / cellSize).roundToInt()
-                if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = false)
+                moveSteps = (dy / cellSize).roundToInt()
+                moveHorizontal = false
             }
         } else if (block.isHorizontal) {
-            val rawSteps = (dx / cellSize).roundToInt()
-            if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = true)
+            moveSteps = (dx / cellSize).roundToInt()
+            moveHorizontal = true
         } else {
-            val rawSteps = (dy / cellSize).roundToInt()
-            if (rawSteps != 0) attemptMove(g, dragBlockId, rawSteps, horizontal = false)
+            moveSteps = (dy / cellSize).roundToInt()
+            moveHorizontal = false
+        }
+
+        if (moveSteps != 0) {
+            val direction = if (moveSteps > 0) 1 else -1
+            var validSteps = 0
+            for (s in 1..abs(moveSteps)) {
+                if (g.canMoveInDir(dragBlockId, direction * s, moveHorizontal)) validSteps = direction * s
+                else break
+            }
+            if (validSteps != 0) {
+                // Record old position for snap animation
+                val oldCol = block.col.toFloat()
+                val oldRow = block.row.toFloat()
+
+                // Apply move to grid immediately
+                g.moveBlockInDir(dragBlockId, validSteps, moveHorizontal)
+
+                // Start snap animation from drag visual to final grid position
+                snapAnimating = true
+                snapBlockId = dragBlockId
+                snapFromCol = oldCol + (if (moveHorizontal) (dragCurrentX - dragStartX) / cellSize - validSteps else 0f)
+                snapFromRow = oldRow + (if (!moveHorizontal) (dragCurrentY - dragStartY) / cellSize - validSteps else 0f)
+                snapStartTime = System.currentTimeMillis()
+                snapPendingSolveCheck = true
+            }
         }
 
         dragBlockId = -1
     }
 
-    private fun attemptMove(g: PuzzleGrid, blockId: Int, steps: Int, horizontal: Boolean) {
-        val direction = if (steps > 0) 1 else -1
-        var validSteps = 0
-        for (s in 1..abs(steps)) {
-            if (g.canMoveInDir(blockId, direction * s, horizontal)) validSteps = direction * s
-            else break
-        }
-        if (validSteps == 0) return
-
-        val moved = g.moveBlockInDir(blockId, validSteps, horizontal)
-        if (moved) {
-            SoundManager.playCageDestroy()
-            if (g.isSolved()) triggerVictory(g)
-        }
-    }
-
     // ──────────────────────────────────────────────────────────────────────
-    // Victory
+    // Escape sequence
     // ──────────────────────────────────────────────────────────────────────
 
-    private fun triggerVictory(g: PuzzleGrid) {
+    private fun startEscapeSequence(g: PuzzleGrid) {
         val moves = g.getMoveCount()
-        victoryStars = when {
+        escapeStars = when {
             moves <= optimalMoves             -> 3
             moves <= (optimalMoves * 1.5f).toInt() -> 2
             else                              -> 1
         }
-        state = PuzzleState.SOLVED
-        SoundManager.playLevelClear()
-        onStageClear?.invoke(moves, victoryStars)
+        escapeMoves = moves
+        state = PuzzleState.ESCAPING
+        escapePhase = 1
+        escapeStartTime = System.currentTimeMillis()
+        SoundManager.playCatRescue()
+    }
+
+    private fun spawnParticles() {
+        particles.clear()
+        val g = grid ?: return
+        val cat = g.blocks.firstOrNull { it.isCat } ?: return
+        val cx = boardLeft + (cat.col + 0.5f) * cellSize
+        val cy = boardTop + (cat.row + 0.5f) * cellSize
+        val rng = java.util.Random()
+
+        repeat(30) {
+            val angle = rng.nextFloat() * Math.PI.toFloat() * 2f
+            val speed = 2f + rng.nextFloat() * 6f
+            particles.add(Particle(
+                x = cx + (rng.nextFloat() - 0.5f) * cellSize,
+                y = cy + (rng.nextFloat() - 0.5f) * cellSize,
+                vx = kotlin.math.cos(angle.toDouble()).toFloat() * speed,
+                vy = kotlin.math.sin(angle.toDouble()).toFloat() * speed - 2f,
+                radius = 4f + rng.nextFloat() * 10f,
+                color = Theme.PARTICLE_COLORS[rng.nextInt(Theme.PARTICLE_COLORS.size)],
+                alpha = 1f
+            ))
+        }
+        particleStartTime = System.currentTimeMillis()
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -327,18 +427,80 @@ class PuzzleView @JvmOverloads constructor(
         if (!h.surface.isValid) return
         val canvas = h.lockCanvas() ?: return
         try {
-            update()
-            render(canvas)
+            synchronized(lock) {
+                update()
+                render(canvas)
+            }
         } finally {
             h.unlockCanvasAndPost(canvas)
         }
     }
 
     private fun update() {
+        val now = System.currentTimeMillis()
+
+        // Snap animation update
+        if (snapAnimating) {
+            val elapsed = now - snapStartTime
+            if (elapsed >= SNAP_DURATION_MS) {
+                snapAnimating = false
+                SoundManager.playBlockMatch()
+                if (snapPendingSolveCheck) {
+                    snapPendingSolveCheck = false
+                    val g = grid
+                    if (g != null && g.isSolved()) {
+                        startEscapeSequence(g)
+                    }
+                }
+            }
+        }
+
+        // Escape sequence update
+        if (state == PuzzleState.ESCAPING) {
+            val elapsed = now - escapeStartTime
+            when (escapePhase) {
+                1 -> { // Wall open
+                    if (elapsed >= WALL_OPEN_MS) {
+                        escapePhase = 2
+                        escapeStartTime = now
+                    }
+                }
+                2 -> { // Cat slide out
+                    if (elapsed >= CAT_SLIDE_MS) {
+                        escapePhase = 3
+                        escapeStartTime = now
+                        spawnParticles()
+                        SoundManager.playLevelClear()
+                    }
+                }
+                3 -> { // Particles
+                    // Update particles
+                    for (p in particles) {
+                        p.x += p.vx
+                        p.y += p.vy
+                        p.vy += 0.15f  // gravity
+                        p.alpha = max(0f, p.alpha - 0.018f)
+                    }
+                    if (elapsed >= PARTICLE_MS) {
+                        escapePhase = 0
+                        particles.clear()
+                        triggerVictory()
+                    }
+                }
+            }
+        }
+
+        // Victory overlay fade
         if (state == PuzzleState.SOLVED) {
             victoryAlpha = min(1f, victoryAlpha + 0.04f)
             starAnimPhase += 0.05f
         }
+    }
+
+    private fun triggerVictory() {
+        victoryStars = escapeStars
+        state = PuzzleState.SOLVED
+        onStageClear?.invoke(escapeMoves, escapeStars)
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -355,6 +517,11 @@ class PuzzleView @JvmOverloads constructor(
         drawBlocks(canvas, g)
         drawToolbar(canvas)
 
+        // Draw particles on top
+        if (escapePhase == 3 || particles.isNotEmpty()) {
+            drawParticles(canvas)
+        }
+
         if (state == PuzzleState.SOLVED && victoryAlpha > 0f) {
             drawVictoryOverlay(canvas, g)
         }
@@ -368,20 +535,16 @@ class PuzzleView @JvmOverloads constructor(
         val hudTop  = 0f
         val w       = width.toFloat()
 
-        // HUD background
         hudBgPaint.color = 0xFFFFF3E0.toInt()
         canvas.drawRect(0f, hudTop, w, hudTop + hudH, hudBgPaint)
 
-        // Stage label (left)
         hudTextPaint.textSize = 18 * density
         hudTextPaint.textAlign = Paint.Align.LEFT
         canvas.drawText("Stage $stageNumber", 16 * density, hudTop + hudH * 0.65f, hudTextPaint)
 
-        // Move counter (center)
         hudTextPaint.textAlign = Paint.Align.CENTER
         canvas.drawText("Moves: ${g.getMoveCount()}", w / 2f, hudTop + hudH * 0.65f, hudTextPaint)
 
-        // Pause button (right)
         val btnSize   = 40 * density
         val btnMargin = 8 * density
         val btnLeft   = w - btnSize - btnMargin
@@ -392,7 +555,6 @@ class PuzzleView @JvmOverloads constructor(
         if (pb != null && !pb.isRecycled) {
             canvas.drawBitmap(pb, null, pauseRect, null)
         } else {
-            // fallback: draw two vertical bars
             val p = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF4E342E.toInt() }
             val barW = btnSize * 0.22f
             val barH = btnSize * 0.55f
@@ -409,7 +571,6 @@ class PuzzleView @JvmOverloads constructor(
         val r = RectF(boardLeft, boardTop, boardLeft + boardSize, boardTop + boardSize)
         canvas.drawRoundRect(r, 8f, 8f, gridBgPaint)
 
-        // Grid lines
         for (i in 0..g.rows) {
             val y = boardTop + i * cellSize
             canvas.drawLine(boardLeft, y, boardLeft + boardSize, y, linePaint)
@@ -430,6 +591,15 @@ class PuzzleView @JvmOverloads constructor(
             color = EXIT_COLOR; alpha = 80
         }
 
+        // Wall open animation: widen the gap
+        val wallOpenProgress = if (escapePhase >= 1 && escapePhase <= 3) {
+            val elapsed = if (escapePhase == 1) {
+                (System.currentTimeMillis() - escapeStartTime).toFloat() / WALL_OPEN_MS
+            } else 1f
+            elapsed.coerceIn(0f, 1f)
+        } else 0f
+        val gapExtra = wallOpenProgress * cellSize * 0.5f
+
         when (g.exitDirection) {
             ExitDirection.RIGHT -> {
                 val exitY = boardTop + g.exitRow * cellSize
@@ -438,7 +608,7 @@ class PuzzleView @JvmOverloads constructor(
                 canvas.drawPath(Path().apply {
                     moveTo(cx, cy - arrowH / 2f); lineTo(cx + arrowW, cy); lineTo(cx, cy + arrowH / 2f); close()
                 }, exitPaint)
-                canvas.drawRect(boardLeft + boardSize - 4f, exitY, boardLeft + boardSize + 4f, exitY + cellSize, gapPaint)
+                canvas.drawRect(boardLeft + boardSize - 4f, exitY - gapExtra, boardLeft + boardSize + 4f, exitY + cellSize + gapExtra, gapPaint)
             }
             ExitDirection.LEFT -> {
                 val exitY = boardTop + g.exitRow * cellSize
@@ -447,7 +617,7 @@ class PuzzleView @JvmOverloads constructor(
                 canvas.drawPath(Path().apply {
                     moveTo(cx, cy - arrowH / 2f); lineTo(cx - arrowW, cy); lineTo(cx, cy + arrowH / 2f); close()
                 }, exitPaint)
-                canvas.drawRect(boardLeft - 4f, exitY, boardLeft + 4f, exitY + cellSize, gapPaint)
+                canvas.drawRect(boardLeft - 4f, exitY - gapExtra, boardLeft + 4f, exitY + cellSize + gapExtra, gapPaint)
             }
             ExitDirection.TOP -> {
                 val exitX = boardLeft + g.exitCol * cellSize
@@ -456,7 +626,7 @@ class PuzzleView @JvmOverloads constructor(
                 canvas.drawPath(Path().apply {
                     moveTo(cx - arrowH / 2f, cy); lineTo(cx, cy - arrowW); lineTo(cx + arrowH / 2f, cy); close()
                 }, exitPaint)
-                canvas.drawRect(exitX, boardTop - 4f, exitX + cellSize, boardTop + 4f, gapPaint)
+                canvas.drawRect(exitX - gapExtra, boardTop - 4f, exitX + cellSize + gapExtra, boardTop + 4f, gapPaint)
             }
             ExitDirection.BOTTOM -> {
                 val exitX = boardLeft + g.exitCol * cellSize
@@ -465,7 +635,7 @@ class PuzzleView @JvmOverloads constructor(
                 canvas.drawPath(Path().apply {
                     moveTo(cx - arrowH / 2f, cy); lineTo(cx, cy + arrowW); lineTo(cx + arrowH / 2f, cy); close()
                 }, exitPaint)
-                canvas.drawRect(exitX, boardTop + boardSize - 4f, exitX + cellSize, boardTop + boardSize + 4f, gapPaint)
+                canvas.drawRect(exitX - gapExtra, boardTop + boardSize - 4f, exitX + cellSize + gapExtra, boardTop + boardSize + 4f, gapPaint)
             }
         }
     }
@@ -474,12 +644,22 @@ class PuzzleView @JvmOverloads constructor(
 
     private fun drawBlocks(canvas: Canvas, g: PuzzleGrid) {
         val padding = cellSize * 0.07f
-        val cr      = min(cellSize * 0.22f, 24f)   // corner radius scales with cell
+        val cr      = min(cellSize * 0.22f, 24f)
 
         for (block in g.blocks) {
             val isDragging = (block.id == dragBlockId)
+            val isSnapping = (block.id == snapBlockId && snapAnimating)
 
-            // Calculate visual position (offset by drag delta)
+            // Cat slide-out: hide cat during slide phase
+            if (block.isCat && escapePhase == 2) {
+                val elapsed = (System.currentTimeMillis() - escapeStartTime).toFloat() / CAT_SLIDE_MS
+                val t = elapsed.coerceIn(0f, 1f)
+                val easeT = t * t  // ease-in (accelerating)
+                drawCatSlideOut(canvas, g, block, padding, cr, easeT)
+                continue
+            }
+            if (block.isCat && escapePhase >= 3) continue  // cat already gone
+
             var left = boardLeft  + block.col * cellSize + padding
             var top  = boardTop   + block.row * cellSize + padding
             val right: Float
@@ -493,9 +673,19 @@ class PuzzleView @JvmOverloads constructor(
                 bottom = boardTop  + (block.row + block.length) * cellSize - padding
             }
 
-            if (isDragging) {
+            // Snap animation: interpolate from old position to current
+            if (isSnapping) {
+                val elapsed = (System.currentTimeMillis() - snapStartTime).toFloat() / SNAP_DURATION_MS
+                val t = elapsed.coerceIn(0f, 1f)
+                val easeT = 1f - (1f - t) * (1f - t)  // ease-out quadratic
+
+                val curCol = snapFromCol + (block.col - snapFromCol) * easeT
+                val curRow = snapFromRow + (block.row - snapFromRow) * easeT
+
+                left = boardLeft + curCol * cellSize + padding
+                top  = boardTop  + curRow * cellSize + padding
+            } else if (isDragging) {
                 if (block.length == 1) {
-                    // 1-cell block: follow dominant drag axis
                     if (abs(dragCurrentX - dragStartX) >= abs(dragCurrentY - dragStartY)) {
                         left += (dragCurrentX - dragStartX).coerceIn(
                             -block.col * cellSize, (g.cols - block.col - 1) * cellSize)
@@ -514,14 +704,14 @@ class PuzzleView @JvmOverloads constructor(
 
             val widthCells  = if (block.isHorizontal || block.length == 1) block.length else 1
             val heightCells = if (!block.isHorizontal || block.length == 1) block.length else 1
-            val visualRight  = if (isDragging) left + (widthCells * cellSize - 2 * padding) else right
-            val visualBottom = if (isDragging) top  + (heightCells * cellSize - 2 * padding) else bottom
+            val visualRight  = if (isDragging || isSnapping) left + (widthCells * cellSize - 2 * padding) else right
+            val visualBottom = if (isDragging || isSnapping) top  + (heightCells * cellSize - 2 * padding) else bottom
 
             val color = if (block.isCat) CAT_COLOR
                         else BLOCK_COLORS[(block.id - 1) % BLOCK_COLORS.size]
 
-            // Shadow (slightly offset)
-            if (isDragging) {
+            // Shadow
+            if (isDragging || isSnapping) {
                 blockShadow.alpha = 80
                 val shadowRect = RectF(left + 6f, top + 6f, visualRight + 6f, visualBottom + 6f)
                 canvas.drawRoundRect(shadowRect, cr, cr, blockShadow)
@@ -532,23 +722,88 @@ class PuzzleView @JvmOverloads constructor(
             val blockRect = RectF(left, top, visualRight, visualBottom)
             canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
 
-            // Highlight (top-left gloss)
+            // Highlight gloss
             glossPaint.shader = LinearGradient(
                 left, top, left, top + (visualBottom - top) * 0.4f,
                 intArrayOf(0x55FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP
             )
             canvas.drawRoundRect(blockRect, cr, cr, glossPaint)
 
-            // Label
+            // Cat bitmap or label
             if (block.isCat) {
-                textPaint.textSize = min(cellSize * 0.45f, 20f)
-                canvas.drawText(
-                    "CAT",
-                    (left + visualRight) / 2f,
-                    (top + visualBottom) / 2f + textPaint.textSize * 0.35f,
-                    textPaint
-                )
+                val bmp = catBitmap
+                if (bmp != null && !bmp.isRecycled) {
+                    val imgSize = min(visualRight - left, visualBottom - top) * 0.7f
+                    val cx = (left + visualRight) / 2f
+                    val cy = (top + visualBottom) / 2f
+                    val imgRect = RectF(cx - imgSize / 2f, cy - imgSize / 2f, cx + imgSize / 2f, cy + imgSize / 2f)
+                    canvas.drawBitmap(bmp, null, imgRect, null)
+                } else {
+                    textPaint.textSize = min(cellSize * 0.45f, 20f)
+                    canvas.drawText(
+                        "CAT",
+                        (left + visualRight) / 2f,
+                        (top + visualBottom) / 2f + textPaint.textSize * 0.35f,
+                        textPaint
+                    )
+                }
             }
+        }
+    }
+
+    private fun drawCatSlideOut(canvas: Canvas, g: PuzzleGrid, block: com.meowrescue.game.puzzle.PuzzleBlock,
+                                 padding: Float, cr: Float, progress: Float) {
+        var left = boardLeft + block.col * cellSize + padding
+        var top  = boardTop  + block.row * cellSize + padding
+        val right: Float
+        val bottom: Float
+
+        if (block.isHorizontal) {
+            right  = boardLeft + (block.col + block.length) * cellSize - padding
+            bottom = boardTop  + (block.row + 1) * cellSize - padding
+        } else {
+            right  = boardLeft + (block.col + 1) * cellSize - padding
+            bottom = boardTop  + (block.row + block.length) * cellSize - padding
+        }
+
+        // Slide offset based on exit direction
+        val slideDistance = cellSize * 3f * progress
+        when (g.exitDirection) {
+            ExitDirection.RIGHT  -> left += slideDistance
+            ExitDirection.LEFT   -> left -= slideDistance
+            ExitDirection.BOTTOM -> top  += slideDistance
+            ExitDirection.TOP    -> top  -= slideDistance
+        }
+        val slideRight  = left + (right - (boardLeft + block.col * cellSize + padding))
+        val slideBottom = top + (bottom - (boardTop + block.row * cellSize + padding))
+
+        blockPaint.color = CAT_COLOR
+        val blockRect = RectF(left, top, slideRight, slideBottom)
+        canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
+
+        // Cat bitmap on sliding block
+        val bmp = catBitmap
+        if (bmp != null && !bmp.isRecycled) {
+            val imgSize = min(slideRight - left, slideBottom - top) * 0.7f
+            val cx = (left + slideRight) / 2f
+            val cy = (top + slideBottom) / 2f
+            val imgRect = RectF(cx - imgSize / 2f, cy - imgSize / 2f, cx + imgSize / 2f, cy + imgSize / 2f)
+            canvas.drawBitmap(bmp, null, imgRect, null)
+        } else {
+            textPaint.textSize = min(cellSize * 0.45f, 20f)
+            canvas.drawText("CAT", (left + slideRight) / 2f,
+                (top + slideBottom) / 2f + textPaint.textSize * 0.35f, textPaint)
+        }
+    }
+
+    // ── Particles ─────────────────────────────────────────────────────────
+
+    private fun drawParticles(canvas: Canvas) {
+        for (p in particles) {
+            if (p.alpha <= 0f) continue
+            particlePaint.color = p.color
+            particlePaint.alpha = (p.alpha * 255).toInt()
+            canvas.drawCircle(p.x, p.y, p.radius, particlePaint)
         }
     }
 
@@ -562,7 +817,6 @@ class PuzzleView @JvmOverloads constructor(
         val btnW       = (width * 0.35f)
         val margin     = (width - btnW * 2) / 3f
 
-        // Undo button
         undoRect.set(margin, toolbarTop, margin + btnW, toolbarTop + btnH)
         buttonPaint.color = 0xFF78909C.toInt()
         canvas.drawRoundRect(undoRect, 12 * density, 12 * density, buttonPaint)
@@ -573,7 +827,6 @@ class PuzzleView @JvmOverloads constructor(
             buttonTextPaint
         )
 
-        // Reset button
         val resetLeft = margin * 2 + btnW
         resetRect.set(resetLeft, toolbarTop, resetLeft + btnW, toolbarTop + btnH)
         buttonPaint.color = 0xFFFF7043.toInt()
@@ -592,13 +845,12 @@ class PuzzleView @JvmOverloads constructor(
         overlayPaint.color = Color.argb(alpha, 255, 248, 240)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), overlayPaint)
 
-        if (victoryAlpha < 0.5f) return   // wait for fade-in before showing text
+        if (victoryAlpha < 0.5f) return
 
         val density = resources.displayMetrics.density
         val cx      = width / 2f
         val cy      = height * 0.38f
 
-        // Panel
         val panelW  = width * 0.78f
         val panelH  = height * 0.38f
         val panelL  = cx - panelW / 2f
@@ -612,7 +864,6 @@ class PuzzleView @JvmOverloads constructor(
             24 * density, 24 * density, panelPaint
         )
 
-        // "Stage Clear!" text
         val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFFFF7043.toInt()
             typeface = Typeface.DEFAULT_BOLD
@@ -621,7 +872,6 @@ class PuzzleView @JvmOverloads constructor(
         }
         canvas.drawText("Stage Clear!", cx, panelT + 56 * density, titlePaint)
 
-        // Move count
         val movePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFF4E342E.toInt()
             typeface = Typeface.DEFAULT_BOLD
@@ -630,13 +880,12 @@ class PuzzleView @JvmOverloads constructor(
         }
         canvas.drawText("Moves: ${g.getMoveCount()}", cx, panelT + 84 * density, movePaint)
 
-        // Stars
         val starSize = 36 * density
         val starGap  = 8 * density
         val totalW   = 3 * starSize + 2 * starGap
         var starX    = cx - totalW / 2f
         val starY    = panelT + 110 * density
-        val pulse    = 1f + 0.08f * kotlin.math.sin(starAnimPhase.toDouble()).toFloat()
+        val pulse    = 1f + 0.08f * sin(starAnimPhase.toDouble()).toFloat()
 
         for (i in 1..3) {
             val earned  = i <= victoryStars
@@ -652,7 +901,6 @@ class PuzzleView @JvmOverloads constructor(
             if (bmp != null && !bmp.isRecycled) {
                 canvas.drawBitmap(bmp, null, rect, null)
             } else {
-                // Fallback: filled/empty circle
                 val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = if (earned) 0xFFFFD600.toInt() else 0xFFBDBDBD.toInt()
                 }
@@ -660,6 +908,23 @@ class PuzzleView @JvmOverloads constructor(
             }
             starX += starSize + starGap
         }
+
+        // "Next Stage" button
+        val btnW = panelW * 0.6f
+        val btnH2 = 48 * density
+        val btnL = cx - btnW / 2f
+        val btnT = starY + starSize + 24 * density
+        nextStageRect.set(btnL, btnT, btnL + btnW, btnT + btnH2)
+
+        buttonPaint.color = 0xFFFF7043.toInt()
+        canvas.drawRoundRect(nextStageRect, 12 * density, 12 * density, buttonPaint)
+        buttonTextPaint.textSize = 18 * density
+        canvas.drawText(
+            "Next Stage \u25B6",
+            nextStageRect.centerX(),
+            nextStageRect.centerY() + buttonTextPaint.textSize * 0.35f,
+            buttonTextPaint
+        )
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -677,7 +942,6 @@ class PuzzleView @JvmOverloads constructor(
         val toolbarH   = 80 * density
         val arrowArea  = 48 * density
 
-        // Reserve arrow space based on exit direction
         val arrowL = if (g.exitDirection == ExitDirection.LEFT) arrowArea else 0f
         val arrowR = if (g.exitDirection == ExitDirection.RIGHT) arrowArea else 0f
         val arrowT = if (g.exitDirection == ExitDirection.TOP) arrowArea else 0f
@@ -711,7 +975,7 @@ class PuzzleView @JvmOverloads constructor(
                 it.setBounds(0, 0, iconSz, iconSz)
                 it.draw(c)
             }
-        } catch (_: Exception) { /* icon_pause.png missing → fallback drawn in drawHud */ }
+        } catch (_: Exception) { }
 
         try {
             val starFullDrawable  = ResourcesCompat.getDrawable(resources, R.drawable.star_full, null)
@@ -727,7 +991,7 @@ class PuzzleView @JvmOverloads constructor(
                 val c = Canvas(starEmptyBitmap!!)
                 it.setBounds(0, 0, starSz, starSz); it.draw(c)
             }
-        } catch (_: Exception) { /* fallback circles drawn in drawVictoryOverlay */ }
+        } catch (_: Exception) { }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

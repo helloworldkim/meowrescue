@@ -32,7 +32,7 @@ object AdManager {
     private var interstitialAd: InterstitialAd? = null
     private var rewardedAd: RewardedAd? = null
 
-    private var lastInterstitialLevel: Int = 0
+    private var stagesSinceLastAd: Int = 0
     private var sessionAdCount: Int = 0
     private var isInitialized = false
 
@@ -62,10 +62,15 @@ object AdManager {
             })
     }
 
-    fun shouldShowInterstitial(levelId: Int): Boolean {
-        if (levelId <= NO_ADS_UNTIL_LEVEL) return false
+    /** Call after each stage clear to track ad interval */
+    fun onStageClear() {
+        stagesSinceLastAd++
+    }
+
+    fun shouldShowInterstitial(currentStage: Int): Boolean {
+        if (currentStage <= NO_ADS_UNTIL_LEVEL) return false
         if (sessionAdCount >= MAX_ADS_PER_SESSION) return false
-        if (lastInterstitialLevel > 0 && levelId - lastInterstitialLevel < INTERSTITIAL_LEVEL_INTERVAL) return false
+        if (stagesSinceLastAd < INTERSTITIAL_LEVEL_INTERVAL) return false
         return interstitialAd != null
     }
 
@@ -88,7 +93,7 @@ object AdManager {
             }
         }
         sessionAdCount++
-        lastInterstitialLevel = activity.intent.getIntExtra("level_id", 0)
+        stagesSinceLastAd = 0
         ad.show(activity)
     }
 

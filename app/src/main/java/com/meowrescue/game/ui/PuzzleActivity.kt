@@ -2,10 +2,12 @@ package com.meowrescue.game.ui
 
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -16,7 +18,6 @@ import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.puzzle.PuzzleGenerator
 import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -29,6 +30,8 @@ class PuzzleActivity : AppCompatActivity() {
     private var bannerAd: AdView? = null
     private var pauseOverlay: FrameLayout? = null
     private lateinit var loadingOverlay: FrameLayout
+    private lateinit var frameRoot: FrameLayout
+    private var congratsOverlay: FrameLayout? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +41,6 @@ class PuzzleActivity : AppCompatActivity() {
         SoundManager.init(this)
         repository = GameRepository(this)
 
-        // Root layout: vertical, PuzzleView fills most of screen, banner at bottom
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -62,14 +64,12 @@ class PuzzleActivity : AppCompatActivity() {
             )
         )
 
-        // Wrap root in a FrameLayout so we can overlay the pause panel
-        val frameRoot = FrameLayout(this)
+        frameRoot = FrameLayout(this)
         frameRoot.addView(rootLayout, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        // Loading overlay
         loadingOverlay = buildLoadingOverlay()
         frameRoot.addView(loadingOverlay, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -84,6 +84,10 @@ class PuzzleActivity : AppCompatActivity() {
         ))
 
         setContentView(frameRoot)
+
+        // Load selected cat bitmap
+        val catRes = repository.getSelectedCatDrawable()
+        puzzleView.setCatBitmap(catRes)
 
         setupCallbacks()
         loadStage(currentStage)
@@ -105,18 +109,34 @@ class PuzzleActivity : AppCompatActivity() {
     }
 
     private fun setupCallbacks() {
+        // Called when escape animation completes and victory overlay shows
         puzzleView.onStageClear = { moves, stars ->
             lifecycleScope.launch {
+                val prevMax = repository.getMaxCompletedLevel()
                 repository.saveProgress(currentStage, stars, null)
-                delay(2000)
-                val nextStage = currentStage + 1
-                if (AdManager.shouldShowInterstitial(currentStage)) {
-                    AdManager.showInterstitial(this@PuzzleActivity) {
-                        loadStage(nextStage)
+                AdManager.onStageClear()
+
+                // Check for new cat unlock (only on first-time clear)
+                if (currentStage > prevMax) {
+                    val newCat = repository.getNewlyUnlockedCat(currentStage)
+                    if (newCat != null) {
+                        showCongratsDialog(newCat)
                     }
-                } else {
-                    loadStage(nextStage)
                 }
+            }
+        }
+
+        // Called when user clicks "Next Stage" button in victory overlay
+        puzzleView.onNextStageClicked = {
+            val nextStage = currentStage + 1
+            if (AdManager.shouldShowInterstitial(currentStage)) {
+                AdManager.showInterstitial(this@PuzzleActivity) {
+                    loadStage(nextStage)
+                    AdManager.loadInterstitial(this@PuzzleActivity)
+                }
+            } else {
+                loadStage(nextStage)
+                AdManager.loadInterstitial(this@PuzzleActivity)
             }
         }
 
@@ -124,6 +144,99 @@ class PuzzleActivity : AppCompatActivity() {
             puzzleView.pause()
             pauseOverlay?.visibility = View.VISIBLE
         }
+    }
+
+    // ── Congratulation dialog for new cat unlock ────────────────────────
+
+    private fun showCongratsDialog(cat: GameRepository.CatDefinition) {
+        val density = resources.displayMetrics.density
+
+        val overlay = FrameLayout(this)
+        overlay.setBackgroundColor(0xAA000000.toInt())
+
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(
+                (24 * density).toInt(), (28 * density).toInt(),
+                (24 * density).toInt(), (28 * density).toInt()
+            )
+            background = GradientDrawable().apply {
+                setColor(0xFFFFF8F0.toInt())
+                cornerRadius = 24 * density
+            }
+            elevation = 8 * density
+        }
+
+        val title = TextView(this).apply {
+            text = "New Cat Unlocked!"
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(0xFFFF7043.toInt())
+            gravity = Gravity.CENTER
+        }
+        panel.addView(title, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = (16 * density).toInt() })
+
+        val catImage = ImageView(this).apply {
+            setImageResource(cat.drawableRes)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        val imgSize = (100 * density).toInt()
+        panel.addView(catImage, LinearLayout.LayoutParams(imgSize, imgSize).also {
+            it.gravity = Gravity.CENTER_HORIZONTAL
+            it.bottomMargin = (12 * density).toInt()
+        })
+
+        val nameTv = TextView(this).apply {
+            text = cat.name
+            textSize = 20f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(0xFF4E342E.toInt())
+            gravity = Gravity.CENTER
+        }
+        panel.addView(nameTv, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = (20 * density).toInt() })
+
+        val okBtn = TextView(this).apply {
+            text = "OK"
+            textSize = 16f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                setColor(0xFFFF7043.toInt())
+                cornerRadius = 12 * density
+            }
+            elevation = 4 * density
+            setOnClickListener {
+                SoundManager.playButtonTap()
+                frameRoot.removeView(overlay)
+                congratsOverlay = null
+            }
+        }
+        panel.addView(okBtn, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            (48 * density).toInt()
+        ))
+
+        overlay.addView(panel, FrameLayout.LayoutParams(
+            (280 * density).toInt(),
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER
+        ))
+
+        congratsOverlay = overlay
+        frameRoot.addView(overlay, FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        ))
+
+        SoundManager.playStarEarn()
     }
 
     // ── Loading overlay ────────────────────────────────────────────────────
@@ -165,7 +278,7 @@ class PuzzleActivity : AppCompatActivity() {
         return overlay
     }
 
-    // ── Pause overlay (programmatic) ──────────────────────────────────────
+    // ── Pause overlay ──────────────────────────────────────────────────────
 
     private fun buildPauseOverlay(): FrameLayout {
         val density = resources.displayMetrics.density
@@ -173,40 +286,20 @@ class PuzzleActivity : AppCompatActivity() {
         val overlay = FrameLayout(this)
         overlay.setBackgroundColor(0xCC000000.toInt())
 
-        // Panel
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(
-                (24 * density).toInt(),
-                (28 * density).toInt(),
-                (24 * density).toInt(),
-                (28 * density).toInt()
+                (24 * density).toInt(), (28 * density).toInt(),
+                (24 * density).toInt(), (28 * density).toInt()
             )
-            setBackgroundColor(0xFFFFF8F0.toInt())
+            background = GradientDrawable().apply {
+                setColor(0xFFFFF8F0.toInt())
+                cornerRadius = 24 * density
+            }
             elevation = 8 * density
-            // Rounded corners via a background drawable would require a drawable resource;
-            // we approximate with clip-to-outline
-            outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
-            clipToOutline = true
         }
-        // Give panel rounded corners programmatically
-        panel.background = androidx.core.content.ContextCompat.getDrawable(
-            this, android.R.drawable.dialog_holo_light_frame
-        ) ?: run {
-            val bg = android.graphics.drawable.GradientDrawable()
-            bg.setColor(0xFFFFF8F0.toInt())
-            bg.cornerRadius = 24 * density
-            bg
-        }
-        // Always use our own rounded background
-        val panelBg = android.graphics.drawable.GradientDrawable().apply {
-            setColor(0xFFFFF8F0.toInt())
-            cornerRadius = 24 * density
-        }
-        panel.background = panelBg
 
-        // Title
         val title = TextView(this).apply {
             text = "Paused"
             textSize = 22f
@@ -219,31 +312,27 @@ class PuzzleActivity : AppCompatActivity() {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).also { it.bottomMargin = (20 * density).toInt() })
 
-        // Resume button
         panel.addView(makeDialogButton("Resume", 0xFFFF7043.toInt()) {
             pauseOverlay?.visibility = View.GONE
             puzzleView.resume()
         }, buttonLayoutParams(density))
 
-        // Restart button
         panel.addView(makeDialogButton("Restart", 0xFF26A69A.toInt()) {
             pauseOverlay?.visibility = View.GONE
             puzzleView.resetPuzzle()
             puzzleView.resume()
         }, buttonLayoutParams(density))
 
-        // Quit button
         panel.addView(makeDialogButton("Quit", 0xFF9E9E9E.toInt()) {
             pauseOverlay?.visibility = View.GONE
             finish()
         }, buttonLayoutParams(density))
 
-        val panelParams = FrameLayout.LayoutParams(
+        overlay.addView(panel, FrameLayout.LayoutParams(
             (260 * density).toInt(),
             FrameLayout.LayoutParams.WRAP_CONTENT,
             Gravity.CENTER
-        )
-        overlay.addView(panel, panelParams)
+        ))
 
         return overlay
     }
@@ -257,17 +346,16 @@ class PuzzleActivity : AppCompatActivity() {
 
     private fun makeDialogButton(label: String, color: Int, onClick: () -> Unit): TextView {
         val density = resources.displayMetrics.density
-        val bg = android.graphics.drawable.GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = 12 * density
-        }
         return TextView(this).apply {
             text = label
             textSize = 16f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
-            background = bg
+            background = GradientDrawable().apply {
+                setColor(color)
+                cornerRadius = 12 * density
+            }
             elevation = 4 * density
             setOnClickListener { onClick() }
         }

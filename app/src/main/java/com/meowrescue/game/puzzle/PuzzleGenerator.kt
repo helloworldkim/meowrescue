@@ -13,6 +13,9 @@ class PuzzleGenerator {
 
     data class GenerateResult(val grid: PuzzleGrid, val optimalMoves: Int)
 
+    // Cache seed offsets for deterministic re-entry
+    private val seedOffsetCache = mutableMapOf<Int, Int>()
+
     private fun difficultyFor(stage: Int): DifficultyParams = when {
         stage <= 10  -> DifficultyParams(5, 3, 5,  minOf(stage / 3 + 2, 5))
         stage <= 30  -> DifficultyParams(5, 4, 7,  minOf(stage / 6 + 3, 7))
@@ -23,10 +26,38 @@ class PuzzleGenerator {
     }
 
     fun generateWithResult(stage: Int): GenerateResult {
+        // Check cache for deterministic re-entry
+        val cachedOffset = seedOffsetCache[stage]
+        if (cachedOffset != null) {
+            return generateCore(stage, cachedOffset)
+        }
+
+        // Try with quality filter, up to 50 seed offsets
+        var lastResult: GenerateResult? = null
+        for (offset in 0 until 50) {
+            val result = generateCore(stage, offset)
+            lastResult = result
+            if (result.optimalMoves >= 2 && isQualityPuzzle(result.grid, stage, result.optimalMoves)) {
+                seedOffsetCache[stage] = offset
+                return result
+            }
+        }
+
+        // Fallback: use last generated puzzle
+        seedOffsetCache[stage] = 49
+        return lastResult!!
+    }
+
+    fun generate(stage: Int): PuzzleGrid = generateWithResult(stage).grid
+
+    // ── Core generation (extracted from old generateWithResult) ──────────
+
+    private fun generateCore(stage: Int, seedOffset: Int): GenerateResult {
         val params = difficultyFor(stage)
         val size = params.gridSize
+        val baseSeed = stage.toLong() + seedOffset.toLong() * 10000
 
-        // Deterministic exit direction and line per stage
+        // Deterministic exit direction per stage (not affected by seedOffset)
         val dirRng = java.util.Random(stage.toLong() * 7919)
         val exitDir = ExitDirection.entries[dirRng.nextInt(4)]
         val exitLine = (1 + dirRng.nextInt(maxOf(1, size - 2))).coerceIn(1, size - 2)
@@ -36,7 +67,7 @@ class PuzzleGenerator {
         val acceptThreshold = maxOf(2, (params.minMoves * 0.7).toInt())
 
         repeat(30) { attempt ->
-            val rng = java.util.Random(stage.toLong() * 1000 + attempt)
+            val rng = java.util.Random(baseSeed * 1000 + attempt)
             val grid = tryGenerate(size, params, rng, exitDir, exitLine) ?: return@repeat
 
             if (hasClearPath(grid)) return@repeat
@@ -61,7 +92,83 @@ class PuzzleGenerator {
         return GenerateResult(fallback, solveFast(fallback).coerceAtLeast(1))
     }
 
-    fun generate(stage: Int): PuzzleGrid = generateWithResult(stage).grid
+    // ── Quality filter ──────────────────────────────────────────────────
+
+    private fun isQualityPuzzle(grid: PuzzleGrid, stage: Int, optimalMoves: Int): Boolean {
+        if (optimalMoves < 2) return false
+
+        val cat = grid.blocks.firstOrNull { it.isCat } ?: return false
+        val gridArr = grid.getGrid()
+
+        // Find blocks directly blocking cat's path to exit
+        val directBlockers = findDirectBlockers(grid, cat, gridArr)
+
+        // 1. 단방향 풀이: all blockers same orientation as cat → single-direction solution
+        if (directBlockers.isNotEmpty()) {
+            val allSameOrientation = directBlockers.all { it.isHorizontal == cat.isHorizontal }
+            if (allSameOrientation) return false
+        }
+
+        // 2. 단일 블록 풀이: only 1 blocker (skip stages 1-5 입문 스테이지)
+        if (stage > 5 && directBlockers.size <= 1) return false
+
+        // 3. 독립 이동 풀이: check if at least one blocker is trapped by another block
+        if (directBlockers.size >= 2) {
+            val anyTrapped = directBlockers.any { blocker ->
+                isBlockerTrapped(blocker, gridArr, grid.rows, grid.cols)
+            }
+            if (!anyTrapped) return false
+        }
+
+        return true
+    }
+
+    private fun findDirectBlockers(grid: PuzzleGrid, cat: PuzzleBlock, gridArr: Array<IntArray>): List<PuzzleBlock> {
+        val blockerIds = mutableSetOf<Int>()
+        when (grid.exitDirection) {
+            ExitDirection.RIGHT -> {
+                for (c in (cat.col + cat.length) until grid.cols) {
+                    val id = gridArr[cat.row][c]
+                    if (id != -1 && id != cat.id) blockerIds.add(id)
+                }
+            }
+            ExitDirection.LEFT -> {
+                for (c in 0 until cat.col) {
+                    val id = gridArr[cat.row][c]
+                    if (id != -1 && id != cat.id) blockerIds.add(id)
+                }
+            }
+            ExitDirection.BOTTOM -> {
+                for (r in (cat.row + cat.length) until grid.rows) {
+                    val id = gridArr[r][cat.col]
+                    if (id != -1 && id != cat.id) blockerIds.add(id)
+                }
+            }
+            ExitDirection.TOP -> {
+                for (r in 0 until cat.row) {
+                    val id = gridArr[r][cat.col]
+                    if (id != -1 && id != cat.id) blockerIds.add(id)
+                }
+            }
+        }
+        return grid.blocks.filter { it.id in blockerIds }
+    }
+
+    private fun isBlockerTrapped(block: PuzzleBlock, gridArr: Array<IntArray>, rows: Int, cols: Int): Boolean {
+        // Blocks are 1 cell wide: horizontal spans columns in 1 row, vertical spans rows in 1 column
+        // Check if block can move at least 1 cell in either direction along its axis
+        if (block.isHorizontal) {
+            val canLeft = block.col > 0 && gridArr[block.row][block.col - 1] == -1
+            val endCol = block.col + block.length
+            val canRight = endCol < cols && gridArr[block.row][endCol] == -1
+            return !canLeft && !canRight
+        } else {
+            val canUp = block.row > 0 && gridArr[block.row - 1][block.col] == -1
+            val endRow = block.row + block.length
+            val canDown = endRow < rows && gridArr[endRow][block.col] == -1
+            return !canUp && !canDown
+        }
+    }
 
     /** Quick check: does the cat have a clear path to exit? If so, puzzle is trivial. */
     private fun hasClearPath(grid: PuzzleGrid): Boolean {

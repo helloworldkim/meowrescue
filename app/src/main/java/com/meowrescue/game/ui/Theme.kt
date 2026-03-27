@@ -40,6 +40,16 @@ object Theme {
     val COLOR_HP_MED = 0xFFFF9800.toInt()
     val COLOR_HP_LOW = 0xFFFF4444.toInt()
 
+    // Particle pastel colors for celebrations
+    val PARTICLE_COLORS = intArrayOf(
+        0xFFFFB3BA.toInt(),  // pastel pink
+        0xFFBAE1FF.toInt(),  // pastel blue
+        0xFFBAFFBA.toInt(),  // pastel green
+        0xFFFFFFBA.toInt(),  // pastel yellow
+        0xFFE8BAFF.toInt(),  // pastel purple
+        0xFFFFD6BA.toInt(),  // pastel orange
+    )
+
     // Battle colors
     const val COLOR_HP_BAR = "#4CAF50"
     const val COLOR_HP_BAR_BG = "#333333"
