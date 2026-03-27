@@ -42,12 +42,14 @@ class PuzzleGenerator {
             return generateCore(stage, cachedOffset)
         }
 
-        // Try with quality filter, up to 80 seed offsets
+        // Try with quality filter, up to 80 seed offsets (3-second time budget)
+        val deadline = System.currentTimeMillis() + 3000L
         var bestResult: GenerateResult? = null
         var bestMoves = 0
         var bestOffset = 0
         for (offset in 0 until 80) {
-            val result = generateCore(stage, offset)
+            if (System.currentTimeMillis() > deadline) break
+            val result = generateCore(stage, offset, deadline)
             if (result.optimalMoves > bestMoves) {
                 bestMoves = result.optimalMoves
                 bestResult = result
@@ -68,7 +70,7 @@ class PuzzleGenerator {
 
     // ── Core generation (extracted from old generateWithResult) ──────────
 
-    private fun generateCore(stage: Int, seedOffset: Int): GenerateResult {
+    private fun generateCore(stage: Int, seedOffset: Int, deadline: Long = Long.MAX_VALUE): GenerateResult {
         val params = difficultyFor(stage)
         val size = params.gridSize
         val baseSeed = stage.toLong() + seedOffset.toLong() * 10000
@@ -83,6 +85,7 @@ class PuzzleGenerator {
         val acceptThreshold = maxOf(2, (params.minMoves * 0.85).toInt())
 
         repeat(60) { attempt ->
+            if (System.currentTimeMillis() > deadline) return@repeat
             val rng = java.util.Random(baseSeed * 1000 + attempt)
             val grid = tryGenerate(size, params, rng, exitDir, exitLine) ?: return@repeat
 

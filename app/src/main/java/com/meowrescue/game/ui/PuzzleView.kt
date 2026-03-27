@@ -81,6 +81,11 @@ class PuzzleView @JvmOverloads constructor(
     private var dragCurrentX = 0f
     private var dragCurrentY = 0f
 
+    // ── Drag constraint cache ────────────────────────────────────────────
+    private var dragAxis: Int = 0          // 0=undecided, 1=horizontal, 2=vertical
+    private var dragMaxNegPx: Float = 0f   // max negative drag offset (pixels)
+    private var dragMaxPosPx: Float = 0f   // max positive drag offset (pixels)
+
     // ── Snap animation ────────────────────────────────────────────────────
     private var snapAnimating = false
     private var snapBlockId   = -1
@@ -191,8 +196,10 @@ class PuzzleView @JvmOverloads constructor(
     }
 
     fun undoMove() {
-        if (state != PuzzleState.PLAYING || snapAnimating) return
-        val moved = grid?.undoLastMove() ?: false
+        val moved = synchronized(lock) {
+            if (state != PuzzleState.PLAYING || snapAnimating) return
+            grid?.undoLastMove() ?: false
+        }
         if (moved) SoundManager.playButtonTap()
     }
 
@@ -248,56 +255,100 @@ class PuzzleView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val x = event.x; val y = event.y
-        synchronized(lock) {
+        val callback: (() -> Unit)? = synchronized(lock) {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> handleDown(x, y)
-                MotionEvent.ACTION_MOVE -> handleMove(x, y)
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> handleUp(x, y)
+                MotionEvent.ACTION_MOVE -> { handleMove(x, y); null }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { handleUp(x, y); null }
+                else -> null
             }
         }
+        callback?.invoke()
         return true
     }
 
-    private fun handleDown(x: Float, y: Float) {
+    /** Returns a callback to invoke outside synchronized(lock), or null. */
+    private fun handleDown(x: Float, y: Float): (() -> Unit)? {
         if (pauseRect.contains(x, y)) {
             SoundManager.playButtonTap()
-            onPauseClicked?.invoke()
-            return
+            val cb = onPauseClicked
+            return { cb?.invoke() }
         }
         if (state == PuzzleState.SOLVED) {
             if (nextStageRect.contains(x, y)) {
                 SoundManager.playButtonTap()
-                onNextStageClicked?.invoke()
+                val cb = onNextStageClicked
+                return { cb?.invoke() }
             }
-            return
+            return null
         }
-        if (state != PuzzleState.PLAYING || snapAnimating) return
+        if (state != PuzzleState.PLAYING || snapAnimating) return null
         if (undoRect.contains(x, y)) {
-            undoMove(); return
+            SoundManager.playButtonTap()
+            return { undoMove() }
         }
         if (resetRect.contains(x, y)) {
-            resetPuzzle(); return
+            SoundManager.playButtonTap()
+            return { resetPuzzle() }
         }
 
-        val g = grid ?: return
+        val g = grid ?: return null
         val col = ((x - boardLeft) / cellSize).toInt()
         val row = ((y - boardTop)  / cellSize).toInt()
-        if (col < 0 || col >= g.cols || row < 0 || row >= g.rows) return
+        if (col < 0 || col >= g.cols || row < 0 || row >= g.rows) return null
         val gridSnap = g.getGrid()
         val blockId = gridSnap[row][col]
-        if (blockId == -1) return
+        if (blockId == -1) return null
 
+        val block = g.blocks.firstOrNull { it.id == blockId } ?: return null
         dragBlockId  = blockId
         dragStartX   = x
         dragStartY   = y
         dragCurrentX = x
         dragCurrentY = y
+
+        // Pre-compute valid drag range
+        if (block.length == 1) {
+            dragAxis = 0  // decide after threshold
+            dragMaxNegPx = 0f
+            dragMaxPosPx = 0f
+        } else {
+            dragAxis = if (block.isHorizontal) 1 else 2
+            computeDragRange(g, blockId, block.isHorizontal)
+        }
+        return null
     }
 
     private fun handleMove(x: Float, y: Float) {
         if (dragBlockId == -1 || snapAnimating) return
         dragCurrentX = x
         dragCurrentY = y
+
+        // Lock axis for 1-cell blocks after movement threshold
+        if (dragAxis == 0) {
+            val dx = abs(x - dragStartX)
+            val dy = abs(y - dragStartY)
+            val threshold = cellSize * 0.12f
+            if (dx > threshold || dy > threshold) {
+                val g = grid ?: return
+                dragAxis = if (dx >= dy) 1 else 2
+                computeDragRange(g, dragBlockId, dragAxis == 1)
+            }
+        }
+    }
+
+    private fun computeDragRange(g: PuzzleGrid, blockId: Int, isHorizontal: Boolean) {
+        val maxDist = if (isHorizontal) g.cols else g.rows
+        var maxPos = 0
+        var maxNeg = 0
+        for (s in 1..maxDist) {
+            if (g.canMoveInDir(blockId, s, isHorizontal)) maxPos = s else break
+        }
+        for (s in 1..maxDist) {
+            if (g.canMoveInDir(blockId, -s, isHorizontal)) maxNeg = -s else break
+        }
+        dragMaxNegPx = maxNeg * cellSize
+        dragMaxPosPx = maxPos * cellSize
     }
 
     private fun handleUp(x: Float, y: Float) {
@@ -306,30 +357,23 @@ class PuzzleView @JvmOverloads constructor(
         val block = g.blocks.firstOrNull { it.id == dragBlockId }
         if (block == null) { dragBlockId = -1; return }
 
-        val dx = x - dragStartX
-        val dy = y - dragStartY
-
-        // Determine move direction and steps
-        var moveSteps = 0
-        var moveHorizontal = true
-
-        if (block.length == 1) {
-            if (abs(dx) >= abs(dy)) {
-                moveSteps = (dx / cellSize).roundToInt()
-                moveHorizontal = true
-            } else {
-                moveSteps = (dy / cellSize).roundToInt()
-                moveHorizontal = false
-            }
-        } else if (block.isHorizontal) {
-            moveSteps = (dx / cellSize).roundToInt()
-            moveHorizontal = true
-        } else {
-            moveSteps = (dy / cellSize).roundToInt()
-            moveHorizontal = false
+        if (dragAxis == 0) {
+            // Axis never determined (very small drag) — no move
+            dragBlockId = -1
+            dragMaxNegPx = 0f; dragMaxPosPx = 0f
+            return
         }
 
+        val moveHorizontal = dragAxis == 1
+        val rawOffset = if (moveHorizontal) dragCurrentX - dragStartX else dragCurrentY - dragStartY
+        val clamped = rawOffset.coerceIn(dragMaxNegPx, dragMaxPosPx)
+        val moveSteps = (clamped / cellSize).roundToInt()
+
         if (moveSteps != 0) {
+            val oldCol = block.col.toFloat()
+            val oldRow = block.row.toFloat()
+
+            // Safety validation + apply
             val direction = if (moveSteps > 0) 1 else -1
             var validSteps = 0
             for (s in 1..abs(moveSteps)) {
@@ -337,24 +381,21 @@ class PuzzleView @JvmOverloads constructor(
                 else break
             }
             if (validSteps != 0) {
-                // Record old position for snap animation
-                val oldCol = block.col.toFloat()
-                val oldRow = block.row.toFloat()
-
-                // Apply move to grid immediately
                 g.moveBlockInDir(dragBlockId, validSteps, moveHorizontal)
 
-                // Start snap animation from drag visual to final grid position
+                // Snap from visual position (clamped drag) to final grid position
+                val snapOffset = if (validSteps == moveSteps) clamped / cellSize else validSteps.toFloat()
                 snapAnimating = true
                 snapBlockId = dragBlockId
-                snapFromCol = oldCol + (if (moveHorizontal) (dragCurrentX - dragStartX) / cellSize - validSteps else 0f)
-                snapFromRow = oldRow + (if (!moveHorizontal) (dragCurrentY - dragStartY) / cellSize - validSteps else 0f)
+                snapFromCol = oldCol + (if (moveHorizontal) snapOffset else 0f)
+                snapFromRow = oldRow + (if (!moveHorizontal) snapOffset else 0f)
                 snapStartTime = System.currentTimeMillis()
                 snapPendingSolveCheck = true
             }
         }
 
         dragBlockId = -1
+        dragAxis = 0; dragMaxNegPx = 0f; dragMaxPosPx = 0f
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -426,13 +467,19 @@ class PuzzleView @JvmOverloads constructor(
         val h = holder
         if (!h.surface.isValid) return
         val canvas = h.lockCanvas() ?: return
+        var stageClearData: Pair<Int, Int>? = null
         try {
             synchronized(lock) {
+                pendingStageClear = null
                 update()
                 render(canvas)
+                stageClearData = pendingStageClear
             }
         } finally {
             h.unlockCanvasAndPost(canvas)
+        }
+        stageClearData?.let { (moves, stars) ->
+            onStageClear?.invoke(moves, stars)
         }
     }
 
@@ -497,10 +544,13 @@ class PuzzleView @JvmOverloads constructor(
         }
     }
 
+    /** Called inside synchronized(lock). Sets pending callback data instead of invoking directly. */
+    private var pendingStageClear: Pair<Int, Int>? = null
+
     private fun triggerVictory() {
         victoryStars = escapeStars
         state = PuzzleState.SOLVED
-        onStageClear?.invoke(escapeMoves, escapeStars)
+        pendingStageClear = Pair(escapeMoves, escapeStars)
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -684,22 +734,10 @@ class PuzzleView @JvmOverloads constructor(
 
                 left = boardLeft + curCol * cellSize + padding
                 top  = boardTop  + curRow * cellSize + padding
-            } else if (isDragging) {
-                if (block.length == 1) {
-                    if (abs(dragCurrentX - dragStartX) >= abs(dragCurrentY - dragStartY)) {
-                        left += (dragCurrentX - dragStartX).coerceIn(
-                            -block.col * cellSize, (g.cols - block.col - 1) * cellSize)
-                    } else {
-                        top += (dragCurrentY - dragStartY).coerceIn(
-                            -block.row * cellSize, (g.rows - block.row - 1) * cellSize)
-                    }
-                } else if (block.isHorizontal) {
-                    left += (dragCurrentX - dragStartX).coerceIn(
-                        -block.col * cellSize, (g.cols - block.col - block.length) * cellSize)
-                } else {
-                    top += (dragCurrentY - dragStartY).coerceIn(
-                        -block.row * cellSize, (g.rows - block.row - block.length) * cellSize)
-                }
+            } else if (isDragging && dragAxis != 0) {
+                val rawOffset = if (dragAxis == 1) dragCurrentX - dragStartX else dragCurrentY - dragStartY
+                val clamped = rawOffset.coerceIn(dragMaxNegPx, dragMaxPosPx)
+                if (dragAxis == 1) left += clamped else top += clamped
             }
 
             val widthCells  = if (block.isHorizontal || block.length == 1) block.length else 1
