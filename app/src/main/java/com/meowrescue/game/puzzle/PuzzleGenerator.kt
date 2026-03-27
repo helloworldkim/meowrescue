@@ -1,6 +1,7 @@
 package com.meowrescue.game.puzzle
 
 import java.util.LinkedList
+import kotlin.math.sqrt
 
 class PuzzleGenerator {
 
@@ -16,13 +17,22 @@ class PuzzleGenerator {
     // Cache seed offsets for deterministic re-entry
     private val seedOffsetCache = mutableMapOf<Int, Int>()
 
-    private fun difficultyFor(stage: Int): DifficultyParams = when {
-        stage <= 10  -> DifficultyParams(5, 3, 5,  minOf(stage / 3 + 2, 5))
-        stage <= 30  -> DifficultyParams(5, 4, 7,  minOf(stage / 6 + 3, 7))
-        stage <= 60  -> DifficultyParams(6, 5, 9,  minOf(stage / 8 + 3, 10))
-        stage <= 100 -> DifficultyParams(6, 6, 10, minOf(stage / 8 + 4, 16))
-        stage <= 150 -> DifficultyParams(7, 7, 12, minOf(stage / 10 + 5, 20))
-        else         -> DifficultyParams(7, 8, 14, minOf(stage / 12 + 8, 22))
+    private fun difficultyFor(stage: Int): DifficultyParams {
+        // sqrt-based scaling: smooth curve from 2 moves (stage 1) to 30 moves (stage 150+)
+        val minMoves = if (stage <= 5) {
+            stage + 1
+        } else {
+            (sqrt(stage.toDouble()) * 2.5 + 1).toInt().coerceAtMost(30)
+        }
+        return when {
+            stage <= 5   -> DifficultyParams(5, 3, 5, minMoves)    // Tutorial
+            stage <= 15  -> DifficultyParams(5, 5, 8, minMoves)    // Beginner
+            stage <= 30  -> DifficultyParams(6, 6, 10, minMoves)   // Easy (6x6)
+            stage <= 50  -> DifficultyParams(6, 8, 12, minMoves)   // Medium
+            stage <= 75  -> DifficultyParams(7, 9, 14, minMoves)   // Hard (7x7)
+            stage <= 100 -> DifficultyParams(7, 10, 15, minMoves)  // Expert
+            else         -> DifficultyParams(7, 11, 16, minMoves)  // Master
+        }
     }
 
     fun generateWithResult(stage: Int): GenerateResult {
@@ -32,20 +42,26 @@ class PuzzleGenerator {
             return generateCore(stage, cachedOffset)
         }
 
-        // Try with quality filter, up to 50 seed offsets
-        var lastResult: GenerateResult? = null
-        for (offset in 0 until 50) {
+        // Try with quality filter, up to 80 seed offsets
+        var bestResult: GenerateResult? = null
+        var bestMoves = 0
+        var bestOffset = 0
+        for (offset in 0 until 80) {
             val result = generateCore(stage, offset)
-            lastResult = result
+            if (result.optimalMoves > bestMoves) {
+                bestMoves = result.optimalMoves
+                bestResult = result
+                bestOffset = offset
+            }
             if (result.optimalMoves >= 2 && isQualityPuzzle(result.grid, stage, result.optimalMoves)) {
                 seedOffsetCache[stage] = offset
                 return result
             }
         }
 
-        // Fallback: use last generated puzzle
-        seedOffsetCache[stage] = 49
-        return lastResult!!
+        // Fallback: use the best puzzle found and cache its actual offset
+        seedOffsetCache[stage] = bestOffset
+        return bestResult!!
     }
 
     fun generate(stage: Int): PuzzleGrid = generateWithResult(stage).grid
@@ -64,9 +80,9 @@ class PuzzleGenerator {
 
         var bestGrid: PuzzleGrid? = null
         var bestMoves = 0
-        val acceptThreshold = maxOf(2, (params.minMoves * 0.7).toInt())
+        val acceptThreshold = maxOf(2, (params.minMoves * 0.85).toInt())
 
-        repeat(30) { attempt ->
+        repeat(60) { attempt ->
             val rng = java.util.Random(baseSeed * 1000 + attempt)
             val grid = tryGenerate(size, params, rng, exitDir, exitLine) ?: return@repeat
 
@@ -111,6 +127,8 @@ class PuzzleGenerator {
 
         // 2. 단일 블록 풀이: only 1 blocker (skip stages 1-5 입문 스테이지)
         if (stage > 5 && directBlockers.size <= 1) return false
+        // 2b. 중급 이상: 최소 3개 직접 차단 블록 필요
+        if (stage > 30 && directBlockers.size <= 2) return false
 
         // 3. 독립 이동 풀이: check if at least one blocker is trapped by another block
         if (directBlockers.size >= 2) {
@@ -155,18 +173,30 @@ class PuzzleGenerator {
     }
 
     private fun isBlockerTrapped(block: PuzzleBlock, gridArr: Array<IntArray>, rows: Int, cols: Int): Boolean {
-        // Blocks are 1 cell wide: horizontal spans columns in 1 row, vertical spans rows in 1 column
         // Check if block can move at least 1 cell in either direction along its axis
+        // For 1-cell blocks, also check perpendicular axis (they can move in both)
         if (block.isHorizontal) {
             val canLeft = block.col > 0 && gridArr[block.row][block.col - 1] == -1
             val endCol = block.col + block.length
             val canRight = endCol < cols && gridArr[block.row][endCol] == -1
-            return !canLeft && !canRight
+            val horizTrapped = !canLeft && !canRight
+            if (block.length == 1) {
+                val canUp = block.row > 0 && gridArr[block.row - 1][block.col] == -1
+                val canDown = block.row + 1 < rows && gridArr[block.row + 1][block.col] == -1
+                return horizTrapped && !canUp && !canDown
+            }
+            return horizTrapped
         } else {
             val canUp = block.row > 0 && gridArr[block.row - 1][block.col] == -1
             val endRow = block.row + block.length
             val canDown = endRow < rows && gridArr[endRow][block.col] == -1
-            return !canUp && !canDown
+            val vertTrapped = !canUp && !canDown
+            if (block.length == 1) {
+                val canLeft = block.col > 0 && gridArr[block.row][block.col - 1] == -1
+                val canRight = block.col + 1 < cols && gridArr[block.row][block.col + 1] == -1
+                return vertTrapped && !canLeft && !canRight
+            }
+            return vertTrapped
         }
     }
 
@@ -217,8 +247,8 @@ class PuzzleGenerator {
         val queue = LinkedList<Pair<IntArray, Int>>()
         queue.add(initState to 0)
 
-        val maxDepth = 25
-        val maxStates = 30_000
+        val maxDepth = 35
+        val maxStates = 80_000
 
         while (queue.isNotEmpty() && visited.size < maxStates) {
             val (state, depth) = queue.poll() ?: break
@@ -400,7 +430,13 @@ class PuzzleGenerator {
         }
         pathCells.shuffle(rng)
 
-        val chainDepth = 1 + rng.nextInt(minOf(3, pathCells.size.coerceAtLeast(1)))
+        val maxChain = when {
+            params.minMoves <= 10 -> 2
+            params.minMoves <= 17 -> 3
+            params.minMoves <= 25 -> 4
+            else -> 5
+        }
+        val chainDepth = 1 + rng.nextInt(minOf(maxChain, pathCells.size.coerceAtLeast(1)))
 
         for (i in 0 until minOf(chainDepth, pathCells.size)) {
             val pathPos = pathCells[i]
