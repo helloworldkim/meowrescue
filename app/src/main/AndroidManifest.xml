@@ -28,17 +28,17 @@
         </activity>
 
         <activity
-            android:name=".ui.GameActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-
-        <activity
-            android:name=".ui.BattleActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-
-        <activity
             android:name=".ui.CollectionActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".ui.StageSelectActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
+            android:name=".ui.PuzzleActivity"
             android:exported="false"
             android:screenOrientation="portrait" />
 

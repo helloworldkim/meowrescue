@@ -19,6 +19,17 @@ object Theme {
     const val COLOR_RARITY_COMMON = "#2ECC71"
     const val COLOR_CARD_BACKGROUND = "#FFFFFF"
 
+    // Pastel + Warm Accent palette
+    const val COLOR_CREAM = "#FFF8F0"
+    const val COLOR_LAVENDER = "#EDE7F6"
+    const val COLOR_WARM_BROWN = "#4E342E"
+    const val COLOR_CORAL = "#FF7043"
+    const val COLOR_TEAL = "#26A69A"
+    const val COLOR_STAR_GOLD = "#FFD600"
+    const val COLOR_LOCKED_GRAY = "#BDBDBD"
+    const val COLOR_LEVEL_COMPLETED_BG = "#FFF3E0"
+    const val COLOR_LEVEL_PLAYABLE_BG = "#E8F5E9"
+
     // UI panel colors
     val COLOR_GOLD = 0xFFFFD700.toInt()
     val COLOR_PANEL_BG = Color.argb(200, 20, 20, 40)

@@ -21,25 +21,25 @@ import com.meowrescue.game.util.SoundManager
 class MenuActivity : AppCompatActivity() {
 
     private lateinit var repository: GameRepository
-    private lateinit var contentLayout: LinearLayout
     private var bannerAd: AdView? = null
+    private lateinit var soundButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         SoundManager.init(this)
         repository = GameRepository(this)
 
+        val dp = resources.displayMetrics.density
+
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val gradient = GradientDrawable(
+            background = GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 intArrayOf(
-                    Color.parseColor("#1A1A2E"),
-                    Color.parseColor("#16213E"),
-                    Color.parseColor("#0F3460")
+                    Color.parseColor(Theme.COLOR_CREAM),
+                    Color.parseColor(Theme.COLOR_LAVENDER)
                 )
             )
-            background = gradient
         }
 
         val rootScroll = ScrollView(this).apply {
@@ -48,10 +48,10 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
-        contentLayout = LinearLayout(this).apply {
+        val contentLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(48, 80, 48, 80)
+            setPadding((48 * dp).toInt(), (80 * dp).toInt(), (48 * dp).toInt(), (80 * dp).toInt())
         }
         rootScroll.addView(contentLayout)
         rootLayout.addView(rootScroll)
@@ -66,95 +66,104 @@ class MenuActivity : AppCompatActivity() {
 
         setContentView(rootLayout)
 
-        showMainMenu()
-    }
-
-    private fun showMainMenu() {
-        contentLayout.removeAllViews()
-
         // Cat mascot image
         val catImage = ImageView(this).apply {
             setImageResource(R.drawable.cat_1)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            val dp = resources.displayMetrics.density
-            val dpW = (180 * dp).toInt()
-            val dpH = (240 * dp).toInt()
-            val lp = LinearLayout.LayoutParams(dpW, dpH)
-            lp.gravity = Gravity.CENTER_HORIZONTAL
-            lp.topMargin = (24 * dp).toInt()
-            lp.bottomMargin = (40 * dp).toInt()
-            layoutParams = lp
+            val w = (180 * dp).toInt()
+            val h = (240 * dp).toInt()
+            layoutParams = LinearLayout.LayoutParams(w, h).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+                topMargin = (24 * dp).toInt()
+                bottomMargin = (32 * dp).toInt()
+            }
         }
         contentLayout.addView(catImage)
 
         // Title
         val title = TextView(this).apply {
             text = "Meow Rescue"
-            textSize = 52f
+            textSize = 48f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Theme.COLOR_GOLD)
+            setTextColor(Color.parseColor(Theme.COLOR_WARM_BROWN))
             gravity = Gravity.CENTER
-            setShadowLayer(8f, 2f, 2f, Color.parseColor("#AA000000"))
-            val dp = resources.displayMetrics.density
-            val lp = LinearLayout.LayoutParams(
+            setShadowLayer(4f, 1f, 1f, Color.parseColor("#33000000"))
+            layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            lp.bottomMargin = (64 * dp).toInt()
-            layoutParams = lp
+            ).apply { bottomMargin = (4 * dp).toInt() }
         }
         contentLayout.addView(title)
 
-        // Start Run button
-        val startButton = makeButton("Start Run", 0xFF2ECC71.toInt(), 0xFF27AE60.toInt())
-        startButton.setOnClickListener {
-            SoundManager.playButtonTap()
-            val intent = Intent(this, BattleActivity::class.java)
-            intent.putExtra("chapter", 1)
-            intent.putExtra("stage", 1)
-            startActivity(intent)
-        }
-        contentLayout.addView(startButton)
-
-        val collectionButton = makeButton("Collection", 0xFF9B59B6.toInt(), 0xFF8E44AD.toInt())
-        collectionButton.setOnClickListener {
-            SoundManager.playButtonTap()
-            startActivity(Intent(this, CollectionActivity::class.java))
-        }
-        contentLayout.addView(collectionButton)
-    }
-
-    private fun makeButton(text: String, colorTop: Int, colorBottom: Int): Button {
-        return Button(this).apply {
-            this.text = text
-            textSize = 22f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            setShadowLayer(4f, 1f, 1f, Color.parseColor("#66000000"))
-            val shape = GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(colorTop, colorBottom)
-            ).apply {
-                cornerRadius = 16f * resources.displayMetrics.density
-            }
-            background = shape
-            elevation = 8f * resources.displayMetrics.density
-            val dp = resources.displayMetrics.density
-            val lp = LinearLayout.LayoutParams(
+        // Subtitle
+        val subtitle = TextView(this).apply {
+            text = "Slide & Save!"
+            textSize = 18f
+            setTextColor(Color.parseColor(Theme.COLOR_WARM_BROWN).let {
+                Color.argb(180, Color.red(it), Color.green(it), Color.blue(it))
+            })
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            lp.topMargin = (16 * dp).toInt()
-            lp.bottomMargin = (16 * dp).toInt()
-            layoutParams = lp
-            setPadding((48 * dp).toInt(), (20 * dp).toInt(), (48 * dp).toInt(), (20 * dp).toInt())
+            ).apply { bottomMargin = (48 * dp).toInt() }
+        }
+        contentLayout.addView(subtitle)
+
+        // Play button
+        val playButton = makeButton("▶  Play", Theme.COLOR_CORAL)
+        playButton.setOnClickListener {
+            SoundManager.playButtonTap()
+            startActivity(Intent(this, StageSelectActivity::class.java))
+        }
+        contentLayout.addView(playButton)
+
+        // Sound toggle button
+        soundButton = makeButton(soundLabel(), Theme.COLOR_TEAL)
+        soundButton.setOnClickListener {
+            SoundManager.playButtonTap()
+            val newEnabled = !repository.isSoundEnabled()
+            repository.setSoundEnabled(newEnabled)
+            SoundManager.setSoundEnabled(newEnabled)
+            if (newEnabled) SoundManager.playBgm("menu")
+            soundButton.text = soundLabel()
+        }
+        contentLayout.addView(soundButton)
+    }
+
+    private fun soundLabel(): String {
+        return if (repository.isSoundEnabled()) "🔊  Sound: ON" else "🔇  Sound: OFF"
+    }
+
+    private fun makeButton(text: String, colorHex: String): Button {
+        val dp = resources.displayMetrics.density
+        return Button(this).apply {
+            this.text = text
+            textSize = 20f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(colorHex))
+                cornerRadius = 24 * dp
+            }
+            elevation = 6 * dp
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (12 * dp).toInt()
+                bottomMargin = (12 * dp).toInt()
+            }
+            setPadding((48 * dp).toInt(), (18 * dp).toInt(), (48 * dp).toInt(), (18 * dp).toInt())
         }
     }
 
     override fun onResume() {
         super.onResume()
         bannerAd?.resume()
-        SoundManager.playBgm("menu")
+        if (repository.isSoundEnabled()) SoundManager.playBgm("menu")
+        // Refresh sound button label in case state changed
+        if (::soundButton.isInitialized) soundButton.text = soundLabel()
     }
 
     override fun onPause() {
