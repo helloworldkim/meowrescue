@@ -1,4 +1,4 @@
-# Meow Rescue — Game Design Document (GDD) v3.0
+# Meow Rescue — Game Design Document (GDD) v4.0
 
 > **슬라이딩 블록 퍼즐 게임. 블록을 밀어서 갇힌 고양이를 탈출시키세요!**
 
@@ -39,7 +39,7 @@
 #### 2.1.1 블록 이동
 
 - **격자**: 5x5 ~ 7x7 크기 (스테이지에 따라 증가)
-- **블록 종류**: 고양이 블록(가로 2칸), 일반 블록(1~3칸, 가로/세로)
+- **블록 종류**: 고양이 블록(1칸), 열쇠 블록(1칸, 금색), 일반 블록(1~3칸, 가로/세로)
 - **이동 규칙**:
   - 가로 블록: 좌우로만 이동
   - 세로 블록: 상하로만 이동
@@ -52,16 +52,47 @@
 
 | 출구 방향 | 고양이 블록 | 설명 |
 |----------|-----------|------|
-| **RIGHT** | 가로 2칸 | 오른쪽 벽으로 탈출 |
-| **LEFT** | 가로 2칸 | 왼쪽 벽으로 탈출 |
-| **TOP** | 세로 2칸 | 위쪽 벽으로 탈출 |
-| **BOTTOM** | 세로 2칸 | 아래쪽 벽으로 탈출 |
+| **RIGHT** | 1칸 | 오른쪽 벽으로 탈출 |
+| **LEFT** | 1칸 | 왼쪽 벽으로 탈출 |
+| **TOP** | 1칸 | 위쪽 벽으로 탈출 |
+| **BOTTOM** | 1칸 | 아래쪽 벽으로 탈출 |
 
-출구 방향은 시드 기반으로 결정되며, 100개 스테이지에서 네 방향이 골고루 등장합니다.
+고양이 블록이 1x1이므로 출구와 다른 행/열에서 시작하여 **경로 탐색** 퍼즐이 가능합니다. 출구 방향은 시드 기반으로 결정되며, 100개 스테이지에서 네 방향이 골고루 등장합니다.
 
-#### 2.1.3 클리어 조건
+#### 2.1.3 열쇠-자물쇠 메커니즘 (스테이지 16+)
 
-고양이 블록이 출구까지 이동하면 클리어됩니다. 이동 횟수에 따라 별점이 부여됩니다:
+| 요소 | 설명 |
+|------|------|
+| **열쇠 블록** | 금색 1x1 블록, 드래그로 이동 가능 |
+| **자물쇠 셀** | 출구 옆 고정 위치, 금색 테두리 표시 |
+| **작동 방식** | 열쇠 블록을 자물쇠 셀 위로 이동해야 출구가 열림 |
+| **출구 표시** | 열쇠 미배치 시 출구 화살표가 흐리게 표시 (alpha 80) |
+
+#### 2.1.4 체크포인트 메커니즘 (스테이지 31+)
+
+| 요소 | 설명 |
+|------|------|
+| **체크포인트 셀** | 별(⭐) 마커가 표시된 셀 |
+| **배치 규칙** | 고양이~출구 직선 경로에서 벗어난 위치 (우회 강제) |
+| **작동 방식** | 고양이가 체크포인트를 경유(pass-through 포함)해야 탈출 가능 |
+| **시각 피드백** | 미도달=회색(alpha 60), 도달=금색(alpha 220) + 400ms 펄스 링 |
+
+#### 2.1.5 스테이지별 피처 적용
+
+| 구간 | 피처 |
+|------|------|
+| **1~15** | 1x1 고양이만 (새 이동 방식 학습) |
+| **16~30** | 열쇠 50% 확률 등장 |
+| **31~50** | 열쇠 또는 체크포인트 (50/50, 상호 배타) |
+| **51+** | 열쇠 + 체크포인트 동시 가능 |
+
+#### 2.1.6 클리어 조건
+
+고양이 블록이 출구까지 이동하면 클리어됩니다. 추가 조건이 있는 경우 모두 충족해야 합니다:
+- **열쇠-자물쇠**: 열쇠 블록이 자물쇠 셀 위에 있어야 함
+- **체크포인트**: 고양이가 체크포인트 셀을 경유했어야 함
+
+이동 횟수에 따라 별점이 부여됩니다:
 
 | 별점 | 조건 |
 |------|------|
@@ -131,9 +162,11 @@
 
 ### 3.2 BFS 솔버
 
-- 상태를 IntArray(블록 위치)로 표현 → PuzzleGrid clone() 없이 탐색
-- Long 기반 해시로 방문 체크 (String 인코딩 대비 10배+ 빠름)
-- 최대 30,000 상태, 깊이 25로 제한하여 모바일 최적화
+- 상태를 IntArray(블록 위치 + 체크포인트 비트)로 표현 → PuzzleGrid clone() 없이 탐색
+- FNV-1a 64비트 해시로 방문 체크 (충돌 확률 최소화)
+- 최대 80,000 상태 (체크포인트 시 120,000), 깊이 35로 제한
+- `isSolvedState()`가 exitRow/exitCol + 열쇠 위치 + 체크포인트 도달 상태를 종합 검증
+- 체크포인트 경유(pass-through) 감지: 이동 경로 중간에 체크포인트가 있으면 도달 처리
 
 ### 3.3 품질 필터 (Quality Filter)
 
@@ -315,33 +348,46 @@ com.meowrescue.game
 ### 8.3 핵심 데이터 구조
 
 ```kotlin
-// ── 퍼즐 격자 ──
-class PuzzleGrid(
-    val rows: Int,               // 격자 행 수
-    val cols: Int,               // 격자 열 수
-    val exitDirection: ExitDirection  // RIGHT, LEFT, TOP, BOTTOM
+// ── 퍼즐 블록 ──
+data class PuzzleBlock(
+    val id: Int, val row: Int, val col: Int,
+    val length: Int, val isHorizontal: Boolean,
+    val isCat: Boolean = false,
+    val isKey: Boolean = false          // 열쇠 블록 여부
 )
 
-// ── 블록 ──
-// grid[row][col] 값으로 표현: 0=빈칸, 1=고양이, 2+=일반 블록
-// blockMeta: Map<Int, BlockMeta> 로 블록 크기/방향 관리
+// ── 퍼즐 격자 ──
+class PuzzleGrid(
+    val rows: Int, val cols: Int,
+    val exitRow: Int, val exitCol: Int,
+    val exitDirection: ExitDirection,
+    val hasKeyLock: Boolean = false,     // 열쇠-자물쇠 메커니즘 활성화
+    val lockRow: Int = -1,              // 자물쇠 셀 행
+    val lockCol: Int = -1,              // 자물쇠 셀 열
+    val checkpointRow: Int = -1,        // 체크포인트 셀 행
+    val checkpointCol: Int = -1         // 체크포인트 셀 열
+)
 
 // ── 출구 방향 ──
 enum class ExitDirection { RIGHT, LEFT, TOP, BOTTOM }
 
 // ── 이동 기록 ──
 data class MoveRecord(
-    val blockId: Int,
-    val fromRow: Int, val fromCol: Int,
-    val toRow: Int, val toCol: Int
+    val blockId: Int, val steps: Int,
+    val horizontal: Boolean,
+    val setCheckpoint: Boolean = false   // 이 이동이 체크포인트를 활성화했는지 (undo 복원용)
+)
+
+// ── 스테이지 피처 ──
+data class StageFeatures(
+    val hasKey: Boolean,                // 열쇠-자물쇠 활성화
+    val hasCheckpoint: Boolean          // 체크포인트 활성화
 )
 
 // ── 고양이 정의 ──
 data class CatDefinition(
-    val id: Int,
-    val name: String,
-    val requiredStage: Int,
-    val drawableRes: Int
+    val id: Int, val name: String,
+    val requiredStage: Int, val drawableRes: Int
 )
 ```
 
@@ -401,9 +447,18 @@ enum class PuzzleState {
 | `allDirectionsAppear` | 100개 스테이지에서 4방향 출구 모두 등장 |
 | `oneCellBlocksMoveBothAxes` | 1칸 블록이 상하좌우 모두 이동 가능 |
 | `multiCellBlocksRestrictedToAxis` | 다칸 블록이 축 방향으로만 이동 |
-| `sampleStagesSolvable` | 샘플 스테이지들이 모두 풀이 가능 |
+| `sampleStagesSolvable` | 1~100 스테이지 모두 풀이 가능 |
+| `oneCellCatSolvesAtExit` | 1x1 고양이 출구 도달 시 클리어 |
+| `oneCellCatWrongRowNotSolved` | 잘못된 행에서 미클리어 |
+| `keyLockRequiresKeyAtLock` | 열쇠 미배치 시 미클리어 / 배치 시 클리어 |
+| `checkpointMustBeReached` | 체크포인트 미경유 시 미클리어 / 경유 시 클리어 |
+| `checkpointReachedByMoving` | 이동으로 체크포인트 도달 감지 |
+| `undoRevertsCheckpoint` | Undo 시 체크포인트 상태 되돌림 |
+| `checkpointPassThrough` | 슬라이드 중간 체크포인트 경유 감지 |
+| `keyAndCheckpointStagesSolvable` | 열쇠/체크포인트 스테이지 풀이 가능성 |
+| `featuresForStageDistribution` | 스테이지별 피처 분포 정확성 |
 
 ---
 
-*Meow Rescue GDD v3.0 — 2026.03*
+*Meow Rescue GDD v4.0 — 2026.03*
 *Platform: Android (Kotlin) | Genre: Sliding Block Puzzle | Style: Casual*

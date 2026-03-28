@@ -35,6 +35,9 @@ class PuzzleView @JvmOverloads constructor(
             0xFF4FC3F7.toInt(),  // sky blue
         )
         val CAT_COLOR      = 0xFFFF7043.toInt()
+        val KEY_COLOR       = 0xFFFFD700.toInt()
+        val LOCK_COLOR      = 0xFFDAA520.toInt()
+        val CHECKPOINT_COLOR = 0xFFFFD700.toInt()
         val GRID_BG        = 0xFFEFEBE9.toInt()
         val CELL_LINE      = 0xFFD7CCC8.toInt()
         val BG_COLOR       = 0xFFFFF8F0.toInt()
@@ -62,6 +65,10 @@ class PuzzleView @JvmOverloads constructor(
     private var initialGrid: PuzzleGrid? = null
     private var stageNumber = 1
     private var optimalMoves = 1
+
+    // ── Checkpoint glow animation ────────────────────────────────────────
+    private var prevCheckpointReached = false
+    private var checkpointGlowStartTime = 0L
 
     // ── Layout ─────────────────────────────────────────────────────────────
     private var cellSize = 0f
@@ -176,6 +183,8 @@ class PuzzleView @JvmOverloads constructor(
             this.snapAnimating = false
             this.escapePhase  = 0
             this.particles.clear()
+            this.prevCheckpointReached = false
+            this.checkpointGlowStartTime = 0L
         }
         recalcLayout()
     }
@@ -213,16 +222,18 @@ class PuzzleView @JvmOverloads constructor(
             snapAnimating = false
             escapePhase  = 0
             particles.clear()
+            prevCheckpointReached = false
+            checkpointGlowStartTime = 0L
         }
         SoundManager.playButtonTap()
     }
 
     fun pause() {
-        if (state == PuzzleState.PLAYING) state = PuzzleState.PAUSED
+        synchronized(lock) { if (state == PuzzleState.PLAYING) state = PuzzleState.PAUSED }
     }
 
     fun resume() {
-        if (state == PuzzleState.PAUSED) state = PuzzleState.PLAYING
+        synchronized(lock) { if (state == PuzzleState.PAUSED) state = PuzzleState.PLAYING }
     }
 
     fun recycleBitmaps() {
@@ -563,6 +574,8 @@ class PuzzleView @JvmOverloads constructor(
 
         drawHud(canvas, g)
         drawBoard(canvas, g)
+        drawLockCell(canvas, g)
+        drawCheckpointCell(canvas, g)
         drawExit(canvas, g)
         drawBlocks(canvas, g)
         drawToolbar(canvas)
@@ -631,14 +644,94 @@ class PuzzleView @JvmOverloads constructor(
         }
     }
 
+    // ── Lock cell ────────────────────────────────────────────────────────
+
+    private fun drawLockCell(canvas: Canvas, g: PuzzleGrid) {
+        if (!g.hasKeyLock || g.lockRow < 0 || g.lockCol < 0) return
+        val left = boardLeft + g.lockCol * cellSize
+        val top  = boardTop  + g.lockRow * cellSize
+        val padding = cellSize * 0.1f
+
+        val keyAtLock = g.blocks.firstOrNull { it.isKey }?.let {
+            it.row == g.lockRow && it.col == g.lockCol
+        } ?: false
+
+        val lockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            color = if (keyAtLock) 0xFF66BB6A.toInt() else LOCK_COLOR
+            alpha = if (keyAtLock) 180 else 120
+        }
+        val rect = RectF(left + padding, top + padding,
+                         left + cellSize - padding, top + cellSize - padding)
+        canvas.drawRoundRect(rect, 6f, 6f, lockPaint)
+
+        // Lock icon text
+        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = cellSize * 0.35f
+            textAlign = Paint.Align.CENTER
+            color = if (keyAtLock) 0xFF66BB6A.toInt() else LOCK_COLOR
+            alpha = if (keyAtLock) 200 else 100
+        }
+        val icon = if (keyAtLock) "\uD83D\uDD13" else "\uD83D\uDD12"
+        canvas.drawText(icon, left + cellSize / 2f, top + cellSize / 2f + iconPaint.textSize * 0.35f, iconPaint)
+    }
+
+    // ── Checkpoint cell ──────────────────────────────────────────────────
+
+    private fun drawCheckpointCell(canvas: Canvas, g: PuzzleGrid) {
+        if (!g.hasCheckpoint) return
+        val left = boardLeft + g.checkpointCol * cellSize
+        val top  = boardTop  + g.checkpointRow * cellSize
+        val cx = left + cellSize / 2f
+        val cy = top + cellSize / 2f
+        val reached = g.checkpointReached
+
+        // Detect transition for glow
+        if (reached && !prevCheckpointReached) {
+            checkpointGlowStartTime = System.currentTimeMillis()
+        }
+        prevCheckpointReached = reached
+
+        // Star marker
+        val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = cellSize * 0.5f
+            textAlign = Paint.Align.CENTER
+            alpha = if (reached) 220 else 80
+        }
+        canvas.drawText("\u2B50", cx, cy + starPaint.textSize * 0.35f, starPaint)
+
+        // Pulse ring on reach
+        if (reached && checkpointGlowStartTime > 0L) {
+            val elapsed = System.currentTimeMillis() - checkpointGlowStartTime
+            if (elapsed < 400L) {
+                val progress = elapsed / 400f
+                val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    style = Paint.Style.STROKE
+                    strokeWidth = 3f
+                    color = CHECKPOINT_COLOR
+                    alpha = ((1f - progress) * 180).toInt()
+                }
+                val radius = cellSize * 0.3f + cellSize * 0.3f * progress
+                canvas.drawCircle(cx, cy, radius, ringPaint)
+            }
+        }
+    }
+
     // ── Exit indicator ────────────────────────────────────────────────────
 
     private fun drawExit(canvas: Canvas, g: PuzzleGrid) {
         val arrowW = cellSize * 0.5f
         val arrowH = cellSize * 0.6f
+        // Dim exit if key-lock not satisfied
+        val keyAtLock = if (g.hasKeyLock) {
+            val key = g.blocks.firstOrNull { it.isKey }
+            key != null && key.row == g.lockRow && key.col == g.lockCol
+        } else true
         exitPaint.style = Paint.Style.FILL
+        exitPaint.alpha = if (keyAtLock) 255 else 80
         val gapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = EXIT_COLOR; alpha = 80
+            color = EXIT_COLOR; alpha = if (keyAtLock) 80 else 40
         }
 
         // Wall open animation: widen the gap
@@ -745,8 +838,11 @@ class PuzzleView @JvmOverloads constructor(
             val visualRight  = if (isDragging || isSnapping) left + (widthCells * cellSize - 2 * padding) else right
             val visualBottom = if (isDragging || isSnapping) top  + (heightCells * cellSize - 2 * padding) else bottom
 
-            val color = if (block.isCat) CAT_COLOR
-                        else BLOCK_COLORS[(block.id - 1) % BLOCK_COLORS.size]
+            val color = when {
+                block.isCat -> CAT_COLOR
+                block.isKey -> KEY_COLOR
+                else -> BLOCK_COLORS[(block.id - 1) % BLOCK_COLORS.size]
+            }
 
             // Shadow
             if (isDragging || isSnapping) {
@@ -767,6 +863,16 @@ class PuzzleView @JvmOverloads constructor(
             )
             canvas.drawRoundRect(blockRect, cr, cr, glossPaint)
 
+            // Key label
+            if (block.isKey) {
+                textPaint.textSize = min(cellSize * 0.35f, 16f)
+                canvas.drawText(
+                    "\uD83D\uDD11",
+                    (left + visualRight) / 2f,
+                    (top + visualBottom) / 2f + textPaint.textSize * 0.35f,
+                    textPaint
+                )
+            }
             // Cat bitmap or label
             if (block.isCat) {
                 val bmp = catBitmap

@@ -8,7 +8,8 @@ data class PuzzleBlock(
     val col: Int,
     val length: Int,
     val isHorizontal: Boolean,
-    val isCat: Boolean = false
+    val isCat: Boolean = false,
+    val isKey: Boolean = false
 )
 
 class PuzzleGrid(
@@ -16,13 +17,21 @@ class PuzzleGrid(
     val cols: Int,
     val exitRow: Int,
     val exitCol: Int = -1,
-    val exitDirection: ExitDirection = ExitDirection.RIGHT
+    val exitDirection: ExitDirection = ExitDirection.RIGHT,
+    val hasKeyLock: Boolean = false,
+    val lockRow: Int = -1,
+    val lockCol: Int = -1,
+    val checkpointRow: Int = -1,
+    val checkpointCol: Int = -1
 ) {
 
     private val grid: Array<IntArray> = Array(rows) { IntArray(cols) { -1 } }
     private val _blocks: MutableList<PuzzleBlock> = mutableListOf()
-    data class MoveRecord(val blockId: Int, val steps: Int, val horizontal: Boolean)
+    data class MoveRecord(val blockId: Int, val steps: Int, val horizontal: Boolean, val setCheckpoint: Boolean = false)
     private val moveHistory: ArrayDeque<MoveRecord> = ArrayDeque()
+
+    val hasCheckpoint: Boolean get() = checkpointRow >= 0 && checkpointCol >= 0
+    var checkpointReached: Boolean = false
 
     val blocks: List<PuzzleBlock> get() = _blocks.toList()
 
@@ -151,8 +160,21 @@ class PuzzleGrid(
         }
         _blocks[idx] = newBlock
         markGrid(newBlock, blockId)
-        moveHistory.addLast(MoveRecord(blockId, steps, horizontal))
         moveCount++
+        // Checkpoint pass-through detection: check all positions along the path
+        var didSetCheckpoint = false
+        if (newBlock.isCat && hasCheckpoint && !checkpointReached) {
+            val startPos = if (horizontal) block.col else block.row
+            val endPos = if (horizontal) newBlock.col else newBlock.row
+            val cpAxis = if (horizontal) checkpointCol else checkpointRow
+            val cpCross = if (horizontal) checkpointRow else checkpointCol
+            val blockCross = if (horizontal) newBlock.row else newBlock.col
+            if (blockCross == cpCross && cpAxis in minOf(startPos, endPos)..maxOf(startPos, endPos)) {
+                checkpointReached = true
+                didSetCheckpoint = true
+            }
+        }
+        moveHistory.addLast(MoveRecord(blockId, steps, horizontal, didSetCheckpoint))
         return true
     }
 
@@ -172,17 +194,25 @@ class PuzzleGrid(
         _blocks[idx] = restoredBlock
         markGrid(restoredBlock, record.blockId)
         if (moveCount > 0) moveCount--
+        if (record.setCheckpoint) checkpointReached = false
         return true
     }
 
     fun isSolved(): Boolean {
         val cat = _blocks.firstOrNull { it.isCat } ?: return false
-        return when (exitDirection) {
-            ExitDirection.RIGHT  -> cat.isHorizontal && cat.row == exitRow && (cat.col + cat.length) == cols
-            ExitDirection.LEFT   -> cat.isHorizontal && cat.row == exitRow && cat.col == 0
-            ExitDirection.BOTTOM -> !cat.isHorizontal && cat.col == exitCol && (cat.row + cat.length) == rows
-            ExitDirection.TOP    -> !cat.isHorizontal && cat.col == exitCol && cat.row == 0
+        val catAtExit = when (exitDirection) {
+            ExitDirection.RIGHT  -> cat.row == exitRow && (cat.col + cat.length) == cols
+            ExitDirection.LEFT   -> cat.row == exitRow && cat.col == 0
+            ExitDirection.BOTTOM -> cat.col == exitCol && (cat.row + cat.length) == rows
+            ExitDirection.TOP    -> cat.col == exitCol && cat.row == 0
         }
+        if (!catAtExit) return false
+        if (hasKeyLock) {
+            val key = _blocks.firstOrNull { it.isKey } ?: return false
+            if (key.row != lockRow || key.col != lockCol) return false
+        }
+        if (hasCheckpoint && !checkpointReached) return false
+        return true
     }
 
     fun getMoveCount(): Int = moveCount
@@ -195,7 +225,8 @@ class PuzzleGrid(
     fun getGrid(): Array<IntArray> = Array(rows) { r -> grid[r].copyOf() }
 
     fun clone(): PuzzleGrid {
-        val clone = PuzzleGrid(rows, cols, exitRow, exitCol, exitDirection)
+        val clone = PuzzleGrid(rows, cols, exitRow, exitCol, exitDirection,
+                               hasKeyLock, lockRow, lockCol, checkpointRow, checkpointCol)
         for (block in _blocks) {
             clone._blocks.add(block)
             clone.markGrid(block, block.id)
@@ -204,10 +235,12 @@ class PuzzleGrid(
         for (record in moveHistory) {
             clone.moveHistory.addLast(record)
         }
+        clone.checkpointReached = checkpointReached
         return clone
     }
 
     fun encodeState(): String {
-        return _blocks.sortedBy { it.id }.joinToString(",") { "${it.row}:${it.col}" }
+        val blocksPart = _blocks.sortedBy { it.id }.joinToString(",") { "${it.row}:${it.col}" }
+        return if (hasCheckpoint) "$blocksPart|cp=$checkpointReached" else blocksPart
     }
 }
