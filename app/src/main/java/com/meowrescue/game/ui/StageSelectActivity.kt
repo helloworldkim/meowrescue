@@ -179,8 +179,8 @@ class StageSelectActivity : AppCompatActivity() {
             val levelId = position + 1
             val dp = resources.displayMetrics.density
             val progress = progressList.getOrNull(position)
-            // Level 1 always unlocked; level N unlocked if level N-1 completed
-            val isUnlocked = levelId == 1 || levelId <= maxCompleted + 1
+            // DEV: all stages unlocked for testing
+            val isUnlocked = true // levelId == 1 || levelId <= maxCompleted + 1
             val isCompleted = progress != null && progress.completed
             val stars = progress?.stars ?: 0
 

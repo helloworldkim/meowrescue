@@ -43,7 +43,6 @@ class PuzzleView @JvmOverloads constructor(
         val BG_COLOR       = 0xFFFFF8F0.toInt()
         val EXIT_COLOR     = 0xFF66BB6A.toInt()
         val WALL_COLOR     = 0xFF5D4037.toInt()
-        val ICE_COLOR      = 0xFF81D4FA.toInt()
         val PORTAL_A_CLR   = 0xFF7C4DFF.toInt()
         val PORTAL_B_CLR   = 0xFF00BFA5.toInt()
         val LINK_COLOR     = 0xFFFF6F00.toInt()
@@ -582,7 +581,6 @@ class PuzzleView @JvmOverloads constructor(
         drawHud(canvas, g)
         drawHintBanner(canvas, g)
         drawBoard(canvas, g)
-        drawIceCells(canvas, g)
         drawPortalCells(canvas, g)
         drawLockCell(canvas, g)
         drawCheckpointCell(canvas, g)
@@ -682,7 +680,6 @@ class PuzzleView @JvmOverloads constructor(
             }
         }
         if (g.blocks.any { it.isWall }) hints.add("\uD83E\uDDF1 갈색 블록은 고정 장애물입니다")
-        if (g.iceCells.isNotEmpty()) hints.add("\u2744 얼음 위에서 블록이 멈추지 않습니다")
         if (g.blocks.any { it.linkId >= 0 }) hints.add("\uD83D\uDD17 연결된 블록은 함께 움직입니다")
         if (g.portalA >= 0 && g.portalB >= 0) hints.add("\uD83C\uDF00 고양이가 포탈에 들어가면 반대편으로 이동")
         if (g.exitDirection2 != null) hints.add("\uD83D\uDC31\uD83D\uDC31 모든 고양이를 탈출시키세요")
@@ -735,29 +732,6 @@ class PuzzleView @JvmOverloads constructor(
         }
     }
 
-    // ── Ice cells ──────────────────────────────────────────────────────────
-
-    private fun drawIceCells(canvas: Canvas, g: PuzzleGrid) {
-        if (g.iceCells.isEmpty()) return
-        val icePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = ICE_COLOR; alpha = 80
-        }
-        val iceBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE; strokeWidth = 1.5f
-            color = ICE_COLOR; alpha = 150
-        }
-        for (pos in g.iceCells) {
-            val r = pos / g.cols; val c = pos % g.cols
-            val left = boardLeft + c * cellSize; val top = boardTop + r * cellSize
-            val rect = RectF(left + 2f, top + 2f, left + cellSize - 2f, top + cellSize - 2f)
-            canvas.drawRoundRect(rect, 4f, 4f, icePaint)
-            canvas.drawRoundRect(rect, 4f, 4f, iceBorder)
-            val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = cellSize * 0.3f; textAlign = Paint.Align.CENTER; alpha = 120
-            }
-            canvas.drawText("\u2744", left + cellSize / 2f, top + cellSize / 2f + tp.textSize * 0.3f, tp)
-        }
-    }
 
     // ── Portal cells ──────────────────────────────────────────────────────
 

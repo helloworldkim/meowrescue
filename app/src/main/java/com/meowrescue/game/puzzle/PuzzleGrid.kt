@@ -25,7 +25,6 @@ class PuzzleGrid(
     val lockCol: Int = -1,
     val checkpointRow: Int = -1,
     val checkpointCol: Int = -1,
-    val iceCells: Set<Int> = emptySet(),
     val portalA: Int = -1,
     val portalB: Int = -1,
     val exitRow2: Int = -1,
@@ -57,6 +56,15 @@ class PuzzleGrid(
         if (!isValidPlacement(block)) return false
         _blocks.add(block)
         markGrid(block, block.id)
+        return true
+    }
+
+    /** Remove a block from the grid by its id. */
+    fun removeBlock(blockId: Int): Boolean {
+        val idx = _blocks.indexOfFirst { it.id == blockId }
+        if (idx == -1) return false
+        clearGrid(_blocks[idx])
+        _blocks.removeAt(idx)
         return true
     }
 
@@ -338,7 +346,7 @@ class PuzzleGrid(
     fun clone(): PuzzleGrid {
         val clone = PuzzleGrid(rows, cols, exitRow, exitCol, exitDirection,
                                hasKeyLock, lockRow, lockCol, checkpointRow, checkpointCol,
-                               iceCells, portalA, portalB, exitRow2, exitCol2, exitDirection2)
+                               portalA, portalB, exitRow2, exitCol2, exitDirection2)
         for (block in _blocks) {
             clone._blocks.add(block)
             clone.markGrid(block, block.id)

@@ -165,13 +165,36 @@ class StageTest {
         val cpStages = (1..120).filter { gen.featuresForStage(it).hasCheckpoint }
         println("CHECKPOINT STAGES: $cpStages")
         // Detailed info for problematic stages
-        for (s in listOf(16, 20, 25, 30, 35, 40, 50, 60, 80, 100, 105, 110, 115, 120)) {
+        for (s in listOf(16, 20, 25, 30, 35, 40, 50, 60, 80, 100, 105, 110, 115, 120, 150, 175, 200)) {
             val result = gen.generateWithResult(s)
             val f = gen.featuresForStage(s)
             val g = result.grid
             println("Stage $s: blocks=${g.blocks.size} moves=${result.optimalMoves} dir=${g.exitDirection} " +
                     "key=${f.hasKey} cp=${f.hasCheckpoint} hasKeyLock=${g.hasKeyLock} hasCp=${g.hasCheckpoint} " +
+                    "portal=${if(g.portalA>=0) "${g.portalA}->${g.portalB}" else "none"} " +
+                    "linked=${g.blocks.count { it.linkId >= 0 }} multiCat=${g.blocks.count { it.isCat }} " +
                     "cat=${g.blocks.firstOrNull { it.isCat }}")
+            if (s == 200) {
+                println("  Exit: row=${g.exitRow} col=${g.exitCol} dir=${g.exitDirection}")
+                println("  Blocks:")
+                for (b in g.blocks) {
+                    println("    $b")
+                }
+                // Print grid
+                val gridArr = g.getGrid()
+                println("  Grid:")
+                for (r in 0 until g.rows) {
+                    val row = (0 until g.cols).joinToString(" ") { c ->
+                        val v = gridArr[r][c]
+                        val pos = r * g.cols + c
+                        when {
+                            v >= 0 -> String.format("%2d", v)
+                            else -> " ."
+                        }
+                    }
+                    println("    $row")
+                }
+            }
         }
     }
 
@@ -203,10 +226,6 @@ class StageTest {
         val wallStages = (51..70).count { gen.featuresForStage(it).hasWalls }
         assertTrue("All stages 51-70 should have walls", wallStages == 20)
 
-        // Stages 71+: some have ice
-        val iceStages = (71..90).count { gen.featuresForStage(it).hasIce }
-        assertTrue("Some stages 71-90 should have ice", iceStages > 0)
-
         // Stages 91+: some have linked blocks
         val linkStages = (91..130).count { gen.featuresForStage(it).hasLinkedBlocks }
         assertTrue("Some stages 91-130 should have linked blocks", linkStages > 0)
@@ -233,6 +252,7 @@ class StageTest {
         assertFalse("Wall block should NOT be movable down", grid.canMoveInDir(1, 1, false))
         assertFalse("Wall block should NOT be movable up", grid.canMoveInDir(1, -1, false))
     }
+
 
     @Test
     fun linkedBlocksMoveTogether() {
@@ -317,10 +337,10 @@ class StageTest {
     fun newFeaturesStagesSolvable() {
         val gen = PuzzleGenerator()
         val failures = mutableListOf<Int>()
-        for (stage in 51..140) {
+        for (stage in 51..200) {
             val result = gen.generateWithResult(stage)
             if (result.optimalMoves < 1) failures.add(stage)
         }
-        assertTrue("Stages 51-140 should be solvable. Failures: $failures", failures.isEmpty())
+        assertTrue("Stages 51-200 should be solvable. Failures: $failures", failures.isEmpty())
     }
 }
