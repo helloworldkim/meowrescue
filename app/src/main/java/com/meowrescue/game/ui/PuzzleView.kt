@@ -42,6 +42,12 @@ class PuzzleView @JvmOverloads constructor(
         val CELL_LINE      = 0xFFD7CCC8.toInt()
         val BG_COLOR       = 0xFFFFF8F0.toInt()
         val EXIT_COLOR     = 0xFF66BB6A.toInt()
+        val WALL_COLOR     = 0xFF5D4037.toInt()
+        val ICE_COLOR      = 0xFF81D4FA.toInt()
+        val PORTAL_A_CLR   = 0xFF7C4DFF.toInt()
+        val PORTAL_B_CLR   = 0xFF00BFA5.toInt()
+        val LINK_COLOR     = 0xFFFF6F00.toInt()
+        val EXIT2_COLOR    = 0xFF42A5F5.toInt()
 
         private const val TARGET_FPS = 60L
         private const val FRAME_MS   = 1000L / TARGET_FPS
@@ -312,6 +318,7 @@ class PuzzleView @JvmOverloads constructor(
         if (blockId == -1) return null
 
         val block = g.blocks.firstOrNull { it.id == blockId } ?: return null
+        if (block.isWall) return null  // Walls cannot be dragged
         dragBlockId  = blockId
         dragStartX   = x
         dragStartY   = y
@@ -575,9 +582,12 @@ class PuzzleView @JvmOverloads constructor(
         drawHud(canvas, g)
         drawHintBanner(canvas, g)
         drawBoard(canvas, g)
+        drawIceCells(canvas, g)
+        drawPortalCells(canvas, g)
         drawLockCell(canvas, g)
         drawCheckpointCell(canvas, g)
         drawExit(canvas, g)
+        drawSecondExit(canvas, g)
         drawBlocks(canvas, g)
         drawLockOverlay(canvas, g)
         drawCheckpointOverlay(canvas, g)
@@ -671,6 +681,11 @@ class PuzzleView @JvmOverloads constructor(
                 hints.add("\u2B50 \u2713")
             }
         }
+        if (g.blocks.any { it.isWall }) hints.add("\uD83E\uDDF1 갈색 블록은 고정 장애물입니다")
+        if (g.iceCells.isNotEmpty()) hints.add("\u2744 얼음 위에서 블록이 멈추지 않습니다")
+        if (g.blocks.any { it.linkId >= 0 }) hints.add("\uD83D\uDD17 연결된 블록은 함께 움직입니다")
+        if (g.portalA >= 0 && g.portalB >= 0) hints.add("\uD83C\uDF00 고양이가 포탈에 들어가면 반대편으로 이동")
+        if (g.exitDirection2 != null) hints.add("\uD83D\uDC31\uD83D\uDC31 모든 고양이를 탈출시키세요")
         if (hints.isEmpty()) return
 
         val density = resources.displayMetrics.density
@@ -718,6 +733,55 @@ class PuzzleView @JvmOverloads constructor(
             val x = boardLeft + j * cellSize
             canvas.drawLine(x, boardTop, x, boardTop + boardSize, linePaint)
         }
+    }
+
+    // ── Ice cells ──────────────────────────────────────────────────────────
+
+    private fun drawIceCells(canvas: Canvas, g: PuzzleGrid) {
+        if (g.iceCells.isEmpty()) return
+        val icePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = ICE_COLOR; alpha = 80
+        }
+        val iceBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = 1.5f
+            color = ICE_COLOR; alpha = 150
+        }
+        for (pos in g.iceCells) {
+            val r = pos / g.cols; val c = pos % g.cols
+            val left = boardLeft + c * cellSize; val top = boardTop + r * cellSize
+            val rect = RectF(left + 2f, top + 2f, left + cellSize - 2f, top + cellSize - 2f)
+            canvas.drawRoundRect(rect, 4f, 4f, icePaint)
+            canvas.drawRoundRect(rect, 4f, 4f, iceBorder)
+            val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = cellSize * 0.3f; textAlign = Paint.Align.CENTER; alpha = 120
+            }
+            canvas.drawText("\u2744", left + cellSize / 2f, top + cellSize / 2f + tp.textSize * 0.3f, tp)
+        }
+    }
+
+    // ── Portal cells ──────────────────────────────────────────────────────
+
+    private fun drawPortalCells(canvas: Canvas, g: PuzzleGrid) {
+        if (g.portalA < 0 || g.portalB < 0) return
+        drawSinglePortal(canvas, g, g.portalA, PORTAL_A_CLR, "A")
+        drawSinglePortal(canvas, g, g.portalB, PORTAL_B_CLR, "B")
+    }
+
+    private fun drawSinglePortal(canvas: Canvas, g: PuzzleGrid, pos: Int, color: Int, label: String) {
+        val r = pos / g.cols; val c = pos % g.cols
+        val cx = boardLeft + c * cellSize + cellSize / 2f
+        val cy = boardTop + r * cellSize + cellSize / 2f
+        val time = System.currentTimeMillis()
+        val pulse = (sin(time / 400.0) * 0.15 + 0.85).toFloat()
+        val radius = cellSize * 0.35f * pulse
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; alpha = 100 }
+        canvas.drawCircle(cx, cy, radius, paint)
+        val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; alpha = 180 }
+        canvas.drawCircle(cx, cy, radius * 0.6f, innerPaint)
+        val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = cellSize * 0.25f; textAlign = Paint.Align.CENTER; this.color = Color.WHITE
+        }
+        canvas.drawText(label, cx, cy + tp.textSize * 0.35f, tp)
     }
 
     // ── Lock cell ────────────────────────────────────────────────────────
@@ -984,14 +1048,72 @@ class PuzzleView @JvmOverloads constructor(
         }
     }
 
+    // ── Second exit (multi-cat) ──────────────────────────────────────────
+
+    private fun drawSecondExit(canvas: Canvas, g: PuzzleGrid) {
+        val dir2 = g.exitDirection2 ?: return
+        val eRow2 = g.exitRow2
+        val eCol2 = g.exitCol2
+        val arrowW = cellSize * 0.5f
+        val arrowH = cellSize * 0.6f
+        val ePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = EXIT2_COLOR; style = Paint.Style.FILL
+        }
+        val gapPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = EXIT2_COLOR; alpha = 80 }
+        when (dir2) {
+            ExitDirection.RIGHT -> {
+                val exitY = boardTop + eRow2 * cellSize
+                val cx = boardLeft + boardSize + arrowW * 0.4f
+                val cy = exitY + cellSize / 2f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx, cy - arrowH / 2f); lineTo(cx + arrowW, cy); lineTo(cx, cy + arrowH / 2f); close()
+                }, ePaint)
+                canvas.drawRect(boardLeft + boardSize - 4f, exitY, boardLeft + boardSize + 4f, exitY + cellSize, gapPaint)
+            }
+            ExitDirection.LEFT -> {
+                val exitY = boardTop + eRow2 * cellSize
+                val cx = boardLeft - arrowW * 0.4f
+                val cy = exitY + cellSize / 2f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx, cy - arrowH / 2f); lineTo(cx - arrowW, cy); lineTo(cx, cy + arrowH / 2f); close()
+                }, ePaint)
+                canvas.drawRect(boardLeft - 4f, exitY, boardLeft + 4f, exitY + cellSize, gapPaint)
+            }
+            ExitDirection.TOP -> {
+                val exitX = boardLeft + eCol2 * cellSize
+                val cx = exitX + cellSize / 2f
+                val cy = boardTop - arrowW * 0.4f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx - arrowH / 2f, cy); lineTo(cx, cy - arrowW); lineTo(cx + arrowH / 2f, cy); close()
+                }, ePaint)
+                canvas.drawRect(exitX, boardTop - 4f, exitX + cellSize, boardTop + 4f, gapPaint)
+            }
+            ExitDirection.BOTTOM -> {
+                val exitX = boardLeft + eCol2 * cellSize
+                val cx = exitX + cellSize / 2f
+                val cy = boardTop + boardSize + arrowW * 0.4f
+                canvas.drawPath(Path().apply {
+                    moveTo(cx - arrowH / 2f, cy); lineTo(cx, cy + arrowW); lineTo(cx + arrowH / 2f, cy); close()
+                }, ePaint)
+                canvas.drawRect(exitX, boardTop + boardSize - 4f, exitX + cellSize, boardTop + boardSize + 4f, gapPaint)
+            }
+        }
+    }
+
     // ── Blocks ────────────────────────────────────────────────────────────
 
     private fun drawBlocks(canvas: Canvas, g: PuzzleGrid) {
         val padding = cellSize * 0.07f
         val cr      = min(cellSize * 0.22f, 24f)
 
+        // Find linked partner of dragged block for visual offset
+        val draggedBlock = if (dragBlockId >= 0) g.blocks.firstOrNull { it.id == dragBlockId } else null
+        val dragPartnerId = if (draggedBlock != null && draggedBlock.linkId >= 0) {
+            g.blocks.firstOrNull { it.linkId == draggedBlock.linkId && it.id != dragBlockId }?.id ?: -1
+        } else -1
+
         for (block in g.blocks) {
-            val isDragging = (block.id == dragBlockId)
+            val isDragging = (block.id == dragBlockId || block.id == dragPartnerId)
             val isSnapping = (block.id == snapBlockId && snapAnimating)
 
             // Cat slide-out: hide cat during slide phase
@@ -1039,6 +1161,19 @@ class PuzzleView @JvmOverloads constructor(
             val visualRight  = if (isDragging || isSnapping) left + (widthCells * cellSize - 2 * padding) else right
             val visualBottom = if (isDragging || isSnapping) top  + (heightCells * cellSize - 2 * padding) else bottom
 
+            // ── Wall block: immovable obstacle ──
+            if (block.isWall) {
+                blockPaint.color = WALL_COLOR
+                val blockRect = RectF(left, top, visualRight, visualBottom)
+                canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
+                val xPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = 0xFFBCAAA4.toInt(); strokeWidth = 3f; style = Paint.Style.STROKE
+                }
+                canvas.drawLine(left + padding, top + padding, visualRight - padding, visualBottom - padding, xPaint)
+                canvas.drawLine(visualRight - padding, top + padding, left + padding, visualBottom - padding, xPaint)
+                continue
+            }
+
             // ── Cat: image-only rendering (no block background) ──
             if (block.isCat) {
                 val cx = (left + visualRight) / 2f
@@ -1080,6 +1215,7 @@ class PuzzleView @JvmOverloads constructor(
                 // ── Normal block rendering ──
                 val color = when {
                     block.isKey -> KEY_COLOR
+                    block.linkId >= 0 -> LINK_COLOR
                     else -> BLOCK_COLORS[(block.id - 1) % BLOCK_COLORS.size]
                 }
 
@@ -1112,6 +1248,16 @@ class PuzzleView @JvmOverloads constructor(
                         textPaint
                     )
                 }
+
+                // Link chain icon
+                if (block.linkId >= 0) {
+                    val chainPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+                    chainPaint.textSize = cellSize * 0.3f
+                    chainPaint.textAlign = Paint.Align.CENTER
+                    chainPaint.color = Color.WHITE
+                    canvas.drawText("\uD83D\uDD17", (left + visualRight) / 2f,
+                        (top + visualBottom) / 2f + chainPaint.textSize * 0.3f, chainPaint)
+                }
             }
         }
     }
@@ -1131,9 +1277,13 @@ class PuzzleView @JvmOverloads constructor(
             bottom = boardTop  + (block.row + block.length) * cellSize - padding
         }
 
-        // Slide offset based on exit direction
+        // Slide offset based on exit direction (use correct exit for multi-cat)
+        val cats = g.blocks.filter { it.isCat }
+        val slideDir = if (g.exitDirection2 != null && cats.size >= 2 && block.id != cats.first().id) {
+            g.exitDirection2
+        } else g.exitDirection
         val slideDistance = cellSize * 3f * progress
-        when (g.exitDirection) {
+        when (slideDir) {
             ExitDirection.RIGHT  -> left += slideDistance
             ExitDirection.LEFT   -> left -= slideDistance
             ExitDirection.BOTTOM -> top  += slideDistance

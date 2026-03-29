@@ -1,4 +1,4 @@
-# Meow Rescue — Game Design Document (GDD) v4.0
+# Meow Rescue — Game Design Document (GDD) v5.0
 
 > **슬라이딩 블록 퍼즐 게임. 블록을 밀어서 갇힌 고양이를 탈출시키세요!**
 
@@ -24,6 +24,7 @@
 ### 1.2 게임의 차별점
 
 - **다방향 출구**: 고양이가 RIGHT, LEFT, TOP, BOTTOM 네 방향으로 탈출 가능
+- **5가지 신규 메커니즘**: 벽 블록, 얼음 타일, 연결 블록, 포탈, 멀티캣으로 퍼즐 다양성 확보
 - **품질 필터**: 단일 방향/단일 블록/독립 이동 퍼즐을 자동 필터링하여 품질 보장
 - **고양이 컬렉션**: 20마리 고양이를 스테이지 클리어로 해금하고, 게임에서 사용
 - **탈출 애니메이션**: 벽 열림 → 고양이 슬라이드 → 파티클 이펙트의 연출
@@ -39,7 +40,7 @@
 #### 2.1.1 블록 이동
 
 - **격자**: 5x5 ~ 7x7 크기 (스테이지에 따라 증가)
-- **블록 종류**: 고양이 블록(1칸), 열쇠 블록(1칸, 금색), 일반 블록(1~3칸, 가로/세로)
+- **블록 종류**: 고양이 블록(1칸), 열쇠 블록(1칸, 금색), 일반 블록(1~3칸, 가로/세로), 벽 블록(1칸, 고정), 연결 블록(쌍으로 동시 이동)
 - **이동 규칙**:
   - 가로 블록: 좌우로만 이동
   - 세로 블록: 상하로만 이동
@@ -88,6 +89,11 @@ HUD 아래, 보드 위에 조건 안내 텍스트를 표시합니다:
 | 열쇠 미배치 | "🔑→🔒 열쇠를 자물쇠 칸에 놓으세요" |
 | 체크포인트 미경유 | "⭐ 별을 먼저 지나가세요" |
 | 체크포인트 도달 | "⭐ ✓" |
+| 벽 블록 등장 | "🧱 갈색 블록은 고정 장애물입니다" |
+| 얼음 타일 등장 | "❄ 얼음 위에서 블록이 멈추지 않습니다" |
+| 연결 블록 등장 | "🔗 연결된 블록은 함께 움직입니다" |
+| 포탈 등장 | "🌀 고양이가 포탈에 들어가면 반대편으로 이동" |
+| 멀티캣 등장 | "🐱🐱 모든 고양이를 탈출시키세요" |
 | 조건 모두 충족 | 배너 자동 숨김 |
 
 #### 2.1.6 스테이지별 피처 적용
@@ -97,13 +103,65 @@ HUD 아래, 보드 위에 조건 안내 텍스트를 표시합니다:
 | **1~15** | 1x1 고양이만 (새 이동 방식 학습) |
 | **16~30** | 열쇠 50% 확률 등장 |
 | **31~50** | 열쇠 또는 체크포인트 (50/50, 상호 배타) |
-| **51+** | 열쇠 + 체크포인트 동시 가능 |
+| **51~70** | 벽 블록 1~3개 + 열쇠/체크포인트 |
+| **71~90** | 얼음 타일 2~4셀 + 벽 + 열쇠/체크포인트 |
+| **91~110** | 연결 블록 1쌍 + 얼음/벽 + 열쇠/체크포인트 |
+| **111~130** | 포탈 1쌍 + 연결/얼음/벽 + 열쇠/체크포인트 |
+| **131+** | 멀티캣 30% + 모든 메커니즘 |
 
-#### 2.1.6 클리어 조건
+#### 2.1.7 벽 블록 (스테이지 51+)
+
+| 요소 | 설명 |
+|------|------|
+| **외형** | 어두운 갈색(#5D4037) + X 패턴 |
+| **특성** | 이동 불가, 드래그 무시 |
+| **배치** | 1~3개, 빈 셀에 랜덤 배치 |
+| **효과** | 정적 장애물로 퍼즐 경로 제약 추가 |
+
+#### 2.1.8 얼음 타일 (스테이지 71+)
+
+| 요소 | 설명 |
+|------|------|
+| **외형** | 하늘색(#81D4FA) 반투명 배경 + ❄ 아이콘 |
+| **특성** | 블록이 얼음 위에서 멈출 수 없음 |
+| **작동 방식** | 블록이 얼음 셀에 도달하면 벽/다른 블록에 부딪힐 때까지 계속 슬라이딩 |
+| **배치** | 2~4셀, 고양이 시작 위치 제외 |
+
+#### 2.1.9 연결 블록 (스테이지 91+)
+
+| 요소 | 설명 |
+|------|------|
+| **외형** | 주황색(#FF6F00) + 🔗 체인 아이콘 |
+| **특성** | 같은 linkId를 가진 2개 블록이 한 쌍 |
+| **작동 방식** | 한쪽을 드래그하면 파트너도 같은 방향·거리로 동시 이동 |
+| **제약** | 양쪽 모두 이동 가능해야 드래그 허용 |
+| **Undo** | 양쪽 블록 모두 원래 위치로 복원 |
+
+#### 2.1.10 포탈 (스테이지 111+)
+
+| 요소 | 설명 |
+|------|------|
+| **외형** | A=보라색(#7C4DFF), B=청록색(#00BFA5) 맥동 원형 |
+| **대상** | 고양이 블록만 텔레포트 (일반 블록 무시) |
+| **작동 방식** | 고양이가 포탈 A에 도착하면 B로 즉시 워프 (역방향도 가능) |
+| **목적지 검사** | 워프 대상 셀이 비어있어야 텔레포트 발동 |
+| **Undo** | 워프 전 위치로 복원 후 이동 되돌림 |
+
+#### 2.1.11 멀티캣 (스테이지 131+)
+
+| 요소 | 설명 |
+|------|------|
+| **2번째 출구** | 파란색(#42A5F5) 화살표, 1번째 출구와 다른 방향 |
+| **2번째 고양이** | 추가 1x1 고양이 블록 자동 배치 |
+| **클리어 조건** | 양쪽 고양이 모두 자신의 출구에 도달해야 클리어 |
+| **등장 확률** | 30% (스테이지 131+) |
+
+#### 2.1.12 클리어 조건
 
 고양이 블록이 출구까지 이동하면 클리어됩니다. 추가 조건이 있는 경우 모두 충족해야 합니다:
 - **열쇠-자물쇠**: 열쇠 블록이 자물쇠 셀 위에 있어야 함
 - **체크포인트**: 고양이가 체크포인트 셀을 경유했어야 함
+- **멀티캣**: 2마리 고양이 모두 각자의 출구에 도달해야 함
 
 이동 횟수에 따라 별점이 부여됩니다:
 
@@ -185,9 +243,14 @@ HUD 아래, 보드 위에 조건 안내 텍스트를 표시합니다:
 
 - 상태를 IntArray(블록 위치 + 체크포인트 비트)로 표현 → PuzzleGrid clone() 없이 탐색
 - FNV-1a 64비트 해시로 방문 체크 (충돌 확률 최소화)
-- 최대 80,000 상태 (체크포인트 시 120,000), 깊이 35로 제한
-- `isSolvedState()`가 exitRow/exitCol + 열쇠 위치 + 체크포인트 도달 상태를 종합 검증
-- 체크포인트 경유(pass-through) 감지: 이동 경로 중간에 체크포인트가 있으면 도달 처리
+- 최대 80,000~150,000 상태 (메커니즘 조합에 따라 동적), 깊이 35로 제한
+- **벽 블록**: 이동 생성 시 자동 스킵
+- **얼음 타일**: 얼음 셀에서 중간 정지 금지 — 벽/장애물에 부딪힐 때까지 슬라이딩
+- **연결 블록**: linkId 파트너 맵으로 O(1) 조회, 쌍 동시 이동 + 충돌 검사
+- **포탈**: 고양이 이동 후 목적지 점유 검사 + 자동 워프 (일반 블록 무시)
+- **멀티캣**: 복수 고양이 인덱스 추적, `isCatAtExit()` 헬퍼로 각 고양이별 출구 검증
+- `isSolvedState()`가 exitRow/exitCol + 열쇠 위치 + 체크포인트 도달 + 멀티캣 출구를 종합 검증
+- 체크포인트 경유(pass-through) 감지: 이동 경로 중간에 체크포인트가 있으면 도달 처리 (연결 파트너 포함)
 
 ### 3.3 품질 필터 (Quality Filter)
 
@@ -375,7 +438,9 @@ data class PuzzleBlock(
     val id: Int, val row: Int, val col: Int,
     val length: Int, val isHorizontal: Boolean,
     val isCat: Boolean = false,
-    val isKey: Boolean = false          // 열쇠 블록 여부
+    val isKey: Boolean = false,         // 열쇠 블록 여부
+    val isWall: Boolean = false,        // 벽 블록 (이동 불가)
+    val linkId: Int = -1                // 연결 블록 쌍 ID (-1=없음)
 )
 
 // ── 퍼즐 격자 ──
@@ -387,7 +452,13 @@ class PuzzleGrid(
     val lockRow: Int = -1,              // 자물쇠 셀 행
     val lockCol: Int = -1,              // 자물쇠 셀 열
     val checkpointRow: Int = -1,        // 체크포인트 셀 행
-    val checkpointCol: Int = -1         // 체크포인트 셀 열
+    val checkpointCol: Int = -1,        // 체크포인트 셀 열
+    val iceCells: Set<Int> = emptySet(),// 얼음 타일 (row*cols+col 인코딩)
+    val portalA: Int = -1,              // 포탈 A 위치 (row*cols+col, -1=없음)
+    val portalB: Int = -1,              // 포탈 B 위치
+    val exitRow2: Int = -1,             // 멀티캣 2번째 출구 행
+    val exitCol2: Int = -1,             // 멀티캣 2번째 출구 열
+    val exitDirection2: ExitDirection? = null // 멀티캣 2번째 출구 방향
 )
 
 // ── 출구 방향 ──
@@ -397,13 +468,22 @@ enum class ExitDirection { RIGHT, LEFT, TOP, BOTTOM }
 data class MoveRecord(
     val blockId: Int, val steps: Int,
     val horizontal: Boolean,
-    val setCheckpoint: Boolean = false   // 이 이동이 체크포인트를 활성화했는지 (undo 복원용)
+    val setCheckpoint: Boolean = false,  // 이 이동이 체크포인트를 활성화했는지 (undo 복원용)
+    val partnerId: Int = -1,            // 연결 블록 파트너 ID
+    val didPortal: Boolean = false,     // 포탈 텔레포트 발동 여부
+    val portalFromRow: Int = -1,        // 포탈 워프 전 행
+    val portalFromCol: Int = -1         // 포탈 워프 전 열
 )
 
 // ── 스테이지 피처 ──
 data class StageFeatures(
     val hasKey: Boolean,                // 열쇠-자물쇠 활성화
-    val hasCheckpoint: Boolean          // 체크포인트 활성화
+    val hasCheckpoint: Boolean,         // 체크포인트 활성화
+    val hasWalls: Boolean = false,      // 벽 블록
+    val hasIce: Boolean = false,        // 얼음 타일
+    val hasLinkedBlocks: Boolean = false,// 연결 블록
+    val hasPortals: Boolean = false,    // 포탈
+    val hasMultiCat: Boolean = false    // 멀티캣
 )
 
 // ── 고양이 정의 ──
@@ -478,9 +558,17 @@ enum class PuzzleState {
 | `undoRevertsCheckpoint` | Undo 시 체크포인트 상태 되돌림 |
 | `checkpointPassThrough` | 슬라이드 중간 체크포인트 경유 감지 |
 | `keyAndCheckpointStagesSolvable` | 열쇠/체크포인트 스테이지 풀이 가능성 |
-| `featuresForStageDistribution` | 스테이지별 피처 분포 정확성 |
+| `featuresForStageDistribution` | 스테이지별 피처 분포 정확성 (벽/얼음/연결/포탈/멀티캣 포함) |
+| `wallBlocksImmovable` | 벽 블록 이동 불가 검증 |
+| `linkedBlocksMoveTogether` | 연결 블록 동시 이동 검증 |
+| `linkedBlockUndoRestoresBoth` | 연결 블록 Undo 시 양쪽 복원 |
+| `portalTeleportsCat` | 포탈 A→B 텔레포트 검증 |
+| `portalUndoRestoresPosition` | 포탈 Undo 시 원래 위치 복원 |
+| `multiCatBothMustExit` | 멀티캣 양쪽 출구 도달 필수 검증 |
+| `newFeaturesStagesSolvable` | 51~140 스테이지 신규 메커니즘 풀이 가능성 |
+| `debugStageInfo` | 주요 스테이지 디버그 정보 출력 |
 
 ---
 
-*Meow Rescue GDD v4.0 — 2026.03*
+*Meow Rescue GDD v5.0 — 2026.03*
 *Platform: Android (Kotlin) | Genre: Sliding Block Puzzle | Style: Casual*

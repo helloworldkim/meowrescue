@@ -15,7 +15,14 @@ class PuzzleGenerator {
 
     data class GenerateResult(val grid: PuzzleGrid, val optimalMoves: Int)
 
-    data class StageFeatures(val hasKey: Boolean, val hasCheckpoint: Boolean)
+    data class StageFeatures(
+        val hasKey: Boolean, val hasCheckpoint: Boolean,
+        val hasWalls: Boolean = false,
+        val hasIce: Boolean = false,
+        val hasLinkedBlocks: Boolean = false,
+        val hasPortals: Boolean = false,
+        val hasMultiCat: Boolean = false
+    )
 
     // Cache seed offsets for deterministic re-entry
     private val seedOffsetCache = mutableMapOf<Int, Int>()
@@ -43,7 +50,16 @@ class PuzzleGenerator {
         val rng = java.util.Random(stage.toLong() * 7919 + 42)
         if (stage <= 30) return StageFeatures(rng.nextBoolean(), false)
         if (stage <= 50) { val k = rng.nextBoolean(); return StageFeatures(k, !k) }
-        return StageFeatures(rng.nextBoolean(), rng.nextBoolean())
+        val hasKey = rng.nextBoolean()
+        val hasCp = rng.nextBoolean()
+        return StageFeatures(
+            hasKey = hasKey, hasCheckpoint = hasCp,
+            hasWalls = stage >= 51,
+            hasIce = stage >= 71 && rng.nextBoolean(),
+            hasLinkedBlocks = stage >= 91 && rng.nextBoolean(),
+            hasPortals = stage >= 111 && rng.nextInt(5) < 2,
+            hasMultiCat = stage >= 131 && rng.nextInt(10) < 3
+        )
     }
 
     fun generateWithResult(stage: Int): GenerateResult {
@@ -229,7 +245,8 @@ class PuzzleGenerator {
 
     // ── Fast BFS solver using compact state representation ──────────────
 
-    private class BlockInfo(val length: Int, val isHorizontal: Boolean, val isCat: Boolean, val isKey: Boolean = false)
+    private class BlockInfo(val length: Int, val isHorizontal: Boolean, val isCat: Boolean,
+                                val isKey: Boolean = false, val isWall: Boolean = false, val linkId: Int = -1)
 
     fun solveFast(grid: PuzzleGrid): Int {
         val blocks = grid.blocks.sortedBy { it.id }
@@ -240,9 +257,11 @@ class PuzzleGenerator {
         val exitRow = grid.exitRow
         val exitCol = grid.exitCol
 
-        val infos = Array(n) { BlockInfo(blocks[it].length, blocks[it].isHorizontal, blocks[it].isCat, blocks[it].isKey) }
-        val catIdx = infos.indexOfFirst { it.isCat }
-        if (catIdx < 0) return -1
+        val infos = Array(n) { BlockInfo(blocks[it].length, blocks[it].isHorizontal, blocks[it].isCat,
+            blocks[it].isKey, blocks[it].isWall, blocks[it].linkId) }
+        val catIndices = (0 until n).filter { infos[it].isCat }
+        if (catIndices.isEmpty()) return -1
+        val catIdx = catIndices[0]
 
         val keyIdx = if (grid.hasKeyLock) infos.indexOfFirst { it.isKey } else -1
         val lockPos = if (keyIdx >= 0) grid.lockRow * cols + grid.lockCol else -1
@@ -253,13 +272,32 @@ class PuzzleGenerator {
         val cpStateIdx = if (hasCheckpoint) n else -1
         val stateSize = n + (if (hasCheckpoint) 1 else 0)
 
+        val iceCells = grid.iceCells
+        val portalA = grid.portalA
+        val portalB = grid.portalB
+        val exitRow2 = grid.exitRow2
+        val exitCol2 = grid.exitCol2
+        val exitDir2 = grid.exitDirection2
+
+        // Build link partner map
+        val linkPartner = IntArray(n) { -1 }
+        for (i in 0 until n) {
+            if (infos[i].linkId >= 0 && linkPartner[i] == -1) {
+                for (j in i + 1 until n) {
+                    if (infos[j].linkId == infos[i].linkId) {
+                        linkPartner[i] = j; linkPartner[j] = i; break
+                    }
+                }
+            }
+        }
+
         val initState = IntArray(stateSize) { if (it < n) blocks[it].row * cols + blocks[it].col else 0 }
         if (hasCheckpoint && cpStateIdx >= 0) {
             val catPos = initState[catIdx]
             if (catPos / cols == cpRow && catPos % cols == cpCol) initState[cpStateIdx] = 1
         }
 
-        if (isSolvedState(initState, infos, catIdx, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx)) return 0
+        if (isSolvedState(initState, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) return 0
 
         val visited = HashSet<Long>(4096)
         visited.add(hashState(initState))
@@ -268,7 +306,12 @@ class PuzzleGenerator {
         queue.add(initState to 0)
 
         val maxDepth = 35
-        val maxStates = if (hasCheckpoint) 120_000 else 80_000
+        val maxStates = when {
+            hasCheckpoint && exitDir2 != null -> 150_000
+            exitDir2 != null -> 120_000
+            hasCheckpoint -> 120_000
+            else -> 80_000
+        }
 
         while (queue.isNotEmpty() && visited.size < maxStates) {
             val (state, depth) = queue.poll() ?: break
@@ -276,8 +319,15 @@ class PuzzleGenerator {
 
             val g = buildGrid(state, infos, rows, cols)
 
+            val processedLinks = mutableSetOf<Int>()
             for (i in 0 until n) {
                 val info = infos[i]
+                if (info.isWall) continue
+                if (info.linkId >= 0) {
+                    if (info.linkId in processedLinks) continue
+                    processedLinks.add(info.linkId)
+                }
+                val partnerId = linkPartner[i]
                 val pos = state[i]
                 val bRow = pos / cols
                 val bCol = pos % cols
@@ -290,14 +340,60 @@ class PuzzleGenerator {
                     for (d in 1..cols) {
                         val nc = bCol + d
                         if (nc + info.length > cols) break
-                        if (g[bRow][nc + info.length - 1] != -1 && g[bRow][nc + info.length - 1] != i) break
+                        if (g[bRow][nc + info.length - 1] != -1 && g[bRow][nc + info.length - 1] != i
+                            && (partnerId < 0 || g[bRow][nc + info.length - 1] != partnerId)) break
+                        // Check partner can move too
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && !pInfo.isHorizontal) break // can't move horizontally
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pnc = pCol + d
+                            if (pnc + pInfo.length > cols) break
+                            // Check partner path clear
+                            var partnerBlocked = false
+                            for (dd in 1..d) {
+                                val checkC = pCol + dd + pInfo.length - 1
+                                if (checkC >= cols) { partnerBlocked = true; break }
+                                val cell = g[pRow][checkC]
+                                if (cell != -1 && cell != partnerId && cell != i) { partnerBlocked = true; break }
+                            }
+                            if (partnerBlocked) break
+                        }
 
                         val ns = state.copyOf()
                         ns[i] = bRow * cols + nc
-                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0 && i == catIdx) {
-                            if (bRow == cpRow && cpCol in bCol..(bCol + d)) ns[cpStateIdx] = 1
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = pRow * cols + (pCol + d)
                         }
-                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx)) return depth + 1
+                        // Ice: block can't stop on ice if it can slide further
+                        if (iceCells.isNotEmpty() && isBlockOnIce(ns[i], info, cols, iceCells)) {
+                            val nextC = nc + 1
+                            if (nextC + info.length <= cols) {
+                                val nextCell = g[bRow][nextC + info.length - 1]
+                                if (nextCell == -1 || nextCell == i || (partnerId >= 0 && nextCell == partnerId)) continue
+                            }
+                        }
+                        // Checkpoint (main block and partner cat)
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bRow == cpRow && cpCol in bCol..(bCol + d)) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pRow == cpRow && cpCol in pCol..(pCol + d)) ns[cpStateIdx] = 1
+                            }
+                        }
+                        // Portal teleport (cat only, main block — matches game logic)
+                        if (portalA >= 0 && portalB >= 0 && i in catIndices) {
+                            val warpTo = when (ns[i]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                            if (warpTo >= 0) {
+                                val wg = buildGrid(ns, infos, rows, cols)
+                                val wr = warpTo / cols; val wc = warpTo % cols
+                                if (wr < rows && wc < cols && (wg[wr][wc] == -1 || wg[wr][wc] == i)) {
+                                    ns[i] = warpTo
+                                }
+                            }
+                        }
+                        if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) { visited.add(h); queue.add(ns to depth + 1) }
                     }
@@ -305,14 +401,53 @@ class PuzzleGenerator {
                     for (d in 1..cols) {
                         val nc = bCol - d
                         if (nc < 0) break
-                        if (g[bRow][nc] != -1 && g[bRow][nc] != i) break
+                        if (g[bRow][nc] != -1 && g[bRow][nc] != i
+                            && (partnerId < 0 || g[bRow][nc] != partnerId)) break
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && !pInfo.isHorizontal) break
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pnc = pCol - d
+                            if (pnc < 0) break
+                            var partnerBlocked = false
+                            for (dd in 1..d) {
+                                val checkC = pCol - dd
+                                if (checkC < 0) { partnerBlocked = true; break }
+                                val cell = g[pRow][checkC]
+                                if (cell != -1 && cell != partnerId && cell != i) { partnerBlocked = true; break }
+                            }
+                            if (partnerBlocked) break
+                        }
 
                         val ns = state.copyOf()
                         ns[i] = bRow * cols + nc
-                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0 && i == catIdx) {
-                            if (bRow == cpRow && cpCol in (bCol - d)..bCol) ns[cpStateIdx] = 1
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = pRow * cols + (pCol - d)
                         }
-                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx)) return depth + 1
+                        if (iceCells.isNotEmpty() && isBlockOnIce(ns[i], info, cols, iceCells)) {
+                            val nextC = nc - 1
+                            if (nextC >= 0) {
+                                val nextCell = g[bRow][nextC]
+                                if (nextCell == -1 || nextCell == i || (partnerId >= 0 && nextCell == partnerId)) continue
+                            }
+                        }
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bRow == cpRow && cpCol in (bCol - d)..bCol) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pRow == cpRow && cpCol in (pCol - d)..pCol) ns[cpStateIdx] = 1
+                            }
+                        }
+                        if (portalA >= 0 && portalB >= 0) {
+                            for (ci in catIndices) {
+                                val movedIdx = if (ci == i) ci else if (ci == partnerId) ci else -1
+                                if (movedIdx < 0) continue
+                                val warpTo = when (ns[movedIdx]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                                if (warpTo >= 0) ns[movedIdx] = warpTo
+                            }
+                        }
+                        if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) { visited.add(h); queue.add(ns to depth + 1) }
                     }
@@ -323,14 +458,55 @@ class PuzzleGenerator {
                         val nr = bRow + d
                         val endCheck = bRow + info.length - 1 + d
                         if (endCheck >= rows) break
-                        if (g[endCheck][bCol] != -1 && g[endCheck][bCol] != i) break
+                        if (g[endCheck][bCol] != -1 && g[endCheck][bCol] != i
+                            && (partnerId < 0 || g[endCheck][bCol] != partnerId)) break
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && pInfo.isHorizontal) break
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pnr = pRow + d
+                            val pEndCheck = pRow + pInfo.length - 1 + d
+                            if (pEndCheck >= rows) break
+                            var partnerBlocked = false
+                            for (dd in 1..d) {
+                                val checkR = pRow + pInfo.length - 1 + dd
+                                if (checkR >= rows) { partnerBlocked = true; break }
+                                val cell = g[checkR][pCol]
+                                if (cell != -1 && cell != partnerId && cell != i) { partnerBlocked = true; break }
+                            }
+                            if (partnerBlocked) break
+                        }
 
                         val ns = state.copyOf()
                         ns[i] = nr * cols + bCol
-                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0 && i == catIdx) {
-                            if (bCol == cpCol && cpRow in bRow..(bRow + d)) ns[cpStateIdx] = 1
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = (pRow + d) * cols + pCol
                         }
-                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx)) return depth + 1
+                        if (iceCells.isNotEmpty() && isBlockOnIceVert(ns[i], info, cols, iceCells)) {
+                            val nextR = nr + 1
+                            val nextEndCheck = bRow + info.length + d
+                            if (nextEndCheck < rows) {
+                                val nextCell = g[nextEndCheck][bCol]
+                                if (nextCell == -1 || nextCell == i || (partnerId >= 0 && nextCell == partnerId)) continue
+                            }
+                        }
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bCol == cpCol && cpRow in bRow..(bRow + d)) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pCol == cpCol && cpRow in pRow..(pRow + d)) ns[cpStateIdx] = 1
+                            }
+                        }
+                        if (portalA >= 0 && portalB >= 0) {
+                            for (ci in catIndices) {
+                                val movedIdx = if (ci == i) ci else if (ci == partnerId) ci else -1
+                                if (movedIdx < 0) continue
+                                val warpTo = when (ns[movedIdx]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                                if (warpTo >= 0) ns[movedIdx] = warpTo
+                            }
+                        }
+                        if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) { visited.add(h); queue.add(ns to depth + 1) }
                     }
@@ -338,14 +514,53 @@ class PuzzleGenerator {
                     for (d in 1..rows) {
                         val nr = bRow - d
                         if (nr < 0) break
-                        if (g[nr][bCol] != -1 && g[nr][bCol] != i) break
+                        if (g[nr][bCol] != -1 && g[nr][bCol] != i
+                            && (partnerId < 0 || g[nr][bCol] != partnerId)) break
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && pInfo.isHorizontal) break
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pnr = pRow - d
+                            if (pnr < 0) break
+                            var partnerBlocked = false
+                            for (dd in 1..d) {
+                                val checkR = pRow - dd
+                                if (checkR < 0) { partnerBlocked = true; break }
+                                val cell = g[checkR][pCol]
+                                if (cell != -1 && cell != partnerId && cell != i) { partnerBlocked = true; break }
+                            }
+                            if (partnerBlocked) break
+                        }
 
                         val ns = state.copyOf()
                         ns[i] = nr * cols + bCol
-                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0 && i == catIdx) {
-                            if (bCol == cpCol && cpRow in (bRow - d)..bRow) ns[cpStateIdx] = 1
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = (pRow - d) * cols + pCol
                         }
-                        if (isSolvedState(ns, infos, catIdx, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx)) return depth + 1
+                        if (iceCells.isNotEmpty() && isBlockOnIceVert(ns[i], info, cols, iceCells)) {
+                            val nextR = nr - 1
+                            if (nextR >= 0) {
+                                val nextCell = g[nextR][bCol]
+                                if (nextCell == -1 || nextCell == i || (partnerId >= 0 && nextCell == partnerId)) continue
+                            }
+                        }
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bCol == cpCol && cpRow in (bRow - d)..bRow) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pCol == cpCol && cpRow in (pRow - d)..pRow) ns[cpStateIdx] = 1
+                            }
+                        }
+                        if (portalA >= 0 && portalB >= 0) {
+                            for (ci in catIndices) {
+                                val movedIdx = if (ci == i) ci else if (ci == partnerId) ci else -1
+                                if (movedIdx < 0) continue
+                                val warpTo = when (ns[movedIdx]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                                if (warpTo >= 0) ns[movedIdx] = warpTo
+                            }
+                        }
+                        if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) return depth + 1
                         val h = hashState(ns)
                         if (h !in visited) { visited.add(h); queue.add(ns to depth + 1) }
                     }
@@ -355,21 +570,51 @@ class PuzzleGenerator {
         return -1
     }
 
+    private fun isBlockOnIce(pos: Int, info: BlockInfo, cols: Int, iceCells: Set<Int>): Boolean {
+        val r = pos / cols; val c = pos % cols
+        return if (info.isHorizontal || info.length == 1) {
+            (c until c + info.length).any { (r * cols + it) in iceCells }
+        } else {
+            (r until r + info.length).any { (it * cols + c) in iceCells }
+        }
+    }
+
+    private fun isBlockOnIceVert(pos: Int, info: BlockInfo, cols: Int, iceCells: Set<Int>): Boolean {
+        val r = pos / cols; val c = pos % cols
+        return if (!info.isHorizontal || info.length == 1) {
+            (r until r + info.length).any { (it * cols + c) in iceCells }
+        } else {
+            (c until c + info.length).any { (r * cols + it) in iceCells }
+        }
+    }
+
     private fun isSolvedState(
-        state: IntArray, infos: Array<BlockInfo>, catIdx: Int,
+        state: IntArray, infos: Array<BlockInfo>, catIndices: List<Int>,
         rows: Int, cols: Int, exitDir: ExitDirection,
         exitRow: Int, exitCol: Int,
         keyIdx: Int, lockPos: Int,
-        cpStateIdx: Int
+        cpStateIdx: Int,
+        exitRow2: Int = -1, exitCol2: Int = -1, exitDir2: ExitDirection? = null
     ): Boolean {
         if (cpStateIdx >= 0 && state[cpStateIdx] == 0) return false
         if (keyIdx >= 0 && state[keyIdx] != lockPos) return false
-        val catPos = state[catIdx]
+        // Primary cat
+        val catIdx = catIndices[0]
+        if (!isCatAtExit(state[catIdx], infos[catIdx], rows, cols, exitDir, exitRow, exitCol)) return false
+        // Second cat (multi-cat)
+        if (exitDir2 != null && catIndices.size >= 2) {
+            if (!isCatAtExit(state[catIndices[1]], infos[catIndices[1]], rows, cols, exitDir2, exitRow2, exitCol2)) return false
+        }
+        return true
+    }
+
+    private fun isCatAtExit(catPos: Int, info: BlockInfo, rows: Int, cols: Int,
+                            exitDir: ExitDirection, exitRow: Int, exitCol: Int): Boolean {
         val catRow = catPos / cols; val catCol = catPos % cols
         return when (exitDir) {
-            ExitDirection.RIGHT  -> catRow == exitRow && catCol + infos[catIdx].length == cols
+            ExitDirection.RIGHT  -> catRow == exitRow && catCol + info.length == cols
             ExitDirection.LEFT   -> catRow == exitRow && catCol == 0
-            ExitDirection.BOTTOM -> catCol == exitCol && catRow + infos[catIdx].length == rows
+            ExitDirection.BOTTOM -> catCol == exitCol && catRow + info.length == rows
             ExitDirection.TOP    -> catCol == exitCol && catRow == 0
         }
     }
@@ -478,6 +723,50 @@ class PuzzleGenerator {
             cpCol = cpCol.coerceIn(0, size - 1)
         }
 
+        // Ice cells
+        val catRow = if (catHoriz) exitLine else catStart
+        val catCol = if (catHoriz) catStart else exitLine
+        val iceSet = if (features.hasIce) {
+            val count = 2 + rng.nextInt(3)
+            val set = mutableSetOf<Int>()
+            repeat(count * 5) {
+                if (set.size >= count) return@repeat
+                val r = rng.nextInt(size); val c = rng.nextInt(size)
+                val pos = r * size + c
+                if (r != catRow || c != catCol) set.add(pos)
+            }
+            set.toSet()
+        } else emptySet()
+
+        // Portal pair
+        val pA: Int; val pB: Int
+        if (features.hasPortals) {
+            var a = -1; var b = -1
+            repeat(40) {
+                val r1 = rng.nextInt(size); val c1 = rng.nextInt(size)
+                val r2 = rng.nextInt(size); val c2 = rng.nextInt(size)
+                if (abs(r1 - r2) + abs(c1 - c2) >= size / 2) {
+                    a = r1 * size + c1; b = r2 * size + c2
+                }
+            }
+            pA = a; pB = b
+        } else { pA = -1; pB = -1 }
+
+        // Multi-cat second exit
+        var eRow2 = -1; var eCol2 = -1; var eDir2: ExitDirection? = null
+        var cat2Row = -1; var cat2Col = -1; var cat2Horiz = false
+        if (features.hasMultiCat) {
+            val availDirs = ExitDirection.entries.filter { it != exitDir }
+            eDir2 = availDirs[rng.nextInt(availDirs.size)]
+            val exitLine2 = 1 + rng.nextInt(maxOf(1, size - 2))
+            eRow2 = if (eDir2 == ExitDirection.RIGHT || eDir2 == ExitDirection.LEFT) exitLine2 else -1
+            eCol2 = if (eDir2 == ExitDirection.TOP || eDir2 == ExitDirection.BOTTOM) exitLine2 else -1
+            cat2Horiz = (eDir2 == ExitDirection.RIGHT || eDir2 == ExitDirection.LEFT)
+            val cat2Start = rng.nextInt(size)
+            cat2Row = if (cat2Horiz) exitLine2 else cat2Start
+            cat2Col = if (cat2Horiz) cat2Start else exitLine2
+        }
+
         val grid = PuzzleGrid(
             size, size,
             exitRow = gridExitRow,
@@ -487,14 +776,24 @@ class PuzzleGenerator {
             lockRow = lockR,
             lockCol = lockC,
             checkpointRow = cpRow,
-            checkpointCol = cpCol
+            checkpointCol = cpCol,
+            iceCells = iceSet,
+            portalA = pA,
+            portalB = pB,
+            exitRow2 = eRow2,
+            exitCol2 = eCol2,
+            exitDirection2 = eDir2
         )
 
-        val catRow = if (catHoriz) exitLine else catStart
-        val catCol = if (catHoriz) catStart else exitLine
         if (!grid.placeBlock(PuzzleBlock(0, catRow, catCol, 1, catHoriz, true))) return null
 
         var nextId = 1
+
+        // Place second cat for multi-cat
+        if (features.hasMultiCat && cat2Row >= 0 && cat2Col >= 0) {
+            if (grid.placeBlock(PuzzleBlock(nextId, cat2Row, cat2Col, 1, cat2Horiz, isCat = true)))
+                nextId++
+        }
 
         // Path cells between cat front and exit edge (1x1 cat: +1 instead of +2)
         val pathCells = if (exitPositive) {
@@ -591,6 +890,40 @@ class PuzzleGenerator {
                 val col = (exitLine + (if (rng.nextBoolean()) -1 - ci else 1 + ci)).coerceIn(0, size - len)
                 val row = rng.nextInt(maxOf(1, size - len))
                 if (grid.placeBlock(PuzzleBlock(nextId, row, col, len, false))) nextId++
+            }
+        }
+
+        // Wall blocks (1-3)
+        if (features.hasWalls) {
+            val wallCount = 1 + rng.nextInt(3)
+            repeat(wallCount) {
+                repeat(20) inner@{
+                    val wr = rng.nextInt(size); val wc = rng.nextInt(size)
+                    if (grid.placeBlock(PuzzleBlock(nextId, wr, wc, 1, true, isWall = true))) {
+                        nextId++; return@inner
+                    }
+                }
+            }
+        }
+
+        // Linked block pair
+        if (features.hasLinkedBlocks) {
+            val linkGroup = 1
+            val linkH = rng.nextBoolean()
+            val len = randomBlockerLength(rng)
+            var placed1 = false
+            repeat(20) {
+                if (placed1) return@repeat
+                val r1 = rng.nextInt(size); val c1 = rng.nextInt(size)
+                if (grid.placeBlock(PuzzleBlock(nextId, r1, c1, len, linkH, linkId = linkGroup))) {
+                    nextId++; placed1 = true
+                    repeat(20) inner@{
+                        val r2 = rng.nextInt(size); val c2 = rng.nextInt(size)
+                        if (grid.placeBlock(PuzzleBlock(nextId, r2, c2, len, linkH, linkId = linkGroup))) {
+                            nextId++; return@inner
+                        }
+                    }
+                }
             }
         }
 

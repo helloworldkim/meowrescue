@@ -198,5 +198,129 @@ class StageTest {
             val f = gen.featuresForStage(s)
             assertTrue("Stage $s: key XOR checkpoint", f.hasKey != f.hasCheckpoint)
         }
+
+        // Stages 51+: walls appear
+        val wallStages = (51..70).count { gen.featuresForStage(it).hasWalls }
+        assertTrue("All stages 51-70 should have walls", wallStages == 20)
+
+        // Stages 71+: some have ice
+        val iceStages = (71..90).count { gen.featuresForStage(it).hasIce }
+        assertTrue("Some stages 71-90 should have ice", iceStages > 0)
+
+        // Stages 91+: some have linked blocks
+        val linkStages = (91..130).count { gen.featuresForStage(it).hasLinkedBlocks }
+        assertTrue("Some stages 91-130 should have linked blocks", linkStages > 0)
+
+        // Stages 111+: some have portals
+        val portalStages = (111..150).count { gen.featuresForStage(it).hasPortals }
+        assertTrue("Some stages 111-150 should have portals", portalStages > 0)
+
+        // Stages 131+: some have multi-cat
+        val mcStages = (131..160).count { gen.featuresForStage(it).hasMultiCat }
+        assertTrue("Some stages 131-160 should have multi-cat", mcStages > 0)
+    }
+
+    // ── New mechanic tests ─────────────────────────────────────────────
+
+    @Test
+    fun wallBlocksImmovable() {
+        val grid = PuzzleGrid(5, 5, 2, exitDirection = ExitDirection.RIGHT)
+        grid.placeBlock(PuzzleBlock(0, 2, 0, 1, true, true))       // cat
+        grid.placeBlock(PuzzleBlock(1, 0, 2, 1, true, isWall = true)) // wall
+
+        assertFalse("Wall block should NOT be movable right", grid.canMoveInDir(1, 1, true))
+        assertFalse("Wall block should NOT be movable left", grid.canMoveInDir(1, -1, true))
+        assertFalse("Wall block should NOT be movable down", grid.canMoveInDir(1, 1, false))
+        assertFalse("Wall block should NOT be movable up", grid.canMoveInDir(1, -1, false))
+    }
+
+    @Test
+    fun linkedBlocksMoveTogether() {
+        val grid = PuzzleGrid(5, 5, 2, exitDirection = ExitDirection.RIGHT)
+        grid.placeBlock(PuzzleBlock(0, 2, 0, 1, true, true))                // cat
+        grid.placeBlock(PuzzleBlock(1, 0, 0, 2, true, linkId = 1))          // linked A
+        grid.placeBlock(PuzzleBlock(2, 4, 0, 2, true, linkId = 1))          // linked B
+
+        assertTrue("Linked block should be movable", grid.canMoveInDir(1, 1, true))
+        grid.moveBlockInDir(1, 1, true)
+
+        // Both should have moved
+        val blockA = grid.blocks.first { it.id == 1 }
+        val blockB = grid.blocks.first { it.id == 2 }
+        assertEquals("Block A col should be 1", 1, blockA.col)
+        assertEquals("Block B col should be 1", 1, blockB.col)
+    }
+
+    @Test
+    fun linkedBlockUndoRestoresBoth() {
+        val grid = PuzzleGrid(5, 5, 2, exitDirection = ExitDirection.RIGHT)
+        grid.placeBlock(PuzzleBlock(0, 2, 0, 1, true, true))
+        grid.placeBlock(PuzzleBlock(1, 0, 0, 2, true, linkId = 1))
+        grid.placeBlock(PuzzleBlock(2, 4, 0, 2, true, linkId = 1))
+
+        grid.moveBlockInDir(1, 1, true)
+        grid.undoLastMove()
+
+        val blockA = grid.blocks.first { it.id == 1 }
+        val blockB = grid.blocks.first { it.id == 2 }
+        assertEquals("Block A col restored to 0", 0, blockA.col)
+        assertEquals("Block B col restored to 0", 0, blockB.col)
+    }
+
+    @Test
+    fun portalTeleportsCat() {
+        // Portal A at (1,1), Portal B at (3,3)
+        val grid = PuzzleGrid(5, 5, 2, exitDirection = ExitDirection.RIGHT,
+            portalA = 1 * 5 + 1, portalB = 3 * 5 + 3)
+        grid.placeBlock(PuzzleBlock(0, 1, 0, 1, true, true)) // cat at (1,0)
+
+        // Move cat right by 1 → lands on (1,1) = portalA → warps to (3,3)
+        grid.moveBlockInDir(0, 1, true)
+        val cat = grid.blocks.first { it.isCat }
+        assertEquals("Cat should warp to portal B row", 3, cat.row)
+        assertEquals("Cat should warp to portal B col", 3, cat.col)
+    }
+
+    @Test
+    fun portalUndoRestoresPosition() {
+        val grid = PuzzleGrid(5, 5, 2, exitDirection = ExitDirection.RIGHT,
+            portalA = 1 * 5 + 1, portalB = 3 * 5 + 3)
+        grid.placeBlock(PuzzleBlock(0, 1, 0, 1, true, true))
+
+        grid.moveBlockInDir(0, 1, true)
+        grid.undoLastMove()
+        val cat = grid.blocks.first { it.isCat }
+        assertEquals("Cat should be back at original row", 1, cat.row)
+        assertEquals("Cat should be back at original col", 0, cat.col)
+    }
+
+    @Test
+    fun multiCatBothMustExit() {
+        // 5x5 grid, primary exit RIGHT row 1, secondary exit LEFT row 3
+        val grid = PuzzleGrid(5, 5, 1, exitDirection = ExitDirection.RIGHT,
+            exitRow2 = 3, exitCol2 = -1, exitDirection2 = ExitDirection.LEFT)
+        grid.placeBlock(PuzzleBlock(0, 1, 4, 1, true, isCat = true))  // cat1 at exit1
+        grid.placeBlock(PuzzleBlock(1, 3, 2, 1, true, isCat = true))  // cat2 NOT at exit2
+
+        assertFalse("Should NOT be solved: cat2 not at exit", grid.isSolved())
+
+        // Place cat2 at left edge
+        val grid2 = PuzzleGrid(5, 5, 1, exitDirection = ExitDirection.RIGHT,
+            exitRow2 = 3, exitCol2 = -1, exitDirection2 = ExitDirection.LEFT)
+        grid2.placeBlock(PuzzleBlock(0, 1, 4, 1, true, isCat = true))  // cat1 at exit1
+        grid2.placeBlock(PuzzleBlock(1, 3, 0, 1, true, isCat = true))  // cat2 at exit2
+
+        assertTrue("Should be solved: both cats at their exits", grid2.isSolved())
+    }
+
+    @Test
+    fun newFeaturesStagesSolvable() {
+        val gen = PuzzleGenerator()
+        val failures = mutableListOf<Int>()
+        for (stage in 51..140) {
+            val result = gen.generateWithResult(stage)
+            if (result.optimalMoves < 1) failures.add(stage)
+        }
+        assertTrue("Stages 51-140 should be solvable. Failures: $failures", failures.isEmpty())
     }
 }
