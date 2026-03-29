@@ -573,11 +573,14 @@ class PuzzleView @JvmOverloads constructor(
         val g = grid ?: return
 
         drawHud(canvas, g)
+        drawHintBanner(canvas, g)
         drawBoard(canvas, g)
         drawLockCell(canvas, g)
         drawCheckpointCell(canvas, g)
         drawExit(canvas, g)
         drawBlocks(canvas, g)
+        drawLockOverlay(canvas, g)
+        drawCheckpointOverlay(canvas, g)
         drawToolbar(canvas)
 
         // Draw particles on top
@@ -605,8 +608,31 @@ class PuzzleView @JvmOverloads constructor(
         hudTextPaint.textAlign = Paint.Align.LEFT
         canvas.drawText("Stage $stageNumber", 16 * density, hudTop + hudH * 0.65f, hudTextPaint)
 
+        // Move count + color based on star tracking
+        val moves = g.getMoveCount()
+        val star3Limit = optimalMoves
+        val star2Limit = (optimalMoves * 1.5f).toInt()
+        val moveColor = when {
+            moves <= star3Limit -> 0xFF388E3C.toInt()  // green (on track for 3 stars)
+            moves <= star2Limit -> 0xFFF57F17.toInt()  // amber (on track for 2 stars)
+            else -> 0xFFD32F2F.toInt()                 // red (1 star)
+        }
+
         hudTextPaint.textAlign = Paint.Align.CENTER
-        canvas.drawText("Moves: ${g.getMoveCount()}", w / 2f, hudTop + hudH * 0.65f, hudTextPaint)
+        hudTextPaint.color = moveColor
+        canvas.drawText("Moves: $moves", w / 2f, hudTop + hudH * 0.45f, hudTextPaint)
+        hudTextPaint.color = 0xFF4E342E.toInt()  // reset
+
+        // Star thresholds
+        val starInfoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = 11 * density
+            textAlign = Paint.Align.CENTER
+            color = 0xFF8D6E63.toInt()
+        }
+        canvas.drawText(
+            "\u2605\u2605\u2605 \u2264$star3Limit   \u2605\u2605 \u2264$star2Limit   \u2605 $star2Limit+",
+            w / 2f, hudTop + hudH * 0.82f, starInfoPaint
+        )
 
         val btnSize   = 40 * density
         val btnMargin = 8 * density
@@ -625,6 +651,56 @@ class PuzzleView @JvmOverloads constructor(
             val cy   = pauseRect.centerY()
             canvas.drawRect(cx - barW * 1.5f, cy - barH / 2f, cx - barW * 0.5f, cy + barH / 2f, p)
             canvas.drawRect(cx + barW * 0.5f, cy - barH / 2f, cx + barW * 1.5f, cy + barH / 2f, p)
+        }
+    }
+
+    // ── Hint banner (between HUD and board) ──────────────────────────────
+
+    private fun drawHintBanner(canvas: Canvas, g: PuzzleGrid) {
+        val hints = mutableListOf<String>()
+        if (g.hasKeyLock) {
+            val keyAtLock = g.blocks.firstOrNull { it.isKey }?.let {
+                it.row == g.lockRow && it.col == g.lockCol
+            } ?: false
+            if (!keyAtLock) hints.add("\uD83D\uDD11\u2192\uD83D\uDD12 열쇠를 자물쇠 칸에 놓으세요")
+        }
+        if (g.hasCheckpoint) {
+            if (!g.checkpointReached) {
+                hints.add("\u2B50 별을 먼저 지나가세요")
+            } else {
+                hints.add("\u2B50 \u2713")
+            }
+        }
+        if (hints.isEmpty()) return
+
+        val density = resources.displayMetrics.density
+        val hudH = 56 * density
+        val bannerTop = hudH + 2 * density
+        val textSize = 13 * density
+        val bannerH = textSize * hints.size + 12 * density
+
+        // Background
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = 0xFFFFF3E0.toInt()
+            alpha = 220
+        }
+        canvas.drawRoundRect(
+            RectF(8 * density, bannerTop, width - 8 * density, bannerTop + bannerH),
+            8f, 8f, bgPaint
+        )
+
+        // Text
+        val tp = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.textSize = textSize
+            textAlign = Paint.Align.CENTER
+            color = 0xFF5D4037.toInt()
+        }
+        for ((i, hint) in hints.withIndex()) {
+            canvas.drawText(
+                hint, width / 2f,
+                bannerTop + 8 * density + textSize * (i + 0.8f),
+                tp
+            )
         }
     }
 
@@ -677,6 +753,101 @@ class PuzzleView @JvmOverloads constructor(
         canvas.drawText(icon, left + cellSize / 2f, top + cellSize / 2f + iconPaint.textSize * 0.35f, iconPaint)
     }
 
+    // ── Lock overlay (drawn ON TOP of blocks so always visible) ──────────
+
+    private fun drawLockOverlay(canvas: Canvas, g: PuzzleGrid) {
+        if (!g.hasKeyLock || g.lockRow < 0 || g.lockCol < 0) return
+
+        val keyAtLock = g.blocks.firstOrNull { it.isKey }?.let {
+            it.row == g.lockRow && it.col == g.lockCol
+        } ?: false
+
+        val left = boardLeft + g.lockCol * cellSize
+        val top  = boardTop  + g.lockRow * cellSize
+        val badgeSize = cellSize * 0.35f
+
+        // Small badge in top-right corner of lock cell
+        val badgeLeft = left + cellSize - badgeSize - cellSize * 0.05f
+        val badgeTop  = top + cellSize * 0.05f
+        val badgeRect = RectF(badgeLeft, badgeTop, badgeLeft + badgeSize, badgeTop + badgeSize)
+
+        // Badge background
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (keyAtLock) 0xFF66BB6A.toInt() else 0xFF5D4037.toInt()
+            alpha = 200
+        }
+        canvas.drawRoundRect(badgeRect, badgeSize * 0.3f, badgeSize * 0.3f, bgPaint)
+
+        // Badge icon
+        val badgeIcon = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = badgeSize * 0.7f
+            textAlign = Paint.Align.CENTER
+        }
+        val icon = if (keyAtLock) "\uD83D\uDD13" else "\uD83D\uDD12"
+        canvas.drawText(icon, badgeRect.centerX(), badgeRect.centerY() + badgeIcon.textSize * 0.3f, badgeIcon)
+
+        // Pulsing border glow when lock not satisfied (to draw attention)
+        if (!keyAtLock) {
+            val time = System.currentTimeMillis()
+            val pulse = (sin(time / 600.0) * 0.3 + 0.7).toFloat()
+            val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2.5f
+                color = LOCK_COLOR
+                alpha = (pulse * 140).toInt()
+            }
+            val pad = cellSize * 0.06f
+            val cellRect = RectF(left + pad, top + pad, left + cellSize - pad, top + cellSize - pad)
+            canvas.drawRoundRect(cellRect, 6f, 6f, glowPaint)
+        }
+    }
+
+    // ── Checkpoint overlay (drawn ON TOP of blocks so always visible) ───
+
+    private fun drawCheckpointOverlay(canvas: Canvas, g: PuzzleGrid) {
+        if (!g.hasCheckpoint) return
+
+        val left = boardLeft + g.checkpointCol * cellSize
+        val top  = boardTop  + g.checkpointRow * cellSize
+        val reached = g.checkpointReached
+        val badgeSize = cellSize * 0.35f
+
+        // Small badge in top-left corner of checkpoint cell
+        val badgeLeft = left + cellSize * 0.05f
+        val badgeTop  = top + cellSize * 0.05f
+        val badgeRect = RectF(badgeLeft, badgeTop, badgeLeft + badgeSize, badgeTop + badgeSize)
+
+        // Badge background
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (reached) 0xFF66BB6A.toInt() else 0xFF5D4037.toInt()
+            alpha = 200
+        }
+        canvas.drawRoundRect(badgeRect, badgeSize * 0.3f, badgeSize * 0.3f, bgPaint)
+
+        // Badge icon
+        val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = badgeSize * 0.7f
+            textAlign = Paint.Align.CENTER
+        }
+        val icon = if (reached) "\u2713" else "\u2B50"
+        canvas.drawText(icon, badgeRect.centerX(), badgeRect.centerY() + iconPaint.textSize * 0.3f, iconPaint)
+
+        // Pulsing border when not reached
+        if (!reached) {
+            val time = System.currentTimeMillis()
+            val pulse = (sin(time / 500.0) * 0.3 + 0.7).toFloat()
+            val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2.5f
+                color = CHECKPOINT_COLOR
+                alpha = (pulse * 140).toInt()
+            }
+            val pad = cellSize * 0.06f
+            val cellRect = RectF(left + pad, top + pad, left + cellSize - pad, top + cellSize - pad)
+            canvas.drawRoundRect(cellRect, 6f, 6f, glowPaint)
+        }
+    }
+
     // ── Checkpoint cell ──────────────────────────────────────────────────
 
     private fun drawCheckpointCell(canvas: Canvas, g: PuzzleGrid) {
@@ -693,15 +864,45 @@ class PuzzleView @JvmOverloads constructor(
         }
         prevCheckpointReached = reached
 
-        // Star marker
-        val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            textSize = cellSize * 0.5f
-            textAlign = Paint.Align.CENTER
-            alpha = if (reached) 220 else 80
+        // Circular background highlight
+        val bgRadius = cellSize * 0.38f
+        val circlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (reached) 0xFFFFD700.toInt() else 0xFF9E9E9E.toInt()
+            alpha = if (reached) 60 else 30
         }
-        canvas.drawText("\u2B50", cx, cy + starPaint.textSize * 0.35f, starPaint)
+        canvas.drawCircle(cx, cy, bgRadius, circlePaint)
 
-        // Pulse ring on reach
+        // Dashed border ring
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+            color = if (reached) 0xFFFFD700.toInt() else 0xFF757575.toInt()
+            alpha = if (reached) 180 else 80
+        }
+        canvas.drawCircle(cx, cy, bgRadius, borderPaint)
+
+        // Star emoji (bigger)
+        val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = cellSize * 0.55f
+            textAlign = Paint.Align.CENTER
+            alpha = if (reached) 255 else 120
+        }
+        canvas.drawText("\u2B50", cx, cy + starPaint.textSize * 0.25f, starPaint)
+
+        // Pulsing ring when NOT reached (draw attention)
+        if (!reached) {
+            val time = System.currentTimeMillis()
+            val pulse = (sin(time / 500.0) * 0.4 + 0.6).toFloat()
+            val pulsePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+                color = CHECKPOINT_COLOR
+                alpha = (pulse * 100).toInt()
+            }
+            canvas.drawCircle(cx, cy, bgRadius + 3f, pulsePaint)
+        }
+
+        // Pulse ring on reach transition
         if (reached && checkpointGlowStartTime > 0L) {
             val elapsed = System.currentTimeMillis() - checkpointGlowStartTime
             if (elapsed < 400L) {
@@ -865,11 +1066,11 @@ class PuzzleView @JvmOverloads constructor(
 
             // Key label
             if (block.isKey) {
-                textPaint.textSize = min(cellSize * 0.35f, 16f)
+                textPaint.textSize = cellSize * 0.55f
                 canvas.drawText(
                     "\uD83D\uDD11",
                     (left + visualRight) / 2f,
-                    (top + visualBottom) / 2f + textPaint.textSize * 0.35f,
+                    (top + visualBottom) / 2f + textPaint.textSize * 0.3f,
                     textPaint
                 )
             }

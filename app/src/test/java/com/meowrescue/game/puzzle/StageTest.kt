@@ -156,6 +156,26 @@ class StageTest {
     }
 
     @Test
+    fun debugStageInfo() {
+        val gen = PuzzleGenerator()
+        // Key stages
+        val keyStages = (1..120).filter { gen.featuresForStage(it).hasKey }
+        println("KEY STAGES: $keyStages")
+        // Checkpoint stages
+        val cpStages = (1..120).filter { gen.featuresForStage(it).hasCheckpoint }
+        println("CHECKPOINT STAGES: $cpStages")
+        // Detailed info for problematic stages
+        for (s in listOf(16, 20, 25, 30, 35, 40, 50, 60, 80, 100, 105, 110, 115, 120)) {
+            val result = gen.generateWithResult(s)
+            val f = gen.featuresForStage(s)
+            val g = result.grid
+            println("Stage $s: blocks=${g.blocks.size} moves=${result.optimalMoves} dir=${g.exitDirection} " +
+                    "key=${f.hasKey} cp=${f.hasCheckpoint} hasKeyLock=${g.hasKeyLock} hasCp=${g.hasCheckpoint} " +
+                    "cat=${g.blocks.firstOrNull { it.isCat }}")
+        }
+    }
+
+    @Test
     fun featuresForStageDistribution() {
         val gen = PuzzleGenerator()
         // Stages 1-15: no features
