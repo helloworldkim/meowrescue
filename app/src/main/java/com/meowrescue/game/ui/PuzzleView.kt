@@ -1039,56 +1039,76 @@ class PuzzleView @JvmOverloads constructor(
             val visualRight  = if (isDragging || isSnapping) left + (widthCells * cellSize - 2 * padding) else right
             val visualBottom = if (isDragging || isSnapping) top  + (heightCells * cellSize - 2 * padding) else bottom
 
-            val color = when {
-                block.isCat -> CAT_COLOR
-                block.isKey -> KEY_COLOR
-                else -> BLOCK_COLORS[(block.id - 1) % BLOCK_COLORS.size]
-            }
-
-            // Shadow
-            if (isDragging || isSnapping) {
-                blockShadow.alpha = 80
-                val shadowRect = RectF(left + 6f, top + 6f, visualRight + 6f, visualBottom + 6f)
-                canvas.drawRoundRect(shadowRect, cr, cr, blockShadow)
-            }
-
-            // Block body
-            blockPaint.color = color
-            val blockRect = RectF(left, top, visualRight, visualBottom)
-            canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
-
-            // Highlight gloss
-            glossPaint.shader = LinearGradient(
-                left, top, left, top + (visualBottom - top) * 0.4f,
-                intArrayOf(0x55FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP
-            )
-            canvas.drawRoundRect(blockRect, cr, cr, glossPaint)
-
-            // Key label
-            if (block.isKey) {
-                textPaint.textSize = cellSize * 0.55f
-                canvas.drawText(
-                    "\uD83D\uDD11",
-                    (left + visualRight) / 2f,
-                    (top + visualBottom) / 2f + textPaint.textSize * 0.3f,
-                    textPaint
-                )
-            }
-            // Cat bitmap or label
+            // ── Cat: image-only rendering (no block background) ──
             if (block.isCat) {
+                val cx = (left + visualRight) / 2f
+                val cy = (top + visualBottom) / 2f
+                val cellW = visualRight - left
+                val cellH = visualBottom - top
                 val bmp = catBitmap
+
+                // Scale up slightly when dragging for tactile feedback
+                val scale = if (isDragging) 1.05f else 1.0f
+                val imgSize = min(cellW, cellH) * 0.92f * scale
+
+                // Subtle drop shadow under cat (only when dragging)
+                if (isDragging) {
+                    val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = 0xFF000000.toInt()
+                        alpha = 25
+                        maskFilter = BlurMaskFilter(imgSize * 0.15f, BlurMaskFilter.Blur.NORMAL)
+                    }
+                    canvas.drawCircle(cx + 3f, cy + 4f, imgSize * 0.35f, shadowPaint)
+                }
+
                 if (bmp != null && !bmp.isRecycled) {
-                    val imgSize = min(visualRight - left, visualBottom - top) * 0.7f
-                    val cx = (left + visualRight) / 2f
-                    val cy = (top + visualBottom) / 2f
-                    val imgRect = RectF(cx - imgSize / 2f, cy - imgSize / 2f, cx + imgSize / 2f, cy + imgSize / 2f)
+                    val imgRect = RectF(
+                        cx - imgSize / 2f, cy - imgSize / 2f,
+                        cx + imgSize / 2f, cy + imgSize / 2f
+                    )
                     canvas.drawBitmap(bmp, null, imgRect, null)
                 } else {
-                    textPaint.textSize = min(cellSize * 0.45f, 20f)
+                    // Fallback: draw a soft circle + text
+                    val fallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = CAT_COLOR; alpha = 200
+                    }
+                    canvas.drawCircle(cx, cy, imgSize * 0.45f, fallbackPaint)
+                    textPaint.textSize = imgSize * 0.35f
+                    canvas.drawText("\uD83D\uDC31", cx, cy + textPaint.textSize * 0.3f, textPaint)
+                }
+            } else {
+                // ── Normal block rendering ──
+                val color = when {
+                    block.isKey -> KEY_COLOR
+                    else -> BLOCK_COLORS[(block.id - 1) % BLOCK_COLORS.size]
+                }
+
+                // Shadow
+                if (isDragging || isSnapping) {
+                    blockShadow.alpha = 80
+                    val shadowRect = RectF(left + 6f, top + 6f, visualRight + 6f, visualBottom + 6f)
+                    canvas.drawRoundRect(shadowRect, cr, cr, blockShadow)
+                }
+
+                // Block body
+                blockPaint.color = color
+                val blockRect = RectF(left, top, visualRight, visualBottom)
+                canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
+
+                // Highlight gloss
+                glossPaint.shader = LinearGradient(
+                    left, top, left, top + (visualBottom - top) * 0.4f,
+                    intArrayOf(0x55FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP
+                )
+                canvas.drawRoundRect(blockRect, cr, cr, glossPaint)
+
+                // Key label
+                if (block.isKey) {
+                    textPaint.textSize = cellSize * 0.55f
                     canvas.drawText(
-                        "CAT",
+                        "\uD83D\uDD11",
                         (left + visualRight) / 2f,
-                        (top + visualBottom) / 2f + textPaint.textSize * 0.35f,
+                        (top + visualBottom) / 2f + textPaint.textSize * 0.3f,
                         textPaint
                     )
                 }
@@ -1122,22 +1142,20 @@ class PuzzleView @JvmOverloads constructor(
         val slideRight  = left + (right - (boardLeft + block.col * cellSize + padding))
         val slideBottom = top + (bottom - (boardTop + block.row * cellSize + padding))
 
-        blockPaint.color = CAT_COLOR
-        val blockRect = RectF(left, top, slideRight, slideBottom)
-        canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
+        // Cat image only (no block background)
+        val cx = (left + slideRight) / 2f
+        val cy = (top + slideBottom) / 2f
+        val imgSize = min(slideRight - left, slideBottom - top) * 0.92f
 
-        // Cat bitmap on sliding block
         val bmp = catBitmap
         if (bmp != null && !bmp.isRecycled) {
-            val imgSize = min(slideRight - left, slideBottom - top) * 0.7f
-            val cx = (left + slideRight) / 2f
-            val cy = (top + slideBottom) / 2f
             val imgRect = RectF(cx - imgSize / 2f, cy - imgSize / 2f, cx + imgSize / 2f, cy + imgSize / 2f)
             canvas.drawBitmap(bmp, null, imgRect, null)
         } else {
-            textPaint.textSize = min(cellSize * 0.45f, 20f)
-            canvas.drawText("CAT", (left + slideRight) / 2f,
-                (top + slideBottom) / 2f + textPaint.textSize * 0.35f, textPaint)
+            val fallbackP = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = CAT_COLOR; alpha = 200 }
+            canvas.drawCircle(cx, cy, imgSize * 0.45f, fallbackP)
+            textPaint.textSize = imgSize * 0.35f
+            canvas.drawText("\uD83D\uDC31", cx, cy + textPaint.textSize * 0.3f, textPaint)
         }
     }
 
@@ -1287,21 +1305,27 @@ class PuzzleView @JvmOverloads constructor(
         val toolbarH   = 80 * density
         val arrowArea  = 48 * density
 
-        val arrowL = if (g.exitDirection == ExitDirection.LEFT) arrowArea else 0f
-        val arrowR = if (g.exitDirection == ExitDirection.RIGHT) arrowArea else 0f
-        val arrowT = if (g.exitDirection == ExitDirection.TOP) arrowArea else 0f
-        val arrowB = if (g.exitDirection == ExitDirection.BOTTOM) arrowArea else 0f
-
-        val availableW = w - arrowL - arrowR
-        val availableH = h - hudH - toolbarH - arrowT - arrowB - (24 * density)
+        // Always reserve arrow space on all sides so board stays centered regardless of exit direction
+        val availableW = w - arrowArea * 2
+        val availableH = h - hudH - toolbarH - arrowArea * 2 - (24 * density)
 
         val maxBoard = min(availableW, availableH)
         val targetH  = (h * 0.65f).coerceIn(availableH * 0.55f, availableH)
         boardSize    = min(maxBoard, targetH)
 
         cellSize  = boardSize / max(g.rows, g.cols)
-        boardLeft = arrowL + (availableW - boardSize) / 2f
-        boardTop  = hudH + arrowT + (availableH - boardSize) / 2f
+        boardLeft = arrowArea + (availableW - boardSize) / 2f
+        boardTop  = hudH + arrowArea + (availableH - boardSize) / 2f
+
+        // Exclude board area from system back gesture on both edges
+        // Must span full screen width so both left and right edge swipes are blocked
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val bT = boardTop.toInt()
+            val bB = (boardTop + boardSize).toInt()
+            systemGestureExclusionRects = listOf(
+                android.graphics.Rect(0, bT, w.toInt(), bB)
+            )
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────
