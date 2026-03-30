@@ -122,6 +122,14 @@ class MenuActivity : AppCompatActivity() {
         }
         contentLayout.addView(playButton)
 
+        // Collection button
+        val collectionBtn = makeButton("\uD83D\uDC31  Collection", Theme.COLOR_BUTTON_COLLECTION)
+        collectionBtn.setOnClickListener {
+            SoundManager.playButtonTap()
+            startActivity(Intent(this, CollectionActivity::class.java))
+        }
+        contentLayout.addView(collectionBtn)
+
         // Endless Mode button (hidden until 200 stages cleared)
         endlessBtn = makeButton("\uD83D\uDD04  Endless Mode", Theme.COLOR_ENDLESS_PURPLE)
         endlessBtn.visibility = View.GONE
