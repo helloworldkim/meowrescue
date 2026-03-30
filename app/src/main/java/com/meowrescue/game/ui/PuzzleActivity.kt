@@ -1,15 +1,9 @@
 package com.meowrescue.game.ui
 
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
@@ -32,15 +26,16 @@ class PuzzleActivity : AppCompatActivity() {
     private var isEndless: Boolean = false
     private var endlessCount: Int = 1
     private var bannerAd: AdView? = null
-    private var pauseOverlay: FrameLayout? = null
+    private lateinit var pauseOverlay: FrameLayout
     private lateinit var loadingOverlay: FrameLayout
     private lateinit var frameRoot: FrameLayout
     private var congratsOverlay: FrameLayout? = null
     private var solvePending = false
+    private val dp by lazy { resources.displayMetrics.density }
 
-    // ── Next stage preloading ────────────────────────────────────────────
-    private var preloadedResult: PuzzleGenerator.GenerateResult? = null
-    private var preloadedStage: Int = -1
+    // ── Next stage preloading (thread-safe) ──────────────────────────────
+    private data class PreloadedPuzzle(val stage: Int, val result: PuzzleGenerator.GenerateResult)
+    private var preloaded: PreloadedPuzzle? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,14 +81,30 @@ class PuzzleActivity : AppCompatActivity() {
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        loadingOverlay = buildLoadingOverlay()
+        loadingOverlay = PuzzleOverlays.buildLoadingOverlay(this, repository.getSelectedCatDrawable(), dp)
         frameRoot.addView(loadingOverlay, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        pauseOverlay = buildPauseOverlay()
-        pauseOverlay!!.visibility = View.GONE
+        pauseOverlay = PuzzleOverlays.buildPauseOverlay(
+            context = this,
+            dp = dp,
+            onResume = {
+                pauseOverlay.visibility = View.GONE
+                puzzleView.resume()
+            },
+            onRestart = {
+                pauseOverlay.visibility = View.GONE
+                puzzleView.resetPuzzle()
+                puzzleView.resume()
+            },
+            onQuit = {
+                pauseOverlay.visibility = View.GONE
+                finish()
+            }
+        )
+        pauseOverlay.visibility = View.GONE
         frameRoot.addView(pauseOverlay, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -110,20 +121,22 @@ class PuzzleActivity : AppCompatActivity() {
         AdManager.loadInterstitial(this)
     }
 
+    // ── Stage loading ────────────────────────────────────────────────────
+
     private fun loadStage(stage: Int) {
         currentStage = stage
         solvePending = false
         loadingOverlay.visibility = View.VISIBLE
         puzzleView.visibility = View.INVISIBLE
         lifecycleScope.launch {
-            // Use preloaded result if available for this stage
-            val result = if (preloadedStage == stage && preloadedResult != null) {
-                preloadedResult!!
+            // Use preloaded result if available for this stage (local capture for safety)
+            val cached = preloaded
+            val result = if (cached != null && cached.stage == stage) {
+                cached.result
             } else {
                 withContext(Dispatchers.Default) { generator.generateWithResult(stage) }
             }
-            preloadedResult = null
-            preloadedStage = -1
+            preloaded = null
 
             puzzleView.setGrid(result.grid, stage, result.optimalMoves, isEndless, endlessCount)
             puzzleView.hintCount = 3
@@ -162,113 +175,110 @@ class PuzzleActivity : AppCompatActivity() {
 
     private fun preloadNextStage() {
         val nextStage = if (isEndless) generateRandomStage() else (currentStage + 1).coerceAtMost(200)
-        lifecycleScope.launch(Dispatchers.Default) {
-            val result = generator.generateWithResult(nextStage)
-            preloadedStage = nextStage
-            preloadedResult = result
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.Default) { generator.generateWithResult(nextStage) }
+            preloaded = PreloadedPuzzle(nextStage, result)
         }
     }
 
-    private fun setupCallbacks() {
-        // Called when escape animation completes and victory overlay shows
-        puzzleView.onStageClear = { moves, stars ->
-            lifecycleScope.launch {
-                if (isEndless) {
-                    endlessCount++
-                    repository.setEndlessCount(endlessCount)
-                    if (endlessCount > repository.getEndlessBest()) {
-                        repository.setEndlessBest(endlessCount)
-                    }
-                    AdManager.onStageClear()
-                } else {
-                    val prevMax = repository.getMaxCompletedLevel()
-                    repository.saveProgress(currentStage, stars, null)
-                    AdManager.onStageClear()
+    // ── Callbacks ────────────────────────────────────────────────────────
 
-                    // Check for new cat unlock (only on first-time clear)
-                    if (currentStage > prevMax) {
-                        val newCat = repository.getNewlyUnlockedCat(currentStage)
-                        if (newCat != null) {
-                            showCongratsDialog(newCat)
-                        }
+    private fun setupCallbacks() {
+        puzzleView.onStageClear = { moves, stars -> handleStageClear(moves, stars) }
+        puzzleView.onNextStageClicked = { handleNextStage() }
+        puzzleView.onRetryClicked = { loadStage(currentStage) }
+        puzzleView.onLevelSelectClicked = { finish() }
+        puzzleView.onPauseClicked = {
+            puzzleView.pause()
+            pauseOverlay.visibility = View.VISIBLE
+        }
+        puzzleView.onHintClicked = { handleHintRequest() }
+        puzzleView.onSolveClicked = { handleSolveRequest() }
+    }
+
+    private fun handleStageClear(moves: Int, stars: Int) {
+        lifecycleScope.launch {
+            if (isEndless) {
+                endlessCount++
+                repository.setEndlessCount(endlessCount)
+                if (endlessCount > repository.getEndlessBest()) {
+                    repository.setEndlessBest(endlessCount)
+                }
+                AdManager.onStageClear()
+            } else {
+                val prevMax = repository.getMaxCompletedLevel()
+                repository.saveProgress(currentStage, stars, null)
+                AdManager.onStageClear()
+
+                // Check for new cat unlock (only on first-time clear)
+                if (currentStage > prevMax) {
+                    val newCat = repository.getNewlyUnlockedCat(currentStage)
+                    if (newCat != null) {
+                        showCongratsDialog(newCat)
                     }
                 }
             }
         }
+    }
 
-        // Called when user clicks "Next Stage" button in victory overlay
-        puzzleView.onNextStageClicked = {
-            // Use preloaded stage if available, otherwise compute fresh
-            val nextStage = if (preloadedStage > 0) preloadedStage
-                else if (isEndless) generateRandomStage() else (currentStage + 1).coerceAtMost(200)
-            if (AdManager.shouldShowInterstitial(currentStage)) {
-                AdManager.showInterstitial(this@PuzzleActivity) {
-                    loadStage(nextStage)
-                    AdManager.loadInterstitial(this@PuzzleActivity)
-                }
-            } else {
+    private fun handleNextStage() {
+        // Use preloaded stage if available, otherwise compute fresh (local capture)
+        val cached = preloaded
+        val nextStage = if (cached != null && cached.stage > 0) cached.stage
+            else if (isEndless) generateRandomStage() else (currentStage + 1).coerceAtMost(200)
+        if (AdManager.shouldShowInterstitial(currentStage)) {
+            AdManager.showInterstitial(this@PuzzleActivity) {
                 loadStage(nextStage)
                 AdManager.loadInterstitial(this@PuzzleActivity)
             }
+        } else {
+            loadStage(nextStage)
+            AdManager.loadInterstitial(this@PuzzleActivity)
         }
+    }
 
-        puzzleView.onRetryClicked = {
-            loadStage(currentStage)
+    private fun handleHintRequest() {
+        if (puzzleView.hintCount > 0) {
+            puzzleView.hintCount--
+            val currentGrid = puzzleView.getCurrentGrid()
+            if (currentGrid != null) {
+                lifecycleScope.launch(Dispatchers.Default) {
+                    val steps = generator.solveSteps(currentGrid)
+                    withContext(Dispatchers.Main) {
+                        if (steps != null && steps.isNotEmpty()) {
+                            puzzleView.showHint(steps[0])
+                        }
+                    }
+                }
+            }
+        } else {
+            // No hints left — show interstitial ad to grant 1 more hint
+            AdManager.showInterstitial(this@PuzzleActivity) {
+                puzzleView.hintCount = 1
+                AdManager.loadInterstitial(this@PuzzleActivity)
+            }
         }
+    }
 
-        puzzleView.onLevelSelectClicked = {
-            finish()
-        }
-
-        puzzleView.onPauseClicked = {
-            puzzleView.pause()
-            pauseOverlay?.visibility = View.VISIBLE
-        }
-
-        puzzleView.onHintClicked = {
-            if (puzzleView.hintCount > 0) {
-                puzzleView.hintCount--
-                val currentGrid = puzzleView.getCurrentGrid()
-                if (currentGrid != null) {
-                    lifecycleScope.launch(Dispatchers.Default) {
-                        val steps = generator.solveSteps(currentGrid)
-                        withContext(Dispatchers.Main) {
-                            if (steps != null && steps.isNotEmpty()) {
-                                puzzleView.showHint(steps[0])
-                            }
+    private fun handleSolveRequest() {
+        if (solvePending) return
+        solvePending = true
+        AdManager.showInterstitial(this@PuzzleActivity) {
+            if (isDestroyed) { solvePending = false; return@showInterstitial }
+            AdManager.loadInterstitial(this@PuzzleActivity)
+            val currentGrid = puzzleView.getCurrentGrid()
+            if (currentGrid != null) {
+                lifecycleScope.launch(Dispatchers.Default) {
+                    val steps = generator.solveSteps(currentGrid)
+                    withContext(Dispatchers.Main) {
+                        solvePending = false
+                        if (!steps.isNullOrEmpty()) {
+                            puzzleView.startAutoSolve(steps)
                         }
                     }
                 }
             } else {
-                // No hints left — show interstitial ad to grant 1 more hint
-                AdManager.showInterstitial(this@PuzzleActivity) {
-                    puzzleView.hintCount = 1
-                    AdManager.loadInterstitial(this@PuzzleActivity)
-                }
-            }
-        }
-
-        puzzleView.onSolveClicked = {
-            if (!solvePending) {
-                solvePending = true
-                AdManager.showInterstitial(this@PuzzleActivity) {
-                    if (isDestroyed) { solvePending = false; return@showInterstitial }
-                    AdManager.loadInterstitial(this@PuzzleActivity)
-                    val currentGrid = puzzleView.getCurrentGrid()
-                    if (currentGrid != null) {
-                        lifecycleScope.launch(Dispatchers.Default) {
-                            val steps = generator.solveSteps(currentGrid)
-                            withContext(Dispatchers.Main) {
-                                solvePending = false
-                                if (!steps.isNullOrEmpty()) {
-                                    puzzleView.startAutoSolve(steps)
-                                }
-                            }
-                        }
-                    } else {
-                        solvePending = false
-                    }
-                }
+                solvePending = false
             }
         }
     }
@@ -278,216 +288,15 @@ class PuzzleActivity : AppCompatActivity() {
     // ── Congratulation dialog for new cat unlock ────────────────────────
 
     private fun showCongratsDialog(cat: GameRepository.CatDefinition) {
-        val density = resources.displayMetrics.density
-
-        val overlay = FrameLayout(this)
-        overlay.setBackgroundColor(0xAA000000.toInt())
-
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(
-                (24 * density).toInt(), (28 * density).toInt(),
-                (24 * density).toInt(), (28 * density).toInt()
-            )
-            background = GradientDrawable().apply {
-                setColor(0xFFFFF8F0.toInt())
-                cornerRadius = 24 * density
-            }
-            elevation = 8 * density
+        val overlay = PuzzleOverlays.buildCongratsOverlay(this, cat, dp, frameRoot) {
+            congratsOverlay = null
         }
-
-        val title = TextView(this).apply {
-            text = "New Cat Unlocked!"
-            textSize = 22f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xFFFF7043.toInt())
-            gravity = Gravity.CENTER
-        }
-        panel.addView(title, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).also { it.bottomMargin = (16 * density).toInt() })
-
-        val catImage = ImageView(this).apply {
-            setImageResource(cat.drawableRes)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-        }
-        val imgSize = (100 * density).toInt()
-        panel.addView(catImage, LinearLayout.LayoutParams(imgSize, imgSize).also {
-            it.gravity = Gravity.CENTER_HORIZONTAL
-            it.bottomMargin = (12 * density).toInt()
-        })
-
-        val nameTv = TextView(this).apply {
-            text = cat.name
-            textSize = 20f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xFF4E342E.toInt())
-            gravity = Gravity.CENTER
-        }
-        panel.addView(nameTv, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).also { it.bottomMargin = (20 * density).toInt() })
-
-        val okBtn = TextView(this).apply {
-            text = "OK"
-            textSize = 16f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                setColor(0xFFFF7043.toInt())
-                cornerRadius = 12 * density
-            }
-            elevation = 4 * density
-            setOnClickListener {
-                SoundManager.playButtonTap()
-                frameRoot.removeView(overlay)
-                congratsOverlay = null
-            }
-        }
-        panel.addView(okBtn, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            (48 * density).toInt()
-        ))
-
-        overlay.addView(panel, FrameLayout.LayoutParams(
-            (280 * density).toInt(),
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER
-        ))
-
         congratsOverlay = overlay
         frameRoot.addView(overlay, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
-
         SoundManager.playStarEarn()
-    }
-
-    // ── Loading overlay ────────────────────────────────────────────────────
-
-    private fun buildLoadingOverlay(): FrameLayout {
-        val density = resources.displayMetrics.density
-        val overlay = FrameLayout(this)
-        overlay.setBackgroundColor(0xFFFFF8F0.toInt())
-
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-        }
-
-        val catImage = android.widget.ImageView(this).apply {
-            setImageResource(repository.getSelectedCatDrawable())
-            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-        }
-        val imgSize = (100 * density).toInt()
-        container.addView(catImage, LinearLayout.LayoutParams(imgSize, imgSize).also {
-            it.gravity = Gravity.CENTER_HORIZONTAL
-            it.bottomMargin = (16 * density).toInt()
-        })
-
-        val loadingText = TextView(this).apply {
-            text = "Preparing puzzle..."
-            textSize = 18f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xFF4E342E.toInt())
-            gravity = Gravity.CENTER
-        }
-        container.addView(loadingText)
-
-        overlay.addView(container, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER
-        ))
-        return overlay
-    }
-
-    // ── Pause overlay ──────────────────────────────────────────────────────
-
-    private fun buildPauseOverlay(): FrameLayout {
-        val density = resources.displayMetrics.density
-
-        val overlay = FrameLayout(this)
-        overlay.setBackgroundColor(0xCC000000.toInt())
-
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(
-                (24 * density).toInt(), (28 * density).toInt(),
-                (24 * density).toInt(), (28 * density).toInt()
-            )
-            background = GradientDrawable().apply {
-                setColor(0xFFFFF8F0.toInt())
-                cornerRadius = 24 * density
-            }
-            elevation = 8 * density
-        }
-
-        val title = TextView(this).apply {
-            text = "Paused"
-            textSize = 22f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(0xFF4E342E.toInt())
-            gravity = Gravity.CENTER
-        }
-        panel.addView(title, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).also { it.bottomMargin = (20 * density).toInt() })
-
-        panel.addView(makeDialogButton("Resume", 0xFFFF7043.toInt()) {
-            pauseOverlay?.visibility = View.GONE
-            puzzleView.resume()
-        }, buttonLayoutParams(density))
-
-        panel.addView(makeDialogButton("Restart", 0xFF26A69A.toInt()) {
-            pauseOverlay?.visibility = View.GONE
-            puzzleView.resetPuzzle()
-            puzzleView.resume()
-        }, buttonLayoutParams(density))
-
-        panel.addView(makeDialogButton("Quit", 0xFF9E9E9E.toInt()) {
-            pauseOverlay?.visibility = View.GONE
-            finish()
-        }, buttonLayoutParams(density))
-
-        overlay.addView(panel, FrameLayout.LayoutParams(
-            (260 * density).toInt(),
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER
-        ))
-
-        return overlay
-    }
-
-    private fun buttonLayoutParams(density: Float): LinearLayout.LayoutParams {
-        return LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            (48 * density).toInt()
-        ).also { it.topMargin = (10 * density).toInt() }
-    }
-
-    private fun makeDialogButton(label: String, color: Int, onClick: () -> Unit): TextView {
-        val density = resources.displayMetrics.density
-        return TextView(this).apply {
-            text = label
-            textSize = 16f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            gravity = Gravity.CENTER
-            background = GradientDrawable().apply {
-                setColor(color)
-                cornerRadius = 12 * density
-            }
-            elevation = 4 * density
-            setOnClickListener { onClick() }
-        }
     }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────

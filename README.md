@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Language](https://img.shields.io/badge/Language-Kotlin%202.2.0-purple)
 ![MinSDK](https://img.shields.io/badge/MinSDK-24%20(Android%207.0)-blue)
-![Version](https://img.shields.io/badge/Version-v5.2-orange)
+![Version](https://img.shields.io/badge/Version-v5.3-orange)
 
 ## 소개
 
@@ -22,7 +22,7 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 - **체크포인트**: 별 마커 셀을 고양이가 경유해야 탈출 가능 (스테이지 31+)
 - **벽 블록**: 움직일 수 없는 고정 장애물 (스테이지 51+)
 - **연결 블록**: 같은 linkId를 가진 한 쌍의 블록이 동시에 이동 (스테이지 91+). 파트너 배치 실패 시 고아 블록 자동 제거
-- **포탈**: 고양이 전용 워프 셀 — A에 도착하면 B로 텔레포트 (스테이지 111+). 목적지 점유 검사 + 얼음 셀 겹침 방지
+- **포탈**: 고양이 전용 워프 셀 — A에 도착하면 B로 텔레포트 (스테이지 111+). 목적지 점유 검사
 - **멀티캣**: 2마리 고양이가 각자의 출구로 탈출해야 클리어 (스테이지 131+)
 - **1칸 블록 양방향 이동**: 1칸짜리 블록은 상하좌우 모두 이동 가능
 - **자동 레벨 생성**: 시드 기반 절차적 생성으로 무한 스테이지
@@ -168,7 +168,7 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 ```
 com.meowrescue.game
 ├── puzzle/
-│   ├── PuzzleGrid.kt              // 격자 상태, 블록 이동/제거, 클리어 판정, 얼음 슬라이딩
+│   ├── PuzzleGrid.kt              // 격자 상태, 블록 이동/제거, 클리어 판정
 │   └── PuzzleGenerator.kt         // 자동 레벨 생성 + 품질 필터
 ├── ui/
 │   ├── MenuActivity.kt            // 메인 메뉴 (Play, Collection, Sound 토글)
@@ -176,7 +176,8 @@ com.meowrescue.game
 │   ├── PuzzleActivity.kt          // 게임 진행, 클리어 처리, 고양이 해금, 광고
 │   ├── PuzzleView.kt              // SurfaceView 렌더링 + 드래그 + 스냅/탈출 애니메이션
 │   ├── CollectionActivity.kt      // 고양이 컬렉션 (4열 그리드, 20마리)
-│   └── Theme.kt                   // UI 색상 + 파티클 컬러
+│   ├── PuzzleOverlays.kt           // 오버레이 빌더 (로딩/일시정지/축하 다이얼로그)
+│   └── Theme.kt                   // UI 색상 + 파티클 컬러 + 공유 Int 상수
 ├── data/
 │   ├── AppDatabase.kt             // Room 데이터베이스
 │   ├── UserProgressDao.kt         // 진행도 DAO
@@ -203,9 +204,11 @@ com.meowrescue.game
 
 - 상태를 IntArray(블록 위치 + 체크포인트 비트)로 표현
 - FNV-1a 64비트 해시로 방문 체크 (충돌 최소화)
-- 최대 80,000~150,000 상태 (메커니즘 조합에 따라 동적), 깊이 35로 제한
-- 벽 블록 자동 스킵, 연결 블록 쌍 동시 이동, 얼음 타일 중간 정지 금지 (게임 로직과 일치)
-- 포탈 텔레포트: 고양이 이동 후 4방향 모두 `buildGrid` + 목적지 점유 검사 + 자동 워프
+- 최대 150,000~300,000 상태 (메커니즘 조합에 따라 동적), 깊이 45로 제한
+- 통합 `bfsCore(trackPath)`: 최소 이동 수 계산과 경로 추적을 단일 메서드로 통합
+- `tryMoveInDirection()` 헬퍼로 4방향 이동 로직 일원화
+- 벽 블록 자동 스킵, 연결 블록 쌍 동시 이동 (게임 로직과 일치)
+- 포탈 텔레포트: 고양이 이동 후 4방향 모두 `isCellOccupied()` O(n) 점유 검사 + 자동 워프
 - 멀티캣: 복수 고양이 인덱스 추적, 각 고양이별 출구 도달 검증
 - `isSolvedState()`가 exitRow/exitCol + 열쇠 위치 + 체크포인트 도달 + 멀티캣 출구를 종합 검증
 - 체크포인트 경유(pass-through) 감지: 이동 경로 중간 체크포인트도 도달 처리
@@ -216,7 +219,7 @@ com.meowrescue.game
 ./gradlew :app:testDebugUnitTest
 ```
 
-25개 단위 테스트:
+22개 단위 테스트:
 - `stage82IsSolvable` — 스테이지 82 풀이 가능성 검증
 - `allDirectionsAppear` — 100개 스테이지에서 4방향 출구 모두 등장
 - `oneCellBlocksMoveBothAxes` — 1칸 블록 양방향 이동 검증
@@ -237,9 +240,6 @@ com.meowrescue.game
 - `portalTeleportsCat` — 포탈 A→B 텔레포트 검증
 - `portalUndoRestoresPosition` — 포탈 Undo 시 원래 위치 복원
 - `multiCatBothMustExit` — 멀티캣 양쪽 출구 도달 필수 검증
-- `iceSlideExtendsMovement` — 얼음 위 블록 슬라이딩 거리 확장 검증
-- `iceSlideStopsAtWall` — 얼음 끝 벽에서 강제 정지 검증
-- `iceSlideStopsAtBlock` — 얼음 위 장애물에서 강제 정지 검증
 - `newFeaturesStagesSolvable` — 51~140 스테이지 신규 메커니즘 풀이 가능성
 - `debugStageInfo` — 주요 스테이지 디버그 정보 출력
 

@@ -51,6 +51,13 @@ object Theme {
         0xFFFFD6BA.toInt(),  // pastel orange
     )
 
+    // Shared Int color constants (for Canvas/Paint usage)
+    const val INT_BG_CREAM     = 0xFFFFF8F0.toInt()     // = COLOR_CREAM
+    const val INT_WARM_BROWN   = 0xFF4E342E.toInt()     // = COLOR_WARM_BROWN
+    const val INT_CORAL        = 0xFFFF7043.toInt()     // = COLOR_CORAL
+    const val INT_TEAL         = 0xFF26A69A.toInt()     // = COLOR_TEAL
+    const val INT_GRAY         = 0xFF9E9E9E.toInt()
+
     // Battle colors
     const val COLOR_HP_BAR = "#4CAF50"
     const val COLOR_HP_BAR_BG = "#333333"

@@ -1,4 +1,4 @@
-# Meow Rescue — Game Design Document (GDD) v5.2
+# Meow Rescue — Game Design Document (GDD) v5.3
 
 > **슬라이딩 블록 퍼즐 게임. 블록을 밀어서 갇힌 고양이를 탈출시키세요!**
 
@@ -245,11 +245,12 @@ HUD 아래, 보드 위에 조건 안내 텍스트를 표시합니다:
 ### 3.2 BFS 솔버
 
 - 상태를 IntArray(블록 위치 + 체크포인트 비트)로 표현 → PuzzleGrid clone() 없이 탐색
-- FNV-1a 64비트 해시로 방문 체크 (충돌 확률 최소화)
-- 최대 80,000~150,000 상태 (메커니즘 조합에 따라 동적), 깊이 35로 제한
+- FNV-1a 64비트 해시로 방문 체크 (충돌 확률 최소화, indexed loop 최적화)
+- 최대 150,000~300,000 상태 (메커니즘 조합에 따라 동적), 깊이 45로 제한
+- **통합 BFS**: `bfsCore(trackPath)` 단일 메서드로 depth-only/path-tracking 모드 통합, `tryMoveInDirection()` 헬퍼로 4방향 이동 로직 일원화
 - **벽 블록**: 이동 생성 시 자동 스킵
 - **연결 블록**: linkId 파트너 맵으로 O(1) 조회, 쌍 동시 이동 + 충돌 검사. 생성 시 고아 블록 방지
-- **포탈**: 고양이 이동 후 4방향 모두 `buildGrid` + 목적지 점유 검사 + 자동 워프 (일반 블록 무시). 생성 시 A=B 방지
+- **포탈**: 고양이 이동 후 `isCellOccupied()` O(n) 헬퍼로 목적지 점유 검사 + 자동 워프 (전체 격자 재구성 불필요). 생성 시 A=B 방지
 - **멀티캣**: 복수 고양이 인덱스 추적, `isCatAtExit()` 헬퍼로 각 고양이별 출구 검증
 - `isSolvedState()`가 exitRow/exitCol + 열쇠 위치 + 체크포인트 도달 + 멀티캣 출구를 종합 검증
 - 체크포인트 경유(pass-through) 감지: 이동 경로 중간에 체크포인트가 있으면 도달 처리 (연결 파트너 포함)
@@ -418,8 +419,9 @@ com.meowrescue.game
 │   ├── PuzzleActivity.kt              // 게임 진행, 클리어 처리, 고양이 해금
 │   ├── PuzzleView.kt                  // SurfaceView 렌더링 + 드래그 + 애니메이션
 │   │                                   // 스냅, 탈출 시퀀스, 파티클, 승리 오버레이
+│   ├── PuzzleOverlays.kt             // 오버레이 빌더 (축하/로딩/일시정지)
 │   ├── CollectionActivity.kt          // 고양이 컬렉션 (4열 그리드, 선택/해금)
-│   └── Theme.kt                        // UI 색상 + 파티클 컬러
+│   └── Theme.kt                        // UI 색상 + 파티클 컬러 + 공유 Int 상수
 ├── data/
 │   ├── AppDatabase.kt                  // Room 데이터베이스
 │   ├── UserProgressDao.kt             // 진행도 DAO
@@ -570,5 +572,5 @@ enum class PuzzleState {
 
 ---
 
-*Meow Rescue GDD v5.2 — 2026.03*
+*Meow Rescue GDD v5.3 — 2026.03*
 *Platform: Android (Kotlin) | Genre: Sliding Block Puzzle | Style: Casual*
