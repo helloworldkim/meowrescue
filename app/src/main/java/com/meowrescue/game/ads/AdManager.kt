@@ -2,6 +2,7 @@ package com.meowrescue.game.ads
 
 import android.app.Activity
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
@@ -27,17 +28,20 @@ object AdManager {
     // Ad policy constants (GDD Section 5.2)
     private const val NO_ADS_UNTIL_LEVEL = 5
     private const val INTERSTITIAL_LEVEL_INTERVAL = 3
-    private const val MAX_ADS_PER_SESSION = 10
-
     private var interstitialAd: InterstitialAd? = null
     private var rewardedAd: RewardedAd? = null
 
+    private const val PREFS_NAME = "ad_prefs"
+    private const val KEY_STAGES_SINCE_AD = "stages_since_last_ad"
+
+    private var prefs: SharedPreferences? = null
     private var stagesSinceLastAd: Int = 0
-    private var sessionAdCount: Int = 0
     private var isInitialized = false
 
     fun initialize(context: Context) {
         if (isInitialized) return
+        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        stagesSinceLastAd = prefs?.getInt(KEY_STAGES_SINCE_AD, 0) ?: 0
         MobileAds.initialize(context) {
             Log.d(TAG, "MobileAds SDK initialized")
             isInitialized = true
@@ -65,13 +69,16 @@ object AdManager {
     /** Call after each stage clear to track ad interval */
     fun onStageClear() {
         stagesSinceLastAd++
+        saveStageCounter()
     }
 
-    fun shouldShowInterstitial(currentStage: Int): Boolean {
+    private fun saveStageCounter() {
+        prefs?.edit()?.putInt(KEY_STAGES_SINCE_AD, stagesSinceLastAd)?.apply()
+    }
+
+    fun shouldShowAd(currentStage: Int): Boolean {
         if (currentStage <= NO_ADS_UNTIL_LEVEL) return false
-        if (sessionAdCount >= MAX_ADS_PER_SESSION) return false
-        if (stagesSinceLastAd < INTERSTITIAL_LEVEL_INTERVAL) return false
-        return interstitialAd != null
+        return stagesSinceLastAd >= INTERSTITIAL_LEVEL_INTERVAL
     }
 
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit) {
@@ -92,8 +99,8 @@ object AdManager {
                 onDismissed()
             }
         }
-        sessionAdCount++
         stagesSinceLastAd = 0
+        saveStageCounter()
         ad.show(activity)
     }
 
@@ -136,7 +143,8 @@ object AdManager {
                 onDismissed()
             }
         }
-        sessionAdCount++
+        stagesSinceLastAd = 0
+        saveStageCounter()
         ad.show(activity) { rewarded = true }
     }
 

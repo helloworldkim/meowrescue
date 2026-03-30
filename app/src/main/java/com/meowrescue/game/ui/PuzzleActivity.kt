@@ -15,6 +15,7 @@ import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.widget.Toast
 import kotlin.random.Random
 
 class PuzzleActivity : AppCompatActivity() {
@@ -118,7 +119,7 @@ class PuzzleActivity : AppCompatActivity() {
 
         setupCallbacks()
         loadStage(currentStage)
-        AdManager.loadInterstitial(this)
+        AdManager.loadRewarded(this)
     }
 
     // ── Stage loading ────────────────────────────────────────────────────
@@ -139,7 +140,7 @@ class PuzzleActivity : AppCompatActivity() {
             preloaded = null
 
             puzzleView.setGrid(result.grid, stage, result.optimalMoves, isEndless, endlessCount)
-            puzzleView.hintCount = 3
+            puzzleView.hintCount = 2
             loadingOverlay.visibility = View.GONE
             puzzleView.visibility = View.VISIBLE
 
@@ -226,14 +227,21 @@ class PuzzleActivity : AppCompatActivity() {
         val cached = preloaded
         val nextStage = if (cached != null && cached.stage > 0) cached.stage
             else if (isEndless) generateRandomStage() else (currentStage + 1).coerceAtMost(200)
-        if (AdManager.shouldShowInterstitial(currentStage)) {
-            AdManager.showInterstitial(this@PuzzleActivity) {
-                loadStage(nextStage)
-                AdManager.loadInterstitial(this@PuzzleActivity)
+        if (AdManager.shouldShowAd(currentStage)) {
+            if (AdManager.isRewardedReady()) {
+                AdManager.showRewarded(this@PuzzleActivity,
+                    onRewarded = {
+                        loadStage(nextStage)
+                        AdManager.loadRewarded(this@PuzzleActivity)
+                    },
+                    onDismissed = { AdManager.loadRewarded(this@PuzzleActivity) }
+                )
+            } else {
+                Toast.makeText(this, "광고를 불러오는 중입니다. 잠시 후 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
+                AdManager.loadRewarded(this)
             }
         } else {
             loadStage(nextStage)
-            AdManager.loadInterstitial(this@PuzzleActivity)
         }
     }
 
@@ -252,10 +260,18 @@ class PuzzleActivity : AppCompatActivity() {
                 }
             }
         } else {
-            // No hints left — show interstitial ad to grant 1 more hint
-            AdManager.showInterstitial(this@PuzzleActivity) {
-                puzzleView.hintCount = 1
-                AdManager.loadInterstitial(this@PuzzleActivity)
+            // No hints left — show rewarded ad to grant 1 more hint
+            if (AdManager.isRewardedReady()) {
+                AdManager.showRewarded(this@PuzzleActivity,
+                    onRewarded = {
+                        puzzleView.hintCount = 1
+                        AdManager.loadRewarded(this@PuzzleActivity)
+                    },
+                    onDismissed = { AdManager.loadRewarded(this@PuzzleActivity) }
+                )
+            } else {
+                Toast.makeText(this, "광고를 불러오는 중입니다. 잠시 후 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
+                AdManager.loadRewarded(this)
             }
         }
     }
@@ -263,24 +279,36 @@ class PuzzleActivity : AppCompatActivity() {
     private fun handleSolveRequest() {
         if (solvePending) return
         solvePending = true
-        AdManager.showInterstitial(this@PuzzleActivity) {
-            if (isDestroyed) { solvePending = false; return@showInterstitial }
-            AdManager.loadInterstitial(this@PuzzleActivity)
-            val currentGrid = puzzleView.getCurrentGrid()
-            if (currentGrid != null) {
-                lifecycleScope.launch(Dispatchers.Default) {
-                    val steps = generator.solveSteps(currentGrid)
-                    withContext(Dispatchers.Main) {
-                        solvePending = false
-                        if (!steps.isNullOrEmpty()) {
-                            puzzleView.startAutoSolve(steps)
+        if (!AdManager.isRewardedReady()) {
+            solvePending = false
+            Toast.makeText(this, "광고를 불러오는 중입니다. 잠시 후 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
+            AdManager.loadRewarded(this)
+            return
+        }
+        AdManager.showRewarded(this@PuzzleActivity,
+            onRewarded = {
+                if (isDestroyed) { solvePending = false; return@showRewarded }
+                AdManager.loadRewarded(this@PuzzleActivity)
+                val currentGrid = puzzleView.getCurrentGrid()
+                if (currentGrid != null) {
+                    lifecycleScope.launch(Dispatchers.Default) {
+                        val steps = generator.solveSteps(currentGrid)
+                        withContext(Dispatchers.Main) {
+                            solvePending = false
+                            if (!steps.isNullOrEmpty()) {
+                                puzzleView.startAutoSolve(steps)
+                            }
                         }
                     }
+                } else {
+                    solvePending = false
                 }
-            } else {
+            },
+            onDismissed = {
                 solvePending = false
+                AdManager.loadRewarded(this@PuzzleActivity)
             }
-        }
+        )
     }
 
     private fun generateRandomStage(): Int = Random.nextInt(131, 10000)
