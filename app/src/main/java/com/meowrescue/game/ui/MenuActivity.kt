@@ -27,6 +27,7 @@ class MenuActivity : AppCompatActivity() {
     private var bannerAd: AdView? = null
     private lateinit var soundButton: Button
     private lateinit var endlessBtn: Button
+    private lateinit var catImage: ImageView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -71,8 +72,8 @@ class MenuActivity : AppCompatActivity() {
         setContentView(rootLayout)
 
         // Cat mascot image
-        val catImage = ImageView(this).apply {
-            setImageResource(R.drawable.cat_1)
+        catImage = ImageView(this).apply {
+            setImageResource(repository.getSelectedCatDrawable())
             scaleType = ImageView.ScaleType.FIT_CENTER
             val w = (180 * dp).toInt()
             val h = (240 * dp).toInt()
@@ -187,6 +188,8 @@ class MenuActivity : AppCompatActivity() {
         if (repository.isSoundEnabled()) SoundManager.playBgm("menu")
         // Refresh sound button label in case state changed
         if (::soundButton.isInitialized) soundButton.text = soundLabel()
+        // Refresh cat mascot in case selection changed
+        if (::catImage.isInitialized) catImage.setImageResource(repository.getSelectedCatDrawable())
         // Show endless button only if 200 stages cleared
         if (::endlessBtn.isInitialized) {
             lifecycleScope.launch {

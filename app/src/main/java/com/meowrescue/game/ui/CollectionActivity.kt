@@ -100,7 +100,7 @@ class CollectionActivity : AppCompatActivity() {
         // Unlocked count
         val unlockedCount = allCats.count { it.unlocked }
         val countTv = TextView(this).apply {
-            text = "$unlockedCount/20"
+            text = "$unlockedCount/${allCats.size}"
             textSize = 14f
             setTextColor(Color.WHITE)
             setTypeface(typeface, Typeface.BOLD)
