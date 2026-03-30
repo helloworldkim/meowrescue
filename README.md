@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Language](https://img.shields.io/badge/Language-Kotlin%202.2.0-purple)
 ![MinSDK](https://img.shields.io/badge/MinSDK-24%20(Android%207.0)-blue)
-![Version](https://img.shields.io/badge/Version-v5.1-orange)
+![Version](https://img.shields.io/badge/Version-v5.2-orange)
 
 ## 소개
 
@@ -35,6 +35,14 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 - **탈출 애니메이션**: 벽 열림 -> 고양이 슬라이드 -> 파티클 이펙트 연출
 - **스냅 애니메이션**: 120ms ease-out 블록 스냅 효과
 - **별점 목표 HUD**: 이동 횟수가 색상으로 실시간 피드백 (녹색=3성, 황색=2성, 빨간색=1성) + 별 기준 이동 횟수 미리 표시
+- **튜토리얼 오버레이**: 스테이지 1~3에서 신규 유저 가이드 (드래그/힌트/Solve 사용법)
+- **힌트 시스템**: BFS 솔버 기반 다음 최적 이동 블록 하이라이트 (깜빡임 효과)
+- **자동 풀이 (Solve)**: 전면 광고 후 BFS 솔버가 350ms 간격으로 퍼즐 자동 풀이
+- **부드러운 드래그**: 실시간 충돌 제약으로 블록이 장애물/벽에서 즉시 정지
+- **향상된 파티클**: 원형+별+컨페티 3종 모양, 회전 물리, 화면 플래시 효과
+- **진동 피드백**: 블록 이동·스테이지 클리어 시 촉각 반응 (HapticManager)
+- **4버튼 툴바**: Undo / Hint / Solve / Reset 한 줄 배치
+- **고양이 해금 미리보기**: 스테이지 선택에서 해금 가능 고양이 썸네일 표시
 - **Undo / Reset**: 실수해도 되돌리기 가능 (체크포인트/연결/포탈 상태도 정확히 복원)
 - **개발 모드**: 모든 스테이지 잠금 해제 (테스트 용이)
 - **진행도 저장**: Room DB로 스테이지 클리어 상태 및 별점 영구 저장
@@ -99,7 +107,24 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 ### 고양이 탈출 시퀀스
 1. **벽 열림** (200ms): 출구 벽이 양쪽으로 갈라짐
 2. **슬라이드** (300ms): 고양이가 ease-in으로 출구 밖으로 이동
-3. **파티클** (500ms): 30개 파스텔 파티클 폭발 효과
+3. **파티클** (500ms): 30개 파스텔 파티클 폭발 효과 (원형 50% / 별 25% / 컨페티 25%)
+4. **화면 플래시**: 탈출 시 밝은 화면 플래시 후 점진 감쇠
+
+### 부드러운 드래그
+- 드래그 시작 시 양방향 최대 이동 범위 1회 계산 (충돌 검사)
+- 렌더링 루프에서 클램핑만 수행 → 장애물/벽에서 즉시 정지
+- 1칸 블록: threshold(셀 크기 12%) 초과 시 축 잠금
+
+### 튜토리얼 오버레이
+- 스테이지 1: 드래그 방법 (3단계, 탭으로 진행)
+- 스테이지 2: 힌트 버튼 사용법 (자동 해제)
+- 스테이지 3: Solve 버튼 사용법 (자동 해제 + 튜토리얼 완료 저장)
+
+### 힌트 & 자동 풀이
+- **힌트**: BFS 솔버로 다음 최적 이동 블록을 깜빡임 하이라이트
+- **자동 풀이**: 전면 광고 게이트 → BFS 전체 풀이 계산 → 350ms 간격 자동 이동
+- 자동 풀이 중 드래그 차단, 이동 실패 시 자동 중단
+- Solve 버튼 더블탭 방지 (solvePending 플래그)
 
 ## 광고 시스템
 
@@ -133,6 +158,7 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 | 데이터베이스 | Room 2.6.1 + SharedPreferences |
 | KSP | 2.2.0-2.0.2 |
 | 광고 | Google AdMob SDK |
+| 진동 | Android Vibrator API (HapticManager) |
 | JDK | 21 |
 | 최소 SDK | API 24 (Android 7.0) |
 | 타겟 SDK | API 35 (Android 15) |
@@ -158,7 +184,8 @@ com.meowrescue.game
 ├── ads/
 │   └── AdManager.kt               // AdMob 광고 관리 (배너/전면/보상형)
 └── util/
-    └── SoundManager.kt            // 효과음 + BGM
+    ├── SoundManager.kt            // 효과음 + BGM
+    └── HapticManager.kt           // 진동 피드백 (블록 이동/클리어)
 ```
 
 ## 퍼즐 생성 알고리즘

@@ -109,4 +109,12 @@ class GameRepository(context: Context) {
     fun setEndlessBest(best: Int) {
         prefs.edit().putInt("endless_best", best).apply()
     }
+
+    // ── Tutorial ─────────────────────────────────────────────────────────
+
+    fun isTutorialCompleted(): Boolean = prefs.getBoolean("tutorial_completed", false)
+
+    fun setTutorialCompleted() {
+        prefs.edit().putBoolean("tutorial_completed", true).apply()
+    }
 }

@@ -41,13 +41,24 @@ class CollectionActivity : AppCompatActivity() {
         repository = GameRepository(this)
 
         lifecycleScope.launch {
-            val maxLevel = repository.getMaxCompletedLevel()
+            // Check individual stage completion for each cat's requiredStage
+            val clearedStages = mutableSetOf<Int>()
+            for (cat in GameRepository.CAT_DEFINITIONS) {
+                if (cat.requiredStage <= 1) {
+                    clearedStages.add(cat.requiredStage) // 나비 always unlocked
+                } else {
+                    val progress = repository.getProgress(cat.requiredStage)
+                    if (progress != null && progress.completed) {
+                        clearedStages.add(cat.requiredStage)
+                    }
+                }
+            }
             val selectedId = repository.getSelectedCatId()
-            buildUi(maxLevel, selectedId)
+            buildUi(clearedStages, selectedId)
         }
     }
 
-    private fun buildUi(maxLevel: Int, selectedId: Int) {
+    private fun buildUi(clearedStages: Set<Int>, selectedId: Int) {
         val density = resources.displayMetrics.density
         val allCats = GameRepository.CAT_DEFINITIONS.map { def ->
             CatEntry(
@@ -55,7 +66,7 @@ class CollectionActivity : AppCompatActivity() {
                 drawableRes = def.drawableRes,
                 name = def.name,
                 requiredStage = def.requiredStage,
-                unlocked = maxLevel >= def.requiredStage,
+                unlocked = def.requiredStage in clearedStages,
                 selected = def.id == selectedId
             )
         }

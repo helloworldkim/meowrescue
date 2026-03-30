@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -32,6 +33,7 @@ class StageSelectActivity : AppCompatActivity() {
 
     private lateinit var repository: GameRepository
     private var bannerAd: AdView? = null
+    private lateinit var recycler: RecyclerView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -97,7 +99,7 @@ class StageSelectActivity : AppCompatActivity() {
         rootLayout.addView(topBar)
 
         // --- RecyclerView ---
-        val recycler = RecyclerView(this).apply {
+        recycler = RecyclerView(this).apply {
             layoutManager = GridLayoutManager(this@StageSelectActivity, 4)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
@@ -116,7 +118,10 @@ class StageSelectActivity : AppCompatActivity() {
 
         setContentView(rootLayout)
 
-        // Load progress then bind adapter
+        loadStageData()
+    }
+
+    private fun loadStageData() {
         lifecycleScope.launch {
             val maxCompleted = repository.getMaxCompletedLevel()
             val allProgress = withContext(Dispatchers.IO) {
@@ -136,6 +141,7 @@ class StageSelectActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         bannerAd?.resume()
+        if (::recycler.isInitialized) loadStageData()
     }
 
     override fun onPause() {
@@ -156,11 +162,16 @@ class StageSelectActivity : AppCompatActivity() {
         private val onLevelClick: (Int) -> Unit
     ) : RecyclerView.Adapter<StageAdapter.VH>() {
 
+        // Map of stage -> CatDefinition for unlock indicators
+        private val catUnlockMap: Map<Int, GameRepository.CatDefinition> = GameRepository.CAT_DEFINITIONS
+            .filter { it.requiredStage > 1 }
+            .associateBy { it.requiredStage }
+
         inner class VH(val cell: FrameLayout) : RecyclerView.ViewHolder(cell)
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
             val dp = resources.displayMetrics.density
-            val size = (70 * dp).toInt()
+            val size = (80 * dp).toInt()
             val cell = FrameLayout(parent.context).apply {
                 layoutParams = RecyclerView.LayoutParams(
                     RecyclerView.LayoutParams.MATCH_PARENT,
@@ -215,6 +226,30 @@ class StageSelectActivity : AppCompatActivity() {
                 ).apply { topMargin = (8 * dp).toInt() }
             }
             holder.cell.addView(numText)
+
+            // Cat unlock thumbnail preview
+            val catDef = catUnlockMap[levelId]
+            if (catDef != null) {
+                val thumbSize = (28 * dp).toInt()
+                val catThumb = ImageView(holder.cell.context).apply {
+                    setImageResource(catDef.drawableRes)
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    layoutParams = FrameLayout.LayoutParams(thumbSize, thumbSize,
+                        Gravity.TOP or Gravity.END
+                    ).apply {
+                        topMargin = (3 * dp).toInt()
+                        marginEnd = (3 * dp).toInt()
+                    }
+                    if (!isCompleted) {
+                        // Dark silhouette for uncleared stages (MULTIPLY preserves transparency)
+                        colorFilter = android.graphics.PorterDuffColorFilter(
+                            0xFF444444.toInt(), android.graphics.PorterDuff.Mode.MULTIPLY
+                        )
+                        alpha = 0.6f
+                    }
+                }
+                holder.cell.addView(catThumb)
+            }
 
             if (isUnlocked) {
                 if (isCompleted && stars > 0) {

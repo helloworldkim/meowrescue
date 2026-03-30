@@ -16,6 +16,7 @@ import com.google.android.gms.ads.AdView
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.puzzle.PuzzleGenerator
+import com.meowrescue.game.util.HapticManager
 import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,11 +36,17 @@ class PuzzleActivity : AppCompatActivity() {
     private lateinit var loadingOverlay: FrameLayout
     private lateinit var frameRoot: FrameLayout
     private var congratsOverlay: FrameLayout? = null
+    private var solvePending = false
+
+    // ── Next stage preloading ────────────────────────────────────────────
+    private var preloadedResult: PuzzleGenerator.GenerateResult? = null
+    private var preloadedStage: Int = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         SoundManager.init(this)
+        HapticManager.init(this)
         repository = GameRepository(this)
 
         isEndless = intent.getBooleanExtra("endless", false)
@@ -105,15 +112,60 @@ class PuzzleActivity : AppCompatActivity() {
 
     private fun loadStage(stage: Int) {
         currentStage = stage
+        solvePending = false
         loadingOverlay.visibility = View.VISIBLE
         puzzleView.visibility = View.INVISIBLE
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.Default) {
-                generator.generateWithResult(stage)
+            // Use preloaded result if available for this stage
+            val result = if (preloadedStage == stage && preloadedResult != null) {
+                preloadedResult!!
+            } else {
+                withContext(Dispatchers.Default) { generator.generateWithResult(stage) }
             }
+            preloadedResult = null
+            preloadedStage = -1
+
             puzzleView.setGrid(result.grid, stage, result.optimalMoves, isEndless, endlessCount)
+            puzzleView.hintCount = 3
             loadingOverlay.visibility = View.GONE
             puzzleView.visibility = View.VISIBLE
+
+            // Show tutorial for stages 1-3 (only first time ever)
+            if (!isEndless && !repository.isTutorialCompleted()) {
+                when (stage) {
+                    1 -> {
+                        puzzleView.tutorialStep = 0
+                        puzzleView.tutorialAutoDismissAt = 0L
+                        puzzleView.onTutorialDismissed = {
+                            repository.setTutorialCompleted()
+                        }
+                    }
+                    2 -> {
+                        puzzleView.tutorialStep = 10
+                        puzzleView.tutorialAutoDismissAt = System.currentTimeMillis() + 2500L
+                        puzzleView.onTutorialDismissed = null
+                    }
+                    3 -> {
+                        puzzleView.tutorialStep = 20
+                        puzzleView.tutorialAutoDismissAt = System.currentTimeMillis() + 2500L
+                        puzzleView.onTutorialDismissed = {
+                            repository.setTutorialCompleted()
+                        }
+                    }
+                }
+            }
+
+            // Preload next stage in background
+            preloadNextStage()
+        }
+    }
+
+    private fun preloadNextStage() {
+        val nextStage = if (isEndless) generateRandomStage() else (currentStage + 1).coerceAtMost(200)
+        lifecycleScope.launch(Dispatchers.Default) {
+            val result = generator.generateWithResult(nextStage)
+            preloadedStage = nextStage
+            preloadedResult = result
         }
     }
 
@@ -146,7 +198,9 @@ class PuzzleActivity : AppCompatActivity() {
 
         // Called when user clicks "Next Stage" button in victory overlay
         puzzleView.onNextStageClicked = {
-            val nextStage = if (isEndless) generateRandomStage() else currentStage + 1
+            // Use preloaded stage if available, otherwise compute fresh
+            val nextStage = if (preloadedStage > 0) preloadedStage
+                else if (isEndless) generateRandomStage() else (currentStage + 1).coerceAtMost(200)
             if (AdManager.shouldShowInterstitial(currentStage)) {
                 AdManager.showInterstitial(this@PuzzleActivity) {
                     loadStage(nextStage)
@@ -158,9 +212,64 @@ class PuzzleActivity : AppCompatActivity() {
             }
         }
 
+        puzzleView.onRetryClicked = {
+            loadStage(currentStage)
+        }
+
+        puzzleView.onLevelSelectClicked = {
+            finish()
+        }
+
         puzzleView.onPauseClicked = {
             puzzleView.pause()
             pauseOverlay?.visibility = View.VISIBLE
+        }
+
+        puzzleView.onHintClicked = {
+            if (puzzleView.hintCount > 0) {
+                puzzleView.hintCount--
+                val currentGrid = puzzleView.getCurrentGrid()
+                if (currentGrid != null) {
+                    lifecycleScope.launch(Dispatchers.Default) {
+                        val steps = generator.solveSteps(currentGrid)
+                        withContext(Dispatchers.Main) {
+                            if (steps != null && steps.isNotEmpty()) {
+                                puzzleView.showHint(steps[0])
+                            }
+                        }
+                    }
+                }
+            } else {
+                // No hints left — show interstitial ad to grant 1 more hint
+                AdManager.showInterstitial(this@PuzzleActivity) {
+                    puzzleView.hintCount = 1
+                    AdManager.loadInterstitial(this@PuzzleActivity)
+                }
+            }
+        }
+
+        puzzleView.onSolveClicked = {
+            if (!solvePending) {
+                solvePending = true
+                AdManager.showInterstitial(this@PuzzleActivity) {
+                    if (isDestroyed) { solvePending = false; return@showInterstitial }
+                    AdManager.loadInterstitial(this@PuzzleActivity)
+                    val currentGrid = puzzleView.getCurrentGrid()
+                    if (currentGrid != null) {
+                        lifecycleScope.launch(Dispatchers.Default) {
+                            val steps = generator.solveSteps(currentGrid)
+                            withContext(Dispatchers.Main) {
+                                solvePending = false
+                                if (!steps.isNullOrEmpty()) {
+                                    puzzleView.startAutoSolve(steps)
+                                }
+                            }
+                        }
+                    } else {
+                        solvePending = false
+                    }
+                }
+            }
         }
     }
 
@@ -272,7 +381,7 @@ class PuzzleActivity : AppCompatActivity() {
         }
 
         val catImage = android.widget.ImageView(this).apply {
-            setImageResource(com.meowrescue.game.R.drawable.cat_1)
+            setImageResource(repository.getSelectedCatDrawable())
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
         }
         val imgSize = (100 * density).toInt()
@@ -402,5 +511,6 @@ class PuzzleActivity : AppCompatActivity() {
         puzzleView.recycleBitmaps()
         bannerAd?.destroy()
         SoundManager.stopBgm()
+        HapticManager.release()
     }
 }

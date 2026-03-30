@@ -63,10 +63,13 @@ class PuzzleGenerator {
     fun generateWithResult(stage: Int): GenerateResult {
         val cachedOffset = seedOffsetCache[stage]
         if (cachedOffset != null) {
-            return generateCore(stage, cachedOffset)
+            val cached = generateCore(stage, cachedOffset)
+            if (cached.optimalMoves >= 2) return cached
+            // Cache produced bad result; regenerate below
+            seedOffsetCache.remove(stage)
         }
 
-        val deadline = System.currentTimeMillis() + 3000L
+        val deadline = System.currentTimeMillis() + if (stage > 100) 5000L else 3000L
         var bestResult: GenerateResult? = null
         var bestMoves = 0
         var bestOffset = 0
@@ -85,7 +88,13 @@ class PuzzleGenerator {
         }
 
         seedOffsetCache[stage] = bestOffset
-        return bestResult ?: generateCore(stage, 0)
+        val result = bestResult ?: generateCore(stage, 0)
+        // Safety net: optimalMoves must be at least 2 for meaningful star thresholds
+        if (result.optimalMoves < 2) {
+            val minFloor = maxOf(2, difficultyFor(stage).minMoves)
+            return result.copy(optimalMoves = minFloor)
+        }
+        return result
     }
 
     fun generate(stage: Int): PuzzleGrid = generateWithResult(stage).grid
@@ -130,8 +139,21 @@ class PuzzleGenerator {
             return GenerateResult(bestGrid!!, bestMoves)
         }
 
+        // Try fallback with current features
         val fallback = buildFallback(size, exitDir, exitLine, features)
-        return GenerateResult(fallback, solveFast(fallback).coerceAtLeast(1))
+        val fallbackMoves = solveFast(fallback)
+        if (fallbackMoves >= 2) {
+            return GenerateResult(fallback, fallbackMoves)
+        }
+        // Complex features may cause unsolvable/trivial fallback; try simple fallback
+        val simpleFallback = buildFallback(size, exitDir, exitLine)
+        val simpleMoves = solveFast(simpleFallback)
+        if (simpleMoves >= 2) {
+            return GenerateResult(simpleFallback, simpleMoves)
+        }
+        // Last resort: use best found grid (even if only 1 move) or fallback with difficulty estimate
+        val estimatedMoves = maxOf(2, params.minMoves)
+        return GenerateResult(bestGrid ?: simpleFallback, estimatedMoves)
     }
 
     // ── Quality filter ──────────────────────────────────────────────────
@@ -302,12 +324,12 @@ class PuzzleGenerator {
         val queue = LinkedList<Pair<IntArray, Int>>()
         queue.add(initState to 0)
 
-        val maxDepth = 35
+        val maxDepth = 45
         val maxStates = when {
-            hasCheckpoint && exitDir2 != null -> 150_000
-            exitDir2 != null -> 120_000
-            hasCheckpoint -> 120_000
-            else -> 80_000
+            hasCheckpoint && exitDir2 != null -> 300_000
+            exitDir2 != null -> 250_000
+            hasCheckpoint -> 250_000
+            else -> 150_000
         }
 
         while (queue.isNotEmpty() && visited.size < maxStates) {
@@ -576,8 +598,8 @@ class PuzzleGenerator {
 
     private fun hashState(state: IntArray): Long {
         var h = -0x340d631b7bdddcdbL // FNV offset basis
-        for (v in state) {
-            h = h xor v.toLong()
+        for ((idx, v) in state.withIndex()) {
+            h = h xor (v.toLong() * (idx + 1))
             h *= 0x100000001b3L // FNV prime
         }
         return h
@@ -600,6 +622,338 @@ class PuzzleGenerator {
     }
 
     fun solve(grid: PuzzleGrid): Int = solveFast(grid)
+
+    // ── Step-returning BFS for hint system ──────────────────────────────
+
+    data class MoveStep(val blockId: Int, val dRow: Int, val dCol: Int)
+
+    /**
+     * Returns the optimal solution path as a list of [MoveStep], or null if unsolvable.
+     * Each step describes moving a block by (dRow, dCol) grid cells.
+     */
+    fun solveSteps(grid: PuzzleGrid): List<MoveStep>? {
+        val blocks = grid.blocks.sortedBy { it.id }
+        val n = blocks.size
+        val rows = grid.rows
+        val cols = grid.cols
+        val exitDir = grid.exitDirection
+        val exitRow = grid.exitRow
+        val exitCol = grid.exitCol
+
+        val infos = Array(n) { BlockInfo(blocks[it].length, blocks[it].isHorizontal, blocks[it].isCat,
+            blocks[it].isKey, blocks[it].isWall, blocks[it].linkId) }
+        val catIndices = (0 until n).filter { infos[it].isCat }
+        if (catIndices.isEmpty()) return null
+
+        val keyIdx = if (grid.hasKeyLock) infos.indexOfFirst { it.isKey } else -1
+        val lockPos = if (keyIdx >= 0) grid.lockRow * cols + grid.lockCol else -1
+
+        val hasCheckpoint = grid.hasCheckpoint
+        val cpRow = grid.checkpointRow
+        val cpCol = grid.checkpointCol
+        val cpStateIdx = if (hasCheckpoint) n else -1
+        val stateSize = n + (if (hasCheckpoint) 1 else 0)
+
+        val portalA = grid.portalA
+        val portalB = grid.portalB
+        val exitRow2 = grid.exitRow2
+        val exitCol2 = grid.exitCol2
+        val exitDir2 = grid.exitDirection2
+
+        val linkPartner = IntArray(n) { -1 }
+        for (i in 0 until n) {
+            if (infos[i].linkId >= 0 && linkPartner[i] == -1) {
+                for (j in i + 1 until n) {
+                    if (infos[j].linkId == infos[i].linkId) {
+                        linkPartner[i] = j; linkPartner[j] = i; break
+                    }
+                }
+            }
+        }
+
+        val initState = IntArray(stateSize) { if (it < n) blocks[it].row * cols + blocks[it].col else 0 }
+        if (hasCheckpoint && cpStateIdx >= 0) {
+            val catPos = initState[catIndices[0]]
+            if (catPos / cols == cpRow && catPos % cols == cpCol) initState[cpStateIdx] = 1
+        }
+
+        if (isSolvedState(initState, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) return emptyList()
+
+        // BFS storing parent state + move for path reconstruction
+        data class Node(val state: IntArray, val parent: Int, val move: MoveStep?)
+
+        val visited = HashMap<Long, Int>(4096)  // hash -> node index
+        val nodes = mutableListOf<Node>()
+        nodes.add(Node(initState, -1, null))
+        visited[hashState(initState)] = 0
+
+        val maxDepth = 45
+        val maxStates = when {
+            hasCheckpoint && exitDir2 != null -> 300_000
+            exitDir2 != null -> 250_000
+            hasCheckpoint -> 250_000
+            else -> 150_000
+        }
+
+        val queue = LinkedList<Pair<Int, Int>>()  // (nodeIndex, depth)
+        queue.add(0 to 0)
+
+        var solvedNodeIdx = -1
+
+        outer@ while (queue.isNotEmpty() && visited.size < maxStates) {
+            val (nodeIdx, depth) = queue.poll() ?: break
+            if (depth >= maxDepth) continue
+            val state = nodes[nodeIdx].state
+            val g = buildGrid(state, infos, rows, cols)
+
+            val processedLinks = mutableSetOf<Int>()
+            for (i in 0 until n) {
+                val info = infos[i]
+                if (info.isWall) continue
+                if (info.linkId >= 0) {
+                    if (info.linkId in processedLinks) continue
+                    processedLinks.add(info.linkId)
+                }
+                val partnerId = linkPartner[i]
+                val pos = state[i]
+                val bRow = pos / cols
+                val bCol = pos % cols
+
+                val tryHoriz = info.isHorizontal || info.length == 1
+                val tryVert  = !info.isHorizontal || info.length == 1
+
+                if (tryHoriz) {
+                    // right
+                    for (d in 1..cols) {
+                        val nc = bCol + d
+                        if (nc + info.length > cols) break
+                        if (g[bRow][nc + info.length - 1] != -1 && g[bRow][nc + info.length - 1] != i
+                            && (partnerId < 0 || g[bRow][nc + info.length - 1] != partnerId)) break
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && !pInfo.isHorizontal) break
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pnc = pCol + d
+                            if (pnc + pInfo.length > cols) break
+                            var blocked = false
+                            for (dd in 1..d) {
+                                val checkC = pCol + dd + pInfo.length - 1
+                                if (checkC >= cols) { blocked = true; break }
+                                val cell = g[pRow][checkC]
+                                if (cell != -1 && cell != partnerId && cell != i) { blocked = true; break }
+                            }
+                            if (blocked) break
+                        }
+                        val ns = state.copyOf()
+                        ns[i] = bRow * cols + nc
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = pRow * cols + (pCol + d)
+                        }
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bRow == cpRow && cpCol in bCol..(bCol + d)) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pRow == cpRow && cpCol in pCol..(pCol + d)) ns[cpStateIdx] = 1
+                            }
+                        }
+                        if (portalA >= 0 && portalB >= 0 && i in catIndices) {
+                            val warpTo = when (ns[i]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                            if (warpTo >= 0) {
+                                val wg = buildGrid(ns, infos, rows, cols)
+                                val wr = warpTo / cols; val wc = warpTo % cols
+                                if (wr < rows && wc < cols && (wg[wr][wc] == -1 || wg[wr][wc] == i)) ns[i] = warpTo
+                            }
+                        }
+                        val h = hashState(ns)
+                        if (h !in visited) {
+                            val newIdx = nodes.size
+                            nodes.add(Node(ns, nodeIdx, MoveStep(blocks[i].id, 0, d)))
+                            visited[h] = newIdx
+                            if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) {
+                                solvedNodeIdx = newIdx; break@outer
+                            }
+                            queue.add(newIdx to depth + 1)
+                        }
+                    }
+                    // left
+                    for (d in 1..cols) {
+                        val nc = bCol - d
+                        if (nc < 0) break
+                        if (g[bRow][nc] != -1 && g[bRow][nc] != i
+                            && (partnerId < 0 || g[bRow][nc] != partnerId)) break
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && !pInfo.isHorizontal) break
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pnc = pCol - d
+                            if (pnc < 0) break
+                            var blocked = false
+                            for (dd in 1..d) {
+                                val checkC = pCol - dd
+                                if (checkC < 0) { blocked = true; break }
+                                val cell = g[pRow][checkC]
+                                if (cell != -1 && cell != partnerId && cell != i) { blocked = true; break }
+                            }
+                            if (blocked) break
+                        }
+                        val ns = state.copyOf()
+                        ns[i] = bRow * cols + nc
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = pRow * cols + (pCol - d)
+                        }
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bRow == cpRow && cpCol in (bCol - d)..bCol) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pRow == cpRow && cpCol in (pCol - d)..pCol) ns[cpStateIdx] = 1
+                            }
+                        }
+                        if (portalA >= 0 && portalB >= 0 && i in catIndices) {
+                            val warpTo = when (ns[i]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                            if (warpTo >= 0) {
+                                val wg = buildGrid(ns, infos, rows, cols)
+                                val wr = warpTo / cols; val wc = warpTo % cols
+                                if (wr < rows && wc < cols && (wg[wr][wc] == -1 || wg[wr][wc] == i)) ns[i] = warpTo
+                            }
+                        }
+                        val h = hashState(ns)
+                        if (h !in visited) {
+                            val newIdx = nodes.size
+                            nodes.add(Node(ns, nodeIdx, MoveStep(blocks[i].id, 0, -d)))
+                            visited[h] = newIdx
+                            if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) {
+                                solvedNodeIdx = newIdx; break@outer
+                            }
+                            queue.add(newIdx to depth + 1)
+                        }
+                    }
+                }
+                if (tryVert) {
+                    // down
+                    for (d in 1..rows) {
+                        val nr = bRow + d
+                        val endCheck = bRow + info.length - 1 + d
+                        if (endCheck >= rows) break
+                        if (g[endCheck][bCol] != -1 && g[endCheck][bCol] != i
+                            && (partnerId < 0 || g[endCheck][bCol] != partnerId)) break
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && pInfo.isHorizontal) break
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pEndCheck = pRow + pInfo.length - 1 + d
+                            if (pEndCheck >= rows) break
+                            var blocked = false
+                            for (dd in 1..d) {
+                                val checkR = pRow + pInfo.length - 1 + dd
+                                if (checkR >= rows) { blocked = true; break }
+                                val cell = g[checkR][pCol]
+                                if (cell != -1 && cell != partnerId && cell != i) { blocked = true; break }
+                            }
+                            if (blocked) break
+                        }
+                        val ns = state.copyOf()
+                        ns[i] = nr * cols + bCol
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = (pRow + d) * cols + pCol
+                        }
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bCol == cpCol && cpRow in bRow..(bRow + d)) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pCol == cpCol && cpRow in pRow..(pRow + d)) ns[cpStateIdx] = 1
+                            }
+                        }
+                        if (portalA >= 0 && portalB >= 0 && i in catIndices) {
+                            val warpTo = when (ns[i]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                            if (warpTo >= 0) {
+                                val wg = buildGrid(ns, infos, rows, cols)
+                                val wr = warpTo / cols; val wc = warpTo % cols
+                                if (wr < rows && wc < cols && (wg[wr][wc] == -1 || wg[wr][wc] == i)) ns[i] = warpTo
+                            }
+                        }
+                        val h = hashState(ns)
+                        if (h !in visited) {
+                            val newIdx = nodes.size
+                            nodes.add(Node(ns, nodeIdx, MoveStep(blocks[i].id, d, 0)))
+                            visited[h] = newIdx
+                            if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) {
+                                solvedNodeIdx = newIdx; break@outer
+                            }
+                            queue.add(newIdx to depth + 1)
+                        }
+                    }
+                    // up
+                    for (d in 1..rows) {
+                        val nr = bRow - d
+                        if (nr < 0) break
+                        if (g[nr][bCol] != -1 && g[nr][bCol] != i
+                            && (partnerId < 0 || g[nr][bCol] != partnerId)) break
+                        if (partnerId >= 0) {
+                            val pInfo = infos[partnerId]
+                            if (pInfo.length >= 2 && pInfo.isHorizontal) break
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            val pnr = pRow - d
+                            if (pnr < 0) break
+                            var blocked = false
+                            for (dd in 1..d) {
+                                val checkR = pRow - dd
+                                if (checkR < 0) { blocked = true; break }
+                                val cell = g[checkR][pCol]
+                                if (cell != -1 && cell != partnerId && cell != i) { blocked = true; break }
+                            }
+                            if (blocked) break
+                        }
+                        val ns = state.copyOf()
+                        ns[i] = nr * cols + bCol
+                        if (partnerId >= 0) {
+                            val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                            ns[partnerId] = (pRow - d) * cols + pCol
+                        }
+                        if (hasCheckpoint && cpStateIdx >= 0 && ns[cpStateIdx] == 0) {
+                            if (i in catIndices && bCol == cpCol && cpRow in (bRow - d)..bRow) ns[cpStateIdx] = 1
+                            if (partnerId >= 0 && partnerId in catIndices) {
+                                val pPos = state[partnerId]; val pRow = pPos / cols; val pCol = pPos % cols
+                                if (pCol == cpCol && cpRow in (pRow - d)..pRow) ns[cpStateIdx] = 1
+                            }
+                        }
+                        if (portalA >= 0 && portalB >= 0 && i in catIndices) {
+                            val warpTo = when (ns[i]) { portalA -> portalB; portalB -> portalA; else -> -1 }
+                            if (warpTo >= 0) {
+                                val wg = buildGrid(ns, infos, rows, cols)
+                                val wr = warpTo / cols; val wc = warpTo % cols
+                                if (wr < rows && wc < cols && (wg[wr][wc] == -1 || wg[wr][wc] == i)) ns[i] = warpTo
+                            }
+                        }
+                        val h = hashState(ns)
+                        if (h !in visited) {
+                            val newIdx = nodes.size
+                            nodes.add(Node(ns, nodeIdx, MoveStep(blocks[i].id, -d, 0)))
+                            visited[h] = newIdx
+                            if (isSolvedState(ns, infos, catIndices, rows, cols, exitDir, exitRow, exitCol, keyIdx, lockPos, cpStateIdx, exitRow2, exitCol2, exitDir2)) {
+                                solvedNodeIdx = newIdx; break@outer
+                            }
+                            queue.add(newIdx to depth + 1)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (solvedNodeIdx < 0) return null
+
+        // Reconstruct path
+        val path = mutableListOf<MoveStep>()
+        var idx = solvedNodeIdx
+        while (idx > 0) {
+            val node = nodes[idx]
+            node.move?.let { path.add(0, it) }
+            idx = node.parent
+        }
+        return path
+    }
 
     // ── Puzzle generation ───────────────────────────────────────────────
 

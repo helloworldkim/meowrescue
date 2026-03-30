@@ -9,7 +9,9 @@ import android.view.SurfaceView
 import androidx.core.content.res.ResourcesCompat
 import com.meowrescue.game.R
 import com.meowrescue.game.puzzle.ExitDirection
+import com.meowrescue.game.puzzle.PuzzleGenerator
 import com.meowrescue.game.puzzle.PuzzleGrid
+import com.meowrescue.game.util.HapticManager
 import com.meowrescue.game.util.SoundManager
 import kotlin.math.abs
 import kotlin.math.max
@@ -48,18 +50,56 @@ class PuzzleView @JvmOverloads constructor(
         val LINK_COLOR     = 0xFFFF6F00.toInt()
         val EXIT2_COLOR    = 0xFF42A5F5.toInt()
 
+        val PARTICLE_COLORS = intArrayOf(
+            0xFFFF7043.toInt(),  // coral
+            0xFFFFD600.toInt(),  // yellow
+            0xFF66BB6A.toInt(),  // green
+            0xFF4FC3F7.toInt(),  // sky blue
+            0xFFCE93D8.toInt(),  // purple
+            0xFFF48FB1.toInt(),  // pink
+            0xFFFFB74D.toInt(),  // amber
+            0xFF80DEEA.toInt(),  // cyan
+            0xFFFFFFFF.toInt(),  // white
+        )
+
         private const val TARGET_FPS = 60L
         private const val FRAME_MS   = 1000L / TARGET_FPS
-        private const val SNAP_DURATION_MS = 120L
+        private const val SNAP_DURATION_MS = 150L
         private const val WALL_OPEN_MS = 200L
         private const val CAT_SLIDE_MS = 300L
-        private const val PARTICLE_MS  = 500L
+        private const val PARTICLE_MS  = 800L
     }
 
     // ── Callbacks ──────────────────────────────────────────────────────────
     var onStageClear: ((moves: Int, stars: Int) -> Unit)? = null
     var onNextStageClicked: (() -> Unit)? = null
+    var onRetryClicked: (() -> Unit)? = null
+    var onLevelSelectClicked: (() -> Unit)? = null
     var onPauseClicked: (() -> Unit)? = null
+    var onHintClicked: (() -> Unit)? = null
+    var onSolveClicked: (() -> Unit)? = null
+
+    // ── Hint state ─────────────────────────────────────────────────────────
+    private var hintBlockId: Int = -1
+    private var hintDRow: Int = 0      // direction: positive = down/right
+    private var hintDCol: Int = 0
+    private var hintStartTime: Long = 0L
+    var hintCount: Int = 3             // remaining hints this stage (set by Activity)
+
+    /** Show a golden glow + direction arrow on the block indicated by the hint step. */
+    fun showHint(step: PuzzleGenerator.MoveStep) {
+        synchronized(lock) {
+            hintBlockId = step.blockId
+            hintDRow = step.dRow
+            hintDCol = step.dCol
+            hintStartTime = System.currentTimeMillis()
+        }
+    }
+
+    /** Clear the hint highlight. */
+    fun clearHint() {
+        synchronized(lock) { hintBlockId = -1 }
+    }
 
     // ── Lock for thread-safe access between UI thread and render thread ────
     private val lock = Any()
@@ -76,6 +116,14 @@ class PuzzleView @JvmOverloads constructor(
     // ── Checkpoint glow animation ────────────────────────────────────────
     private var prevCheckpointReached = false
     private var checkpointGlowStartTime = 0L
+
+    // ── Tutorial overlay ─────────────────────────────────────────────────
+    // -1 = inactive; 0/1/2 = stage-1 tap-to-advance steps; 10 = stage-2 tip; 20 = stage-3 tip
+    var tutorialStep = -1
+    var tutorialAutoDismissAt = 0L  // epoch ms; 0 = tap-to-dismiss
+    var onTutorialDismissed: (() -> Unit)? = null
+    private val tutorialTapRect = RectF()
+    private var tutorialPulse = 0f  // 0..2π for pulsing animation
 
     // ── Layout ─────────────────────────────────────────────────────────────
     private var cellSize = 0f
@@ -100,6 +148,10 @@ class PuzzleView @JvmOverloads constructor(
     private var dragMaxNegPx: Float = 0f   // max negative drag offset (pixels)
     private var dragMaxPosPx: Float = 0f   // max positive drag offset (pixels)
 
+    // ── Smooth drag visual interpolation ─────────────────────────────────
+    private var dragSmoothX = 0f           // smoothed visual offset (pixels)
+    private var dragSmoothY = 0f
+
     // ── Snap animation ────────────────────────────────────────────────────
     private var snapAnimating = false
     private var snapBlockId   = -1
@@ -118,16 +170,29 @@ class PuzzleView @JvmOverloads constructor(
     private data class Particle(
         var x: Float, var y: Float,
         var vx: Float, var vy: Float,
-        var radius: Float, var color: Int, var alpha: Float
+        var radius: Float, var color: Int, var alpha: Float,
+        var rotation: Float = 0f, var rotSpeed: Float = 0f,
+        var shape: Int = 0  // 0=circle, 1=star, 2=confetti
     )
     private val particles = mutableListOf<Particle>()
     private var particleStartTime = 0L
+    private var screenFlashAlpha = 0f
+
+    // ── Auto-solve ───────────────────────────────────────────────────────
+    private var autoSolving = false
+    private var autoSolveSteps: List<PuzzleGenerator.MoveStep> = emptyList()
+    private var autoSolveIndex = 0
+    private var autoSolveNextTime = 0L
 
     // ── HUD button rects ────────────────────────────────────────────────
     private val pauseRect      = RectF()
     private val undoRect       = RectF()
     private val resetRect      = RectF()
-    private val nextStageRect  = RectF()
+    private val hintRect       = RectF()
+    private val solveRect      = RectF()
+    private val nextStageRect    = RectF()
+    private val retryRect        = RectF()
+    private val levelSelectRect  = RectF()
 
     // ── Resources ─────────────────────────────────────────────────────────
     private var pauseBitmap: Bitmap? = null
@@ -163,6 +228,18 @@ class PuzzleView @JvmOverloads constructor(
     }
     private val glossPaint    = Paint(Paint.ANTI_ALIAS_FLAG)
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val flashPaint    = Paint()
+    private val tutBgPaint    = Paint()
+    private val tutPanelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tutTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFF7043.toInt(); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
+    }
+    private val tutBodyPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF4E342E.toInt(); textAlign = Paint.Align.CENTER
+    }
+    private val tutHintPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF9E9E9E.toInt(); textAlign = Paint.Align.CENTER
+    }
 
     // ── Render thread ──────────────────────────────────────────────────────
     private var renderThread: Thread? = null
@@ -189,13 +266,33 @@ class PuzzleView @JvmOverloads constructor(
             this.state        = PuzzleState.PLAYING
             this.victoryAlpha = 0f
             this.dragBlockId  = -1
+            this.dragSmoothX  = 0f; this.dragSmoothY = 0f
             this.snapAnimating = false
             this.escapePhase  = 0
             this.particles.clear()
             this.prevCheckpointReached = false
             this.checkpointGlowStartTime = 0L
+            this.hintBlockId  = -1
+            this.autoSolving  = false
+            this.autoSolveSteps = emptyList()
+            this.autoSolveIndex = 0
+            this.autoSolveNextTime = 0L
+            this.screenFlashAlpha = 0f
         }
         recalcLayout()
+    }
+
+    /** Returns a snapshot of the current live grid state for hint computation. */
+    fun getCurrentGrid(): PuzzleGrid? = synchronized(lock) { grid }
+
+    fun startAutoSolve(steps: List<PuzzleGenerator.MoveStep>) {
+        synchronized(lock) {
+            autoSolving = true
+            autoSolveSteps = steps
+            autoSolveIndex = 0
+            autoSolveNextTime = System.currentTimeMillis() + 300L
+            hintBlockId = -1  // clear hint inline to avoid nested lock
+        }
     }
 
     fun setCatBitmap(resId: Int) {
@@ -214,11 +311,29 @@ class PuzzleView @JvmOverloads constructor(
     }
 
     fun undoMove() {
-        val moved = synchronized(lock) {
+        synchronized(lock) {
             if (state != PuzzleState.PLAYING || snapAnimating) return
-            grid?.undoLastMove() ?: false
+            val g = grid ?: return
+            // Save current positions before undo so we can animate from old → new
+            val blocksBefore = g.blocks.associateBy { it.id }
+            val moved = g.undoLastMove()
+            if (!moved) return
+            // Find which block changed position and start snap animation
+            val movedBlock = g.blocks.firstOrNull { b ->
+                val before = blocksBefore[b.id]
+                before != null && (before.col != b.col || before.row != b.row)
+            }
+            if (movedBlock != null) {
+                val before = blocksBefore[movedBlock.id]!!
+                snapAnimating = true
+                snapBlockId   = movedBlock.id
+                snapFromCol   = before.col.toFloat()
+                snapFromRow   = before.row.toFloat()
+                snapStartTime = System.currentTimeMillis()
+                snapPendingSolveCheck = false
+            }
         }
-        if (moved) SoundManager.playButtonTap()
+        SoundManager.playButtonTap()
     }
 
     fun resetPuzzle() {
@@ -228,11 +343,18 @@ class PuzzleView @JvmOverloads constructor(
             state = PuzzleState.PLAYING
             victoryAlpha = 0f
             dragBlockId  = -1
+            dragSmoothX  = 0f; dragSmoothY = 0f
             snapAnimating = false
             escapePhase  = 0
             particles.clear()
             prevCheckpointReached = false
             checkpointGlowStartTime = 0L
+            hintBlockId = -1
+            autoSolving = false
+            autoSolveSteps = emptyList()
+            autoSolveIndex = 0
+            autoSolveNextTime = 0L
+            screenFlashAlpha = 0f
         }
         SoundManager.playButtonTap()
     }
@@ -289,6 +411,17 @@ class PuzzleView @JvmOverloads constructor(
 
     /** Returns a callback to invoke outside synchronized(lock), or null. */
     private fun handleDown(x: Float, y: Float): (() -> Unit)? {
+        // Tutorial tap-to-advance (only for tap-to-dismiss steps, not auto-dismiss)
+        if (tutorialStep >= 0 && tutorialAutoDismissAt == 0L) {
+            tutorialStep++
+            if (tutorialStep > 2) {
+                // All stage-1 steps done
+                tutorialStep = -1
+                pendingTutorialDismiss = true
+            }
+            SoundManager.playButtonTap()
+            return null
+        }
         if (pauseRect.contains(x, y)) {
             SoundManager.playButtonTap()
             val cb = onPauseClicked
@@ -298,6 +431,16 @@ class PuzzleView @JvmOverloads constructor(
             if (nextStageRect.contains(x, y)) {
                 SoundManager.playButtonTap()
                 val cb = onNextStageClicked
+                return { cb?.invoke() }
+            }
+            if (retryRect.contains(x, y)) {
+                SoundManager.playButtonTap()
+                val cb = onRetryClicked
+                return { cb?.invoke() }
+            }
+            if (levelSelectRect.contains(x, y)) {
+                SoundManager.playButtonTap()
+                val cb = onLevelSelectClicked
                 return { cb?.invoke() }
             }
             return null
@@ -311,6 +454,18 @@ class PuzzleView @JvmOverloads constructor(
             SoundManager.playButtonTap()
             return { resetPuzzle() }
         }
+        if (hintRect.contains(x, y)) {
+            SoundManager.playButtonTap()
+            val cb = onHintClicked
+            return { cb?.invoke() }
+        }
+        if (solveRect.contains(x, y) && !autoSolving) {
+            SoundManager.playButtonTap()
+            val cb = onSolveClicked
+            return { cb?.invoke() }
+        }
+
+        if (autoSolving) return null  // Block drag during auto-solve
 
         val g = grid ?: return null
         val col = ((x - boardLeft) / cellSize).toInt()
@@ -327,6 +482,8 @@ class PuzzleView @JvmOverloads constructor(
         dragStartY   = y
         dragCurrentX = x
         dragCurrentY = y
+        dragSmoothX  = 0f
+        dragSmoothY  = 0f
 
         // Pre-compute valid drag range
         if (block.length == 1) {
@@ -349,7 +506,7 @@ class PuzzleView @JvmOverloads constructor(
         if (dragAxis == 0) {
             val dx = abs(x - dragStartX)
             val dy = abs(y - dragStartY)
-            val threshold = cellSize * 0.12f
+            val threshold = cellSize * 0.06f
             if (dx > threshold || dy > threshold) {
                 val g = grid ?: return
                 dragAxis = if (dx >= dy) 1 else 2
@@ -404,12 +561,11 @@ class PuzzleView @JvmOverloads constructor(
             if (validSteps != 0) {
                 g.moveBlockInDir(dragBlockId, validSteps, moveHorizontal)
 
-                // Snap from visual position (clamped drag) to final grid position
-                val snapOffset = if (validSteps == moveSteps) clamped / cellSize else validSteps.toFloat()
+                // Snap from smoothed visual position to final grid position
                 snapAnimating = true
                 snapBlockId = dragBlockId
-                snapFromCol = oldCol + (if (moveHorizontal) snapOffset else 0f)
-                snapFromRow = oldRow + (if (!moveHorizontal) snapOffset else 0f)
+                snapFromCol = oldCol + dragSmoothX / cellSize
+                snapFromRow = oldRow + dragSmoothY / cellSize
                 snapStartTime = System.currentTimeMillis()
                 snapPendingSolveCheck = true
             }
@@ -417,6 +573,7 @@ class PuzzleView @JvmOverloads constructor(
 
         dragBlockId = -1
         dragAxis = 0; dragMaxNegPx = 0f; dragMaxPosPx = 0f
+        dragSmoothX = 0f; dragSmoothY = 0f
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -424,6 +581,7 @@ class PuzzleView @JvmOverloads constructor(
     // ──────────────────────────────────────────────────────────────────────
 
     private fun startEscapeSequence(g: PuzzleGrid) {
+        autoSolving = false
         val moves = g.getMoveCount()
         escapeStars = when {
             moves <= optimalMoves             -> 3
@@ -444,21 +602,33 @@ class PuzzleView @JvmOverloads constructor(
         val cx = boardLeft + (cat.col + 0.5f) * cellSize
         val cy = boardTop + (cat.row + 0.5f) * cellSize
         val rng = java.util.Random()
+        val count = if (escapeStars == 3) 80 else 50
 
-        repeat(30) {
+        repeat(count) {
             val angle = rng.nextFloat() * Math.PI.toFloat() * 2f
-            val speed = 2f + rng.nextFloat() * 6f
+            val speed = 3f + rng.nextFloat() * 11f
+            val spread = if (rng.nextFloat() < 0.4f) cellSize * 1.2f else cellSize * 0.4f
+            val shapeRoll = rng.nextFloat()
+            val shape = when {
+                shapeRoll < 0.25f -> 1  // star
+                shapeRoll < 0.50f -> 2  // confetti
+                else -> 0              // circle
+            }
             particles.add(Particle(
-                x = cx + (rng.nextFloat() - 0.5f) * cellSize,
-                y = cy + (rng.nextFloat() - 0.5f) * cellSize,
+                x = cx + (rng.nextFloat() - 0.5f) * spread,
+                y = cy + (rng.nextFloat() - 0.5f) * spread,
                 vx = kotlin.math.cos(angle.toDouble()).toFloat() * speed,
-                vy = kotlin.math.sin(angle.toDouble()).toFloat() * speed - 2f,
-                radius = 4f + rng.nextFloat() * 10f,
-                color = Theme.PARTICLE_COLORS[rng.nextInt(Theme.PARTICLE_COLORS.size)],
-                alpha = 1f
+                vy = kotlin.math.sin(angle.toDouble()).toFloat() * speed - 3f,
+                radius = 3f + rng.nextFloat() * 14f,
+                color = PARTICLE_COLORS[rng.nextInt(PARTICLE_COLORS.size)],
+                alpha = 1f,
+                rotation = rng.nextFloat() * 360f,
+                rotSpeed = (rng.nextFloat() - 0.5f) * 12f,
+                shape = shape
             ))
         }
         particleStartTime = System.currentTimeMillis()
+        screenFlashAlpha = if (escapeStars == 3) 0.7f else 0.4f
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -489,12 +659,15 @@ class PuzzleView @JvmOverloads constructor(
         if (!h.surface.isValid) return
         val canvas = h.lockCanvas() ?: return
         var stageClearData: Pair<Int, Int>? = null
+        var tutorialDismissed = false
         try {
             synchronized(lock) {
                 pendingStageClear = null
+                pendingTutorialDismiss = false
                 update()
                 render(canvas)
                 stageClearData = pendingStageClear
+                tutorialDismissed = pendingTutorialDismiss
             }
         } finally {
             h.unlockCanvasAndPost(canvas)
@@ -502,10 +675,23 @@ class PuzzleView @JvmOverloads constructor(
         stageClearData?.let { (moves, stars) ->
             onStageClear?.invoke(moves, stars)
         }
+        if (tutorialDismissed) {
+            onTutorialDismissed?.invoke()
+        }
     }
 
     private fun update() {
         val now = System.currentTimeMillis()
+
+        // Smooth drag interpolation (lerp toward target each frame)
+        if (dragBlockId >= 0 && dragAxis != 0) {
+            val rawOffset = if (dragAxis == 1) dragCurrentX - dragStartX else dragCurrentY - dragStartY
+            val clamped = rawOffset.coerceIn(dragMaxNegPx, dragMaxPosPx)
+            val targetX = if (dragAxis == 1) clamped else 0f
+            val targetY = if (dragAxis == 2) clamped else 0f
+            dragSmoothX += (targetX - dragSmoothX) * 0.40f
+            dragSmoothY += (targetY - dragSmoothY) * 0.40f
+        }
 
         // Snap animation update
         if (snapAnimating) {
@@ -513,6 +699,7 @@ class PuzzleView @JvmOverloads constructor(
             if (elapsed >= SNAP_DURATION_MS) {
                 snapAnimating = false
                 SoundManager.playBlockMatch()
+                HapticManager.vibrateBlockMove()
                 if (snapPendingSolveCheck) {
                     snapPendingSolveCheck = false
                     val g = grid
@@ -539,15 +726,16 @@ class PuzzleView @JvmOverloads constructor(
                         escapeStartTime = now
                         spawnParticles()
                         SoundManager.playLevelClear()
+                        HapticManager.vibrateStageClear()
                     }
                 }
                 3 -> { // Particles
-                    // Update particles
                     for (p in particles) {
                         p.x += p.vx
                         p.y += p.vy
                         p.vy += 0.15f  // gravity
-                        p.alpha = max(0f, p.alpha - 0.018f)
+                        p.alpha = max(0f, p.alpha - 0.015f)
+                        p.rotation += p.rotSpeed
                     }
                     if (elapsed >= PARTICLE_MS) {
                         escapePhase = 0
@@ -563,7 +751,61 @@ class PuzzleView @JvmOverloads constructor(
             victoryAlpha = min(1f, victoryAlpha + 0.04f)
             starAnimPhase += 0.05f
         }
+
+        // Tutorial pulse animation + auto-dismiss
+        if (tutorialStep >= 0) {
+            tutorialPulse += 0.07f
+            if (tutorialAutoDismissAt > 0 && now >= tutorialAutoDismissAt) {
+                tutorialStep = -1
+                tutorialAutoDismissAt = 0
+                pendingTutorialDismiss = true
+            }
+        }
+
+        // Screen flash decay
+        if (screenFlashAlpha > 0f) {
+            screenFlashAlpha = max(0f, screenFlashAlpha - 0.04f)
+        }
+
+        // Auto-solve stepping
+        if (autoSolving && !snapAnimating && state == PuzzleState.PLAYING) {
+            if (now >= autoSolveNextTime && autoSolveIndex < autoSolveSteps.size) {
+                val step = autoSolveSteps[autoSolveIndex]
+                val g = grid
+                if (g != null) {
+                    val block = g.blocks.firstOrNull { it.id == step.blockId }
+                    if (block != null) {
+                        val oldRow = block.row
+                        val oldCol = block.col
+                        val horizontal = step.dCol != 0
+                        val moveSteps = if (horizontal) step.dCol else step.dRow
+                        val moved = g.moveBlockInDir(block.id, moveSteps, horizontal)
+                        if (!moved) {
+                            autoSolving = false
+                            return
+                        }
+                        val newBlock = g.blocks.firstOrNull { it.id == step.blockId }
+                        if (newBlock != null && (newBlock.row != oldRow || newBlock.col != oldCol)) {
+                            snapAnimating = true
+                            snapBlockId = step.blockId
+                            snapFromCol = oldCol.toFloat()
+                            snapFromRow = oldRow.toFloat()
+                            snapStartTime = now
+                            snapPendingSolveCheck = true
+                        }
+                    }
+                }
+                autoSolveIndex++
+                if (autoSolveIndex >= autoSolveSteps.size) {
+                    autoSolving = false
+                } else {
+                    autoSolveNextTime = now + 350L
+                }
+            }
+        }
     }
+
+    private var pendingTutorialDismiss = false
 
     /** Called inside synchronized(lock). Sets pending callback data instead of invoking directly. */
     private var pendingStageClear: Pair<Int, Int>? = null
@@ -595,6 +837,13 @@ class PuzzleView @JvmOverloads constructor(
         drawCheckpointOverlay(canvas, g)
         drawToolbar(canvas)
 
+        // Screen flash effect
+        if (screenFlashAlpha > 0f) {
+            flashPaint.color = Color.WHITE
+            flashPaint.alpha = (screenFlashAlpha * 255).toInt()
+            canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), flashPaint)
+        }
+
         // Draw particles on top
         if (escapePhase == 3 || particles.isNotEmpty()) {
             drawParticles(canvas)
@@ -602,6 +851,10 @@ class PuzzleView @JvmOverloads constructor(
 
         if (state == PuzzleState.SOLVED && victoryAlpha > 0f) {
             drawVictoryOverlay(canvas, g)
+        }
+
+        if (tutorialStep >= 0) {
+            drawTutorialOverlay(canvas)
         }
     }
 
@@ -1130,15 +1383,73 @@ class PuzzleView @JvmOverloads constructor(
                 left = boardLeft + curCol * cellSize + padding
                 top  = boardTop  + curRow * cellSize + padding
             } else if (isDragging && dragAxis != 0) {
-                val rawOffset = if (dragAxis == 1) dragCurrentX - dragStartX else dragCurrentY - dragStartY
-                val clamped = rawOffset.coerceIn(dragMaxNegPx, dragMaxPosPx)
-                if (dragAxis == 1) left += clamped else top += clamped
+                // Use smoothed visual offset for fluid motion
+                left += dragSmoothX
+                top  += dragSmoothY
             }
 
             val widthCells  = if (block.isHorizontal || block.length == 1) block.length else 1
             val heightCells = if (!block.isHorizontal || block.length == 1) block.length else 1
             val visualRight  = if (isDragging || isSnapping) left + (widthCells * cellSize - 2 * padding) else right
             val visualBottom = if (isDragging || isSnapping) top  + (heightCells * cellSize - 2 * padding) else bottom
+
+            // ── Hint glow: golden pulsing outline + direction arrow ──
+            if (block.id == hintBlockId) {
+                val elapsed = System.currentTimeMillis() - hintStartTime
+                val glowAlpha = if (elapsed > 3000L) {
+                    val fade = 1f - ((elapsed - 3000L) / 1500f).coerceIn(0f, 1f)
+                    if (fade <= 0f) hintBlockId = -1
+                    fade
+                } else 1f
+                if (glowAlpha > 0f) {
+                    val glowPulse = (sin(System.currentTimeMillis() / 300.0) * 0.4 + 0.6).toFloat()
+                    val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        style = Paint.Style.STROKE
+                        strokeWidth = cellSize * 0.12f
+                        color = android.graphics.Color.argb(
+                            (glowAlpha * glowPulse * 255).toInt().coerceIn(0, 255),
+                            0xFF, 0xD7, 0x00
+                        )
+                        maskFilter = BlurMaskFilter(cellSize * 0.18f, BlurMaskFilter.Blur.OUTER)
+                    }
+                    val glowRect = RectF(left - padding * 0.5f, top - padding * 0.5f,
+                        visualRight + padding * 0.5f, visualBottom + padding * 0.5f)
+                    canvas.drawRoundRect(glowRect, cr, cr, glowPaint)
+
+                    // Direction arrow pointing toward the move
+                    val arrowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.argb(
+                            (glowAlpha * glowPulse * 230).toInt().coerceIn(0, 255),
+                            0xFF, 0xD7, 0x00
+                        )
+                        style = Paint.Style.FILL
+                    }
+                    val cx = (left + visualRight) / 2f
+                    val cy = (top + visualBottom) / 2f
+                    val arrowLen = cellSize * 0.35f
+                    val arrowHead = cellSize * 0.18f
+                    // Determine arrow direction from hint deltas
+                    val dx = if (hintDCol > 0) 1f else if (hintDCol < 0) -1f else 0f
+                    val dy = if (hintDRow > 0) 1f else if (hintDRow < 0) -1f else 0f
+                    val tipX = cx + dx * arrowLen
+                    val tipY = cy + dy * arrowLen
+                    val tailX = cx - dx * arrowLen * 0.3f
+                    val tailY = cy - dy * arrowLen * 0.3f
+                    // Arrow shaft
+                    val shaftPaint = Paint(arrowPaint).apply { strokeWidth = cellSize * 0.07f; style = Paint.Style.STROKE }
+                    canvas.drawLine(tailX, tailY, tipX, tipY, shaftPaint)
+                    // Arrowhead triangle
+                    val perpX = -dy * arrowHead * 0.5f
+                    val perpY = dx * arrowHead * 0.5f
+                    val arrowPath = android.graphics.Path().apply {
+                        moveTo(tipX, tipY)
+                        lineTo(tipX - dx * arrowHead + perpX, tipY - dy * arrowHead + perpY)
+                        lineTo(tipX - dx * arrowHead - perpX, tipY - dy * arrowHead - perpY)
+                        close()
+                    }
+                    canvas.drawPath(arrowPath, arrowPaint)
+                }
+            }
 
             // ── Wall block: immovable obstacle ──
             if (block.isWall) {
@@ -1173,6 +1484,23 @@ class PuzzleView @JvmOverloads constructor(
                         maskFilter = BlurMaskFilter(imgSize * 0.15f, BlurMaskFilter.Blur.NORMAL)
                     }
                     canvas.drawCircle(cx + 3f, cy + 4f, imgSize * 0.35f, shadowPaint)
+                }
+
+                // Colored ring for multi-cat: 2nd cat gets blue ring matching EXIT2_COLOR
+                val cats = g.blocks.filter { it.isCat }
+                val isSecondCat = g.exitDirection2 != null && cats.size >= 2 && block.id != cats.first().id
+                if (isSecondCat) {
+                    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = EXIT2_COLOR; style = Paint.Style.STROKE
+                        strokeWidth = 3f * resources.displayMetrics.density
+                    }
+                    canvas.drawCircle(cx, cy, imgSize * 0.48f, ringPaint)
+                } else if (g.exitDirection2 != null && cats.size >= 2) {
+                    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = EXIT_COLOR; style = Paint.Style.STROKE
+                        strokeWidth = 3f * resources.displayMetrics.density
+                    }
+                    canvas.drawCircle(cx, cy, imgSize * 0.48f, ringPaint)
                 }
 
                 if (bmp != null && !bmp.isRecycled) {
@@ -1295,7 +1623,101 @@ class PuzzleView @JvmOverloads constructor(
             if (p.alpha <= 0f) continue
             particlePaint.color = p.color
             particlePaint.alpha = (p.alpha * 255).toInt()
-            canvas.drawCircle(p.x, p.y, p.radius, particlePaint)
+            when (p.shape) {
+                1 -> drawStarShape(canvas, p.x, p.y, p.radius, particlePaint)
+                2 -> {
+                    canvas.save()
+                    canvas.rotate(p.rotation, p.x, p.y)
+                    canvas.drawRect(
+                        p.x - p.radius, p.y - p.radius * 0.4f,
+                        p.x + p.radius, p.y + p.radius * 0.4f,
+                        particlePaint
+                    )
+                    canvas.restore()
+                }
+                else -> canvas.drawCircle(p.x, p.y, p.radius, particlePaint)
+            }
+        }
+    }
+
+    private val starPath = Path()
+    private fun drawStarShape(canvas: Canvas, cx: Float, cy: Float, radius: Float, paint: Paint) {
+        starPath.reset()
+        val inner = radius * 0.45f
+        for (i in 0 until 10) {
+            val r = if (i % 2 == 0) radius else inner
+            val angle = Math.PI / 5.0 * i - Math.PI / 2.0
+            val x = cx + (r * kotlin.math.cos(angle)).toFloat()
+            val y = cy + (r * kotlin.math.sin(angle)).toFloat()
+            if (i == 0) starPath.moveTo(x, y) else starPath.lineTo(x, y)
+        }
+        starPath.close()
+        canvas.drawPath(starPath, paint)
+    }
+
+    // ── Tutorial overlay ──────────────────────────────────────────────────
+
+    private fun drawTutorialOverlay(canvas: Canvas) {
+        val density = resources.displayMetrics.density
+        val w = width.toFloat()
+        val h = height.toFloat()
+
+        // Semi-transparent overlay
+        val overlayAlpha = (0.55f + 0.08f * sin(tutorialPulse.toDouble())).toFloat()
+        tutBgPaint.color = Color.BLACK
+        tutBgPaint.alpha = (overlayAlpha * 255).toInt()
+        canvas.drawRect(0f, 0f, w, h, tutBgPaint)
+
+        // Panel
+        val panelW = w * 0.85f
+        val panelH = 160 * density
+        val panelL = (w - panelW) / 2f
+        val panelT = h * 0.35f
+        tutPanelPaint.color = 0xFFFFF8F0.toInt()
+        tutPanelPaint.setShadowLayer(8f, 0f, 4f, 0x44000000)
+        canvas.drawRoundRect(
+            RectF(panelL, panelT, panelL + panelW, panelT + panelH),
+            20 * density, 20 * density, tutPanelPaint
+        )
+
+        tutTitlePaint.textSize = 22 * density
+        tutBodyPaint.textSize = 15 * density
+        val cx = w / 2f
+
+        when (tutorialStep) {
+            0 -> {
+                canvas.drawText("Welcome!", cx, panelT + 48 * density, tutTitlePaint)
+                canvas.drawText("Swipe blocks to clear", cx, panelT + 80 * density, tutBodyPaint)
+                canvas.drawText("a path for the cat!", cx, panelT + 102 * density, tutBodyPaint)
+            }
+            1 -> {
+                canvas.drawText("Goal", cx, panelT + 48 * density, tutTitlePaint)
+                canvas.drawText("Move the cat to the", cx, panelT + 80 * density, tutBodyPaint)
+                canvas.drawText("green exit to rescue it!", cx, panelT + 102 * density, tutBodyPaint)
+            }
+            2 -> {
+                canvas.drawText("Stars", cx, panelT + 48 * density, tutTitlePaint)
+                canvas.drawText("Use fewer moves to", cx, panelT + 80 * density, tutBodyPaint)
+                canvas.drawText("earn more stars!", cx, panelT + 102 * density, tutBodyPaint)
+            }
+            10 -> {
+                canvas.drawText("New Mechanic!", cx, panelT + 48 * density, tutTitlePaint)
+                canvas.drawText("Keys unlock blocked paths.", cx, panelT + 80 * density, tutBodyPaint)
+                canvas.drawText("Move the key to the lock!", cx, panelT + 102 * density, tutBodyPaint)
+            }
+            20 -> {
+                canvas.drawText("Checkpoints!", cx, panelT + 48 * density, tutTitlePaint)
+                canvas.drawText("Pass through the star", cx, panelT + 80 * density, tutBodyPaint)
+                canvas.drawText("before reaching the exit!", cx, panelT + 102 * density, tutBodyPaint)
+            }
+        }
+
+        // Tap to continue prompt
+        if (tutorialAutoDismissAt == 0L) {
+            val pulse = (sin(tutorialPulse * 2.0) * 0.3 + 0.7).toFloat()
+            tutHintPaint.textSize = 13 * density
+            tutHintPaint.alpha = (pulse * 255).toInt()
+            canvas.drawText("Tap to continue", cx, panelT + panelH - 18 * density, tutHintPaint)
         }
     }
 
@@ -1304,27 +1726,55 @@ class PuzzleView @JvmOverloads constructor(
     private fun drawToolbar(canvas: Canvas) {
         val density    = resources.displayMetrics.density
         val arrowExtra = if (grid?.exitDirection == ExitDirection.BOTTOM) 48 * density else 0f
-        val toolbarTop = boardTop + boardSize + arrowExtra + cellSize * 0.3f
-        val btnH       = 48 * density
-        val btnW       = (width * 0.35f)
-        val margin     = (width - btnW * 2) / 3f
+        val toolbarTop = boardTop + boardSize + arrowExtra + cellSize * 0.8f
+        val btnH       = 46 * density
+        val btnW       = (width * 0.21f)
+        val margin     = (width - btnW * 4) / 5f
 
+        buttonTextPaint.textSize = 13 * density
+
+        // Undo button
         undoRect.set(margin, toolbarTop, margin + btnW, toolbarTop + btnH)
         buttonPaint.color = 0xFF78909C.toInt()
         canvas.drawRoundRect(undoRect, 12 * density, 12 * density, buttonPaint)
-        buttonTextPaint.textSize = 16 * density
         canvas.drawText(
-            "\u21A9 Undo",
+            "Undo",
             undoRect.centerX(), undoRect.centerY() + buttonTextPaint.textSize * 0.35f,
             buttonTextPaint
         )
 
-        val resetLeft = margin * 2 + btnW
+        // Hint button (gold, pulsing)
+        val hintLeft = margin * 2 + btnW
+        hintRect.set(hintLeft, toolbarTop, hintLeft + btnW, toolbarTop + btnH)
+        val hintPulse = (sin(System.currentTimeMillis() / 500.0) * 0.15 + 0.85).toFloat()
+        val hintR = (0xFF * hintPulse).toInt().coerceIn(0, 255)
+        val hintG = (0xC0 * hintPulse).toInt().coerceIn(0, 255)
+        buttonPaint.color = android.graphics.Color.argb(255, hintR, hintG, 0)
+        canvas.drawRoundRect(hintRect, 12 * density, 12 * density, buttonPaint)
+        canvas.drawText(
+            "Hint${if (hintCount > 0) " $hintCount" else ""}",
+            hintRect.centerX(), hintRect.centerY() + buttonTextPaint.textSize * 0.35f,
+            buttonTextPaint
+        )
+
+        // Solve button (purple, shows auto-solve state)
+        val solveLeft = margin * 3 + btnW * 2
+        solveRect.set(solveLeft, toolbarTop, solveLeft + btnW, toolbarTop + btnH)
+        buttonPaint.color = if (autoSolving) 0xFF7E57C2.toInt() else 0xFF9575CD.toInt()
+        canvas.drawRoundRect(solveRect, 12 * density, 12 * density, buttonPaint)
+        canvas.drawText(
+            if (autoSolving) "..." else "Solve",
+            solveRect.centerX(), solveRect.centerY() + buttonTextPaint.textSize * 0.35f,
+            buttonTextPaint
+        )
+
+        // Reset button
+        val resetLeft = margin * 4 + btnW * 3
         resetRect.set(resetLeft, toolbarTop, resetLeft + btnW, toolbarTop + btnH)
         buttonPaint.color = 0xFFFF7043.toInt()
         canvas.drawRoundRect(resetRect, 12 * density, 12 * density, buttonPaint)
         canvas.drawText(
-            "\u21BB Reset",
+            "Reset",
             resetRect.centerX(), resetRect.centerY() + buttonTextPaint.textSize * 0.35f,
             buttonTextPaint
         )
@@ -1341,10 +1791,10 @@ class PuzzleView @JvmOverloads constructor(
 
         val density = resources.displayMetrics.density
         val cx      = width / 2f
-        val cy      = height * 0.38f
+        val cy      = height * 0.36f
 
-        val panelW  = width * 0.78f
-        val panelH  = height * 0.38f
+        val panelW  = width * 0.82f
+        val panelH  = height * 0.48f
         val panelL  = cx - panelW / 2f
         val panelT  = cy - panelH / 2f
         val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -1363,7 +1813,7 @@ class PuzzleView @JvmOverloads constructor(
             textSize  = 28 * density
         }
         val clearTitle = if (isEndless) "Endless #$endlessCount Clear!" else "Stage Clear!"
-        canvas.drawText(clearTitle, cx, panelT + 56 * density, titlePaint)
+        canvas.drawText(clearTitle, cx, panelT + 52 * density, titlePaint)
 
         val movePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFF4E342E.toInt()
@@ -1371,19 +1821,42 @@ class PuzzleView @JvmOverloads constructor(
             textAlign = Paint.Align.CENTER
             textSize  = 16 * density
         }
-        canvas.drawText("Moves: ${g.getMoveCount()}", cx, panelT + 84 * density, movePaint)
+        canvas.drawText("Moves: ${g.getMoveCount()}", cx, panelT + 78 * density, movePaint)
 
         val starSize = 36 * density
         val starGap  = 8 * density
         val totalW   = 3 * starSize + 2 * starGap
         var starX    = cx - totalW / 2f
-        val starY    = panelT + 110 * density
-        val pulse    = 1f + 0.08f * sin(starAnimPhase.toDouble()).toFloat()
+        val starY    = panelT + 98 * density
+        // 3-star: bigger pulse amplitude
+        val pulseAmp = if (victoryStars == 3) 0.18f else 0.08f
+        val pulse    = 1f + pulseAmp * sin(starAnimPhase.toDouble()).toFloat()
+
+        // 3-star golden shimmer behind stars
+        if (victoryStars == 3) {
+            val shimmerAlpha = ((sin(starAnimPhase.toDouble()) * 0.3 + 0.5) * 255).toInt().coerceIn(0, 255)
+            val shimmerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFFD600.toInt()
+                maskFilter = BlurMaskFilter(starSize * 1.2f, BlurMaskFilter.Blur.NORMAL)
+            }
+            shimmerPaint.alpha = shimmerAlpha
+            canvas.drawCircle(cx, starY + starSize / 2f, totalW * 0.65f, shimmerPaint)
+        }
 
         for (i in 1..3) {
             val earned  = i <= victoryStars
-            val bmp     = if (earned) starFullBitmap else starEmptyBitmap
-            val scale   = if (earned) pulse else 1f
+            // Staggered pop-in: each star appears with a delay based on index
+            // starAnimPhase goes 0→∞; star i appears after phase > (i-1)*0.4
+            val starDelay = (i - 1) * 0.4f
+            val starPhase = (starAnimPhase - starDelay).coerceAtLeast(0f)
+            // Pop scale: quickly scales from 0→1.2→1.0 then pulses
+            val popScale = when {
+                starPhase < 0.01f -> 0f
+                starPhase < 0.3f  -> (starPhase / 0.3f) * 1.25f  // overshoot
+                starPhase < 0.5f  -> 1.25f - ((starPhase - 0.3f) / 0.2f) * 0.25f  // settle
+                else              -> if (earned) pulse else 1f
+            }
+            val scale   = if (earned) popScale else minOf(popScale, 1f)
             val scaledS = starSize * scale
             val offsetX = (scaledS - starSize) / 2f
             val offsetY = (scaledS - starSize) / 2f
@@ -1391,31 +1864,73 @@ class PuzzleView @JvmOverloads constructor(
                 starX - offsetX, starY - offsetY,
                 starX + starSize + offsetX, starY + starSize + offsetY
             )
-            if (bmp != null && !bmp.isRecycled) {
-                canvas.drawBitmap(bmp, null, rect, null)
-            } else {
-                val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = if (earned) 0xFFFFD600.toInt() else 0xFFBDBDBD.toInt()
+            if (scale > 0f) {
+                val bmp = if (earned) starFullBitmap else starEmptyBitmap
+                if (bmp != null && !bmp.isRecycled) {
+                    canvas.drawBitmap(bmp, null, rect, null)
+                } else {
+                    val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = if (earned) 0xFFFFD600.toInt() else 0xFFBDBDBD.toInt()
+                    }
+                    canvas.drawCircle(rect.centerX(), rect.centerY(), starSize / 2f * scale, starPaint)
                 }
-                canvas.drawCircle(rect.centerX(), rect.centerY(), starSize / 2f * scale, starPaint)
             }
             starX += starSize + starGap
         }
 
-        // "Next Stage" button
-        val btnW = panelW * 0.6f
-        val btnH2 = 48 * density
-        val btnL = cx - btnW / 2f
-        val btnT = starY + starSize + 24 * density
-        nextStageRect.set(btnL, btnT, btnL + btnW, btnT + btnH2)
+        // "PERFECT!" text for 3-star clear (fades in after stars pop)
+        if (victoryStars == 3 && starAnimPhase > 1.5f) {
+            val perfectAlpha = ((starAnimPhase - 1.5f) / 0.5f).coerceIn(0f, 1f)
+            val perfectPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = 0xFFFF7043.toInt()
+                typeface = Typeface.DEFAULT_BOLD
+                textAlign = Paint.Align.CENTER
+                textSize  = 22 * density
+            }
+            perfectPaint.alpha = (perfectAlpha * 255).toInt()
+            canvas.drawText("PERFECT!", cx, starY - 10 * density, perfectPaint)
+        }
 
+        // ── Buttons ──
+        val btnW  = panelW * 0.7f
+        val btnH2 = 44 * density
+        val btnGap = 10 * density
+        val btnL  = cx - btnW / 2f
+        var btnY  = starY + starSize + 20 * density
+
+        // "Next Stage" button (coral)
+        nextStageRect.set(btnL, btnY, btnL + btnW, btnY + btnH2)
         buttonPaint.color = 0xFFFF7043.toInt()
         canvas.drawRoundRect(nextStageRect, 12 * density, 12 * density, buttonPaint)
-        buttonTextPaint.textSize = 18 * density
+        buttonTextPaint.textSize = 17 * density
         canvas.drawText(
-            if (isEndless) "Next Puzzle \u25B6" else "Next Stage \u25B6",
+            if (isEndless) "Next Puzzle  \u25B6" else "Next Stage  \u25B6",
             nextStageRect.centerX(),
             nextStageRect.centerY() + buttonTextPaint.textSize * 0.35f,
+            buttonTextPaint
+        )
+
+        // "Retry" button (teal)
+        btnY += btnH2 + btnGap
+        retryRect.set(btnL, btnY, btnL + btnW, btnY + btnH2)
+        buttonPaint.color = 0xFF26A69A.toInt()
+        canvas.drawRoundRect(retryRect, 12 * density, 12 * density, buttonPaint)
+        canvas.drawText(
+            "\u21BB  Retry",
+            retryRect.centerX(),
+            retryRect.centerY() + buttonTextPaint.textSize * 0.35f,
+            buttonTextPaint
+        )
+
+        // "Level Select" / "Menu" button (gray-blue)
+        btnY += btnH2 + btnGap
+        levelSelectRect.set(btnL, btnY, btnL + btnW, btnY + btnH2)
+        buttonPaint.color = 0xFF78909C.toInt()
+        canvas.drawRoundRect(levelSelectRect, 12 * density, 12 * density, buttonPaint)
+        canvas.drawText(
+            if (isEndless) "\u2630  Menu" else "\u2630  Level Select",
+            levelSelectRect.centerX(),
+            levelSelectRect.centerY() + buttonTextPaint.textSize * 0.35f,
             buttonTextPaint
         )
     }
