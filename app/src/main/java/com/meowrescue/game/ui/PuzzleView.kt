@@ -70,6 +70,8 @@ class PuzzleView @JvmOverloads constructor(
     private var initialGrid: PuzzleGrid? = null
     private var stageNumber = 1
     private var optimalMoves = 1
+    private var isEndless = false
+    private var endlessCount = 0
 
     // ── Checkpoint glow animation ────────────────────────────────────────
     private var prevCheckpointReached = false
@@ -176,12 +178,14 @@ class PuzzleView @JvmOverloads constructor(
     // Public API
     // ──────────────────────────────────────────────────────────────────────
 
-    fun setGrid(grid: PuzzleGrid, stage: Int, optimalMoves: Int) {
+    fun setGrid(grid: PuzzleGrid, stage: Int, optimalMoves: Int, endless: Boolean = false, endlessCount: Int = 0) {
         synchronized(lock) {
             this.grid         = grid
             this.initialGrid  = grid.clone()
             this.stageNumber  = stage
             this.optimalMoves = optimalMoves
+            this.isEndless    = endless
+            this.endlessCount = endlessCount
             this.state        = PuzzleState.PLAYING
             this.victoryAlpha = 0f
             this.dragBlockId  = -1
@@ -614,7 +618,8 @@ class PuzzleView @JvmOverloads constructor(
 
         hudTextPaint.textSize = 18 * density
         hudTextPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText("Stage $stageNumber", 16 * density, hudTop + hudH * 0.65f, hudTextPaint)
+        val stageLabel = if (isEndless) "Endless #$endlessCount" else "Stage $stageNumber"
+        canvas.drawText(stageLabel, 16 * density, hudTop + hudH * 0.65f, hudTextPaint)
 
         // Move count + color based on star tracking
         val moves = g.getMoveCount()
@@ -1357,7 +1362,8 @@ class PuzzleView @JvmOverloads constructor(
             textAlign = Paint.Align.CENTER
             textSize  = 28 * density
         }
-        canvas.drawText("Stage Clear!", cx, panelT + 56 * density, titlePaint)
+        val clearTitle = if (isEndless) "Endless #$endlessCount Clear!" else "Stage Clear!"
+        canvas.drawText(clearTitle, cx, panelT + 56 * density, titlePaint)
 
         val movePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = 0xFF4E342E.toInt()
@@ -1407,7 +1413,7 @@ class PuzzleView @JvmOverloads constructor(
         canvas.drawRoundRect(nextStageRect, 12 * density, 12 * density, buttonPaint)
         buttonTextPaint.textSize = 18 * density
         canvas.drawText(
-            "Next Stage \u25B6",
+            if (isEndless) "Next Puzzle \u25B6" else "Next Stage \u25B6",
             nextStageRect.centerX(),
             nextStageRect.centerY() + buttonTextPaint.textSize * 0.35f,
             buttonTextPaint

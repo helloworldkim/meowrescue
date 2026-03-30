@@ -102,4 +102,18 @@ class GameRepository(context: Context) {
     fun setSoundEnabled(enabled: Boolean) {
         prefs.edit().putBoolean("sound_enabled", enabled).apply()
     }
+
+    // ── Endless Mode ─────────────────────────────────────────────────
+
+    fun getEndlessCount(): Int = prefs.getInt("endless_count", 1)
+
+    fun setEndlessCount(count: Int) {
+        prefs.edit().putInt("endless_count", count).apply()
+    }
+
+    fun getEndlessBest(): Int = prefs.getInt("endless_best", 0)
+
+    fun setEndlessBest(best: Int) {
+        prefs.edit().putInt("endless_best", best).apply()
+    }
 }

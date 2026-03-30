@@ -25,6 +25,7 @@ object Theme {
     const val COLOR_WARM_BROWN = "#4E342E"
     const val COLOR_CORAL = "#FF7043"
     const val COLOR_TEAL = "#26A69A"
+    const val COLOR_ENDLESS_PURPLE = "#9575CD"
     const val COLOR_STAR_GOLD = "#FFD600"
     const val COLOR_LOCKED_GRAY = "#BDBDBD"
     const val COLOR_LEVEL_COMPLETED_BG = "#FFF3E0"

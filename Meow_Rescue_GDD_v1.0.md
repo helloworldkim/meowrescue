@@ -1,4 +1,4 @@
-# Meow Rescue — Game Design Document (GDD) v5.1
+# Meow Rescue — Game Design Document (GDD) v5.2
 
 > **슬라이딩 블록 퍼즐 게임. 블록을 밀어서 갇힌 고양이를 탈출시키세요!**
 
@@ -148,7 +148,18 @@ HUD 아래, 보드 위에 조건 안내 텍스트를 표시합니다:
 | **클리어 조건** | 양쪽 고양이 모두 자신의 출구에 도달해야 클리어 |
 | **등장 확률** | 30% (스테이지 131+) |
 
-#### 2.1.11 클리어 조건
+#### 2.1.11 끝없는 모드 (Endless Mode)
+
+| 요소 | 설명 |
+|------|------|
+| **해금 조건** | 200 스테이지 모두 클리어 시 메뉴에 버튼 표시 |
+| **퍼즐 생성** | 131~9999 범위의 랜덤 시드로 스테이지 생성 (모든 메커니즘 활용) |
+| **진행 표시** | HUD에 "Endless #N", 승리 오버레이에 "Endless #N Clear!" |
+| **진행 저장** | SharedPreferences에 현재 카운트 + 최고 기록 저장, 앱 재시작 후 이어서 진행 |
+| **제외 항목** | 스테이지 진행 저장 없음, 고양이 해금 없음 |
+| **다음 퍼즐** | "Next Puzzle" 버튼으로 새 랜덤 퍼즐 자동 로드 |
+
+#### 2.1.12 클리어 조건
 
 고양이 블록이 출구까지 이동하면 클리어됩니다. 추가 조건이 있는 경우 모두 충족해야 합니다:
 - **열쇠-자물쇠**: 열쇠 블록이 자물쇠 셀 위에 있어야 함
@@ -497,7 +508,7 @@ enum class PuzzleState {
 | 저장소 | 용도 |
 |--------|------|
 | **Room DB** | 스테이지 클리어 상태, 별점, 최고 기록 |
-| **SharedPreferences** | 선택된 고양이 ID, 사운드 설정 |
+| **SharedPreferences** | 선택된 고양이 ID, 사운드 설정, 끝없는 모드 카운트/최고 기록 |
 
 ---
 
@@ -507,7 +518,7 @@ enum class PuzzleState {
 
 | 화면 | 주요 요소 |
 |------|-----------|
-| **메인 메뉴** | Meow Rescue 로고, Play, Collection, Sound 토글 |
+| **메인 메뉴** | Meow Rescue 로고, Play, Endless Mode (200스테이지 클리어 후 해금), Sound 토글 |
 | **스테이지 선택** | 4열 그리드, 별점 표시, 잠금/해금, 스크롤 |
 | **퍼즐 화면** | 격자 + 블록 + HUD(Pause/Undo/Reset/이동수) + 배너 광고 |
 | **승리 오버레이** | 별점 + 이동 횟수 + "Next Stage" 버튼 |
@@ -559,5 +570,5 @@ enum class PuzzleState {
 
 ---
 
-*Meow Rescue GDD v5.1 — 2026.03*
+*Meow Rescue GDD v5.2 — 2026.03*
 *Platform: Android (Kotlin) | Genre: Sliding Block Puzzle | Style: Casual*

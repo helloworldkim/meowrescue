@@ -11,7 +11,10 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
@@ -23,6 +26,7 @@ class MenuActivity : AppCompatActivity() {
     private lateinit var repository: GameRepository
     private var bannerAd: AdView? = null
     private lateinit var soundButton: Button
+    private lateinit var endlessBtn: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -118,6 +122,17 @@ class MenuActivity : AppCompatActivity() {
         }
         contentLayout.addView(playButton)
 
+        // Endless Mode button (hidden until 200 stages cleared)
+        endlessBtn = makeButton("\uD83D\uDD04  Endless Mode", Theme.COLOR_ENDLESS_PURPLE)
+        endlessBtn.visibility = View.GONE
+        endlessBtn.setOnClickListener {
+            SoundManager.playButtonTap()
+            val intent = Intent(this, PuzzleActivity::class.java)
+            intent.putExtra("endless", true)
+            startActivity(intent)
+        }
+        contentLayout.addView(endlessBtn)
+
         // Sound toggle button
         soundButton = makeButton(soundLabel(), Theme.COLOR_TEAL)
         soundButton.setOnClickListener {
@@ -164,6 +179,13 @@ class MenuActivity : AppCompatActivity() {
         if (repository.isSoundEnabled()) SoundManager.playBgm("menu")
         // Refresh sound button label in case state changed
         if (::soundButton.isInitialized) soundButton.text = soundLabel()
+        // Show endless button only if 200 stages cleared
+        if (::endlessBtn.isInitialized) {
+            lifecycleScope.launch {
+                val maxLevel = repository.getMaxCompletedLevel()
+                endlessBtn.visibility = if (maxLevel >= 200) View.VISIBLE else View.GONE
+            }
+        }
     }
 
     override fun onPause() {

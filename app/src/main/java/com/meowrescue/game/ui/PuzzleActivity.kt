@@ -20,6 +20,7 @@ import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 
 class PuzzleActivity : AppCompatActivity() {
 
@@ -27,6 +28,8 @@ class PuzzleActivity : AppCompatActivity() {
     private lateinit var repository: GameRepository
     private val generator = PuzzleGenerator()
     private var currentStage: Int = 1
+    private var isEndless: Boolean = false
+    private var endlessCount: Int = 1
     private var bannerAd: AdView? = null
     private var pauseOverlay: FrameLayout? = null
     private lateinit var loadingOverlay: FrameLayout
@@ -36,10 +39,16 @@ class PuzzleActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        currentStage = intent.getIntExtra("stage", 1)
-
         SoundManager.init(this)
         repository = GameRepository(this)
+
+        isEndless = intent.getBooleanExtra("endless", false)
+        if (isEndless) {
+            endlessCount = repository.getEndlessCount()
+            currentStage = generateRandomStage()
+        } else {
+            currentStage = intent.getIntExtra("stage", 1)
+        }
 
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -102,7 +111,7 @@ class PuzzleActivity : AppCompatActivity() {
             val result = withContext(Dispatchers.Default) {
                 generator.generateWithResult(stage)
             }
-            puzzleView.setGrid(result.grid, stage, result.optimalMoves)
+            puzzleView.setGrid(result.grid, stage, result.optimalMoves, isEndless, endlessCount)
             loadingOverlay.visibility = View.GONE
             puzzleView.visibility = View.VISIBLE
         }
@@ -112,15 +121,24 @@ class PuzzleActivity : AppCompatActivity() {
         // Called when escape animation completes and victory overlay shows
         puzzleView.onStageClear = { moves, stars ->
             lifecycleScope.launch {
-                val prevMax = repository.getMaxCompletedLevel()
-                repository.saveProgress(currentStage, stars, null)
-                AdManager.onStageClear()
+                if (isEndless) {
+                    endlessCount++
+                    repository.setEndlessCount(endlessCount)
+                    if (endlessCount > repository.getEndlessBest()) {
+                        repository.setEndlessBest(endlessCount)
+                    }
+                    AdManager.onStageClear()
+                } else {
+                    val prevMax = repository.getMaxCompletedLevel()
+                    repository.saveProgress(currentStage, stars, null)
+                    AdManager.onStageClear()
 
-                // Check for new cat unlock (only on first-time clear)
-                if (currentStage > prevMax) {
-                    val newCat = repository.getNewlyUnlockedCat(currentStage)
-                    if (newCat != null) {
-                        showCongratsDialog(newCat)
+                    // Check for new cat unlock (only on first-time clear)
+                    if (currentStage > prevMax) {
+                        val newCat = repository.getNewlyUnlockedCat(currentStage)
+                        if (newCat != null) {
+                            showCongratsDialog(newCat)
+                        }
                     }
                 }
             }
@@ -128,7 +146,7 @@ class PuzzleActivity : AppCompatActivity() {
 
         // Called when user clicks "Next Stage" button in victory overlay
         puzzleView.onNextStageClicked = {
-            val nextStage = currentStage + 1
+            val nextStage = if (isEndless) generateRandomStage() else currentStage + 1
             if (AdManager.shouldShowInterstitial(currentStage)) {
                 AdManager.showInterstitial(this@PuzzleActivity) {
                     loadStage(nextStage)
@@ -145,6 +163,8 @@ class PuzzleActivity : AppCompatActivity() {
             pauseOverlay?.visibility = View.VISIBLE
         }
     }
+
+    private fun generateRandomStage(): Int = Random.nextInt(131, 10000)
 
     // ── Congratulation dialog for new cat unlock ────────────────────────
 
