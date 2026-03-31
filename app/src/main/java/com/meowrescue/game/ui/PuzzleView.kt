@@ -157,6 +157,8 @@ class PuzzleView @JvmOverloads constructor(
     // ── Smooth drag visual interpolation ─────────────────────────────────
     private var dragSmoothX = 0f           // smoothed visual offset (pixels)
     private var dragSmoothY = 0f
+    private var lastFrameTime = 0L         // timestamp of previous frame start (ms)
+    private var frameMs = 16.67f           // actual frame delta time (ms)
 
     // ── Snap animation ────────────────────────────────────────────────────
     private var snapAnimating = false
@@ -200,6 +202,14 @@ class PuzzleView @JvmOverloads constructor(
     private val retryRect        = RectF()
     private val levelSelectRect  = RectF()
 
+    // ── Reusable temp objects (avoid per-frame allocation) ──
+    private val tmpRect1 = RectF()
+    private val tmpRect2 = RectF()
+    private val tmpRect3 = RectF()
+    private val tmpSrcRect = Rect()
+    private val tmpMatrix = Matrix()
+    private var cachedDensity = 0f
+
     // ── Resources ─────────────────────────────────────────────────────────
     private var pauseBitmap: Bitmap? = null
     private var starFullBitmap: Bitmap? = null
@@ -236,7 +246,7 @@ class PuzzleView @JvmOverloads constructor(
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val flashPaint    = Paint()
     private val tutBgPaint    = Paint()
-    private val tutPanelPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tutPanelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { setShadowLayer(8f, 0f, 4f, 0x44000000) }
     private val tutTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFFF7043.toInt(); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
     }
@@ -307,6 +317,8 @@ class PuzzleView @JvmOverloads constructor(
     private val wallXPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFBCAAA4.toInt(); strokeWidth = 3f; style = Paint.Style.STROKE
     }
+    private var catDragBlur: BlurMaskFilter? = null
+    private var hintGlowBlur: BlurMaskFilter? = null
     private val catShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val catRingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -322,6 +334,7 @@ class PuzzleView @JvmOverloads constructor(
     }
     private val victoryPanelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFFFF8F0.toInt()
+        setShadowLayer(12f, 0f, 4f, 0x44000000)
     }
     private val victoryTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFFF7043.toInt(); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
@@ -564,8 +577,7 @@ class PuzzleView @JvmOverloads constructor(
         val col = ((x - boardLeft) / cellSize).toInt()
         val row = ((y - boardTop)  / cellSize).toInt()
         if (col < 0 || col >= g.cols || row < 0 || row >= g.rows) return null
-        val gridSnap = g.getGrid()
-        val blockId = gridSnap[row][col]
+        val blockId = g.blockIdAt(row, col)
         if (blockId == -1) return null
 
         val block = g.blocks.firstOrNull { it.id == blockId } ?: return null
@@ -599,7 +611,7 @@ class PuzzleView @JvmOverloads constructor(
         if (dragAxis == 0) {
             val dx = abs(x - dragStartX)
             val dy = abs(y - dragStartY)
-            val threshold = cellSize * 0.06f
+            val threshold = max(cellSize * 0.06f, 8f * resources.displayMetrics.density)
             if (dx > threshold || dy > threshold) {
                 val g = grid ?: return
                 dragAxis = if (dx >= dy) 1 else 2
@@ -733,6 +745,9 @@ class PuzzleView @JvmOverloads constructor(
         renderThread = Thread {
             while (running) {
                 val start = System.currentTimeMillis()
+                val prevLast = lastFrameTime
+                if (prevLast > 0L) frameMs = (start - prevLast).coerceIn(1L, 100L).toFloat()
+                lastFrameTime = start
                 drawFrame()
                 val elapsed = System.currentTimeMillis() - start
                 val sleep   = FRAME_MS - elapsed
@@ -781,8 +796,10 @@ class PuzzleView @JvmOverloads constructor(
             val clamped = rawOffset.coerceIn(dragMaxNegPx, dragMaxPosPx)
             val targetX = if (dragAxis == 1) clamped else 0f
             val targetY = if (dragAxis == 2) clamped else 0f
-            dragSmoothX += (targetX - dragSmoothX) * 0.40f
-            dragSmoothY += (targetY - dragSmoothY) * 0.40f
+            val dt = frameMs.coerceIn(1f, 32f)  // clamp to avoid extremes
+            val alpha = 1f - Math.pow((1.0 - 0.40), (dt / 16.67)).toFloat()
+            dragSmoothX += (targetX - dragSmoothX) * alpha
+            dragSmoothY += (targetY - dragSmoothY) * alpha
         }
     }
 
@@ -1092,8 +1109,8 @@ class PuzzleView @JvmOverloads constructor(
     // ── Board ─────────────────────────────────────────────────────────────
 
     private fun drawBoard(canvas: Canvas, g: PuzzleGrid) {
-        val r = RectF(boardLeft, boardTop, boardLeft + boardSize, boardTop + boardSize)
-        canvas.drawRoundRect(r, 8f, 8f, gridBgPaint)
+        tmpRect1.set(boardLeft, boardTop, boardLeft + boardSize, boardTop + boardSize)
+        canvas.drawRoundRect(tmpRect1, 8f, 8f, gridBgPaint)
 
         for (i in 0..g.rows) {
             val y = boardTop + i * cellSize
@@ -1375,8 +1392,8 @@ class PuzzleView @JvmOverloads constructor(
 
     private fun drawWallBlock(canvas: Canvas, left: Float, top: Float, right: Float, bottom: Float, cr: Float, padding: Float) {
         blockPaint.color = WALL_COLOR
-        val blockRect = RectF(left, top, right, bottom)
-        canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
+        tmpRect1.set(left, top, right, bottom)
+        canvas.drawRoundRect(tmpRect1, cr, cr, blockPaint)
         canvas.drawLine(left + padding, top + padding, right - padding, bottom - padding, wallXPaint)
         canvas.drawLine(right - padding, top + padding, left + padding, bottom - padding, wallXPaint)
     }
@@ -1395,7 +1412,7 @@ class PuzzleView @JvmOverloads constructor(
         if (isDragging) {
             catShadowPaint.color = 0xFF000000.toInt()
             catShadowPaint.alpha = 25
-            catShadowPaint.maskFilter = BlurMaskFilter(imgSize * 0.15f, BlurMaskFilter.Blur.NORMAL)
+            catShadowPaint.maskFilter = catDragBlur
             canvas.drawCircle(cx + 3f, cy + 4f, imgSize * 0.35f, catShadowPaint)
         }
 
@@ -1412,8 +1429,8 @@ class PuzzleView @JvmOverloads constructor(
         }
 
         if (bmp != null && !bmp.isRecycled) {
-            val imgRect = RectF(cx - imgSize / 2f, cy - imgSize / 2f, cx + imgSize / 2f, cy + imgSize / 2f)
-            canvas.drawBitmap(bmp, null, imgRect, null)
+            tmpRect1.set(cx - imgSize / 2f, cy - imgSize / 2f, cx + imgSize / 2f, cy + imgSize / 2f)
+            canvas.drawBitmap(bmp, null, tmpRect1, null)
         } else {
             canvas.drawCircle(cx, cy, imgSize * 0.45f, catFallbackPaint)
             textPaint.textSize = imgSize * 0.35f
@@ -1432,20 +1449,20 @@ class PuzzleView @JvmOverloads constructor(
 
         if (isDragging || isSnapping) {
             blockShadow.alpha = 80
-            val shadowRect = RectF(left + 6f, top + 6f, right + 6f, bottom + 6f)
-            canvas.drawRoundRect(shadowRect, cr, cr, blockShadow)
+            tmpRect2.set(left + 6f, top + 6f, right + 6f, bottom + 6f)
+            canvas.drawRoundRect(tmpRect2, cr, cr, blockShadow)
         }
 
         blockPaint.color = color
-        val blockRect = RectF(left, top, right, bottom)
-        canvas.drawRoundRect(blockRect, cr, cr, blockPaint)
+        tmpRect1.set(left, top, right, bottom)
+        canvas.drawRoundRect(tmpRect1, cr, cr, blockPaint)
 
         // Highlight gloss using cached gradient + matrix translate
         val grad = glossGradient
         if (grad != null) {
-            val m = Matrix()
-            m.setTranslate(left, top)
-            grad.setLocalMatrix(m)
+            tmpMatrix.reset()
+            tmpMatrix.setTranslate(left, top)
+            grad.setLocalMatrix(tmpMatrix)
             glossPaint.shader = grad
         } else {
             glossPaint.shader = LinearGradient(
@@ -1453,7 +1470,7 @@ class PuzzleView @JvmOverloads constructor(
                 intArrayOf(0x55FFFFFF, 0x00FFFFFF), null, Shader.TileMode.CLAMP
             )
         }
-        canvas.drawRoundRect(blockRect, cr, cr, glossPaint)
+        canvas.drawRoundRect(tmpRect1, cr, cr, glossPaint)
 
         if (block.isKey) {
             textPaint.textSize = cellSize * 0.55f
@@ -1488,11 +1505,11 @@ class PuzzleView @JvmOverloads constructor(
             (glowAlpha * glowPulse * 255).toInt().coerceIn(0, 255),
             0xFF, 0xD7, 0x00
         )
-        hintGlowPaint.maskFilter = BlurMaskFilter(cellSize * 0.18f, BlurMaskFilter.Blur.OUTER)
+        hintGlowPaint.maskFilter = hintGlowBlur
         val padding = cellSize * 0.07f
-        val glowRect = RectF(left - padding * 0.5f, top - padding * 0.5f,
+        tmpRect1.set(left - padding * 0.5f, top - padding * 0.5f,
             right + padding * 0.5f, bottom + padding * 0.5f)
-        canvas.drawRoundRect(glowRect, cr, cr, hintGlowPaint)
+        canvas.drawRoundRect(tmpRect1, cr, cr, hintGlowPaint)
 
         hintArrowPaint.color = android.graphics.Color.argb(
             (glowAlpha * glowPulse * 230).toInt().coerceIn(0, 255),
@@ -1692,7 +1709,6 @@ class PuzzleView @JvmOverloads constructor(
         val panelL = (w - panelW) / 2f
         val panelT = h * 0.35f
         tutPanelPaint.color = 0xFFFFF8F0.toInt()
-        tutPanelPaint.setShadowLayer(8f, 0f, 4f, 0x44000000)
         canvas.drawRoundRect(
             RectF(panelL, panelT, panelL + panelW, panelT + panelH),
             20 * density, 20 * density, tutPanelPaint
@@ -1810,7 +1826,6 @@ class PuzzleView @JvmOverloads constructor(
         val panelH  = height * 0.48f
         val panelL  = cx - panelW / 2f
         val panelT  = cy - panelH / 2f
-        victoryPanelPaint.setShadowLayer(12f, 0f, 4f, 0x44000000)
         canvas.drawRoundRect(
             RectF(panelL, panelT, panelL + panelW, panelT + panelH),
             24 * density, 24 * density, victoryPanelPaint
@@ -1925,7 +1940,8 @@ class PuzzleView @JvmOverloads constructor(
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
 
-        val density    = resources.displayMetrics.density
+        cachedDensity = resources.displayMetrics.density
+        val density    = cachedDensity
         val hudH       = HUD_HEIGHT_DP * density
         val toolbarH   = TOOLBAR_HEIGHT_DP * density
         val arrowArea  = ARROW_AREA_DP * density
@@ -1940,6 +1956,9 @@ class PuzzleView @JvmOverloads constructor(
         cellSize  = boardSize / max(g.rows, g.cols)
         boardLeft = arrowArea + (availableW - boardSize) / 2f
         boardTop  = hudH + arrowArea + (availableH - boardSize) / 2f
+
+        catDragBlur = BlurMaskFilter(cellSize * 0.22f, BlurMaskFilter.Blur.NORMAL)
+        hintGlowBlur = BlurMaskFilter(cellSize * 0.18f, BlurMaskFilter.Blur.OUTER)
 
         // Build gloss gradient once at layout time (height = cellSize * 0.4)
         glossGradient = LinearGradient(

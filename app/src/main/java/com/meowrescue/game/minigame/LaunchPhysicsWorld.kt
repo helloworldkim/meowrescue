@@ -299,13 +299,13 @@ class LaunchPhysicsWorld {
 
     // ── Accessors ───────────────────────────────────────────────────────
 
-    fun getProjectiles(): List<ProjectileBody> = projectiles.toList()
+    fun getProjectiles(): List<ProjectileBody> = projectiles
 
-    fun getObstacles(): List<ObstacleBody> = obstacles.toList()
+    fun getObstacles(): List<ObstacleBody> = obstacles
 
-    fun getEnemies(): List<EnemyBody> = enemies.toList()
+    fun getEnemies(): List<EnemyBody> = enemies
 
-    fun getDebris(): List<DebrisParticle> = debris.toList()
+    fun getDebris(): List<DebrisParticle> = debris
 
     fun getSlingshotAnchor(): Vec2 = Vec2(SLINGSHOT_X, SLINGSHOT_Y)
 
@@ -393,10 +393,7 @@ class LaunchPhysicsWorld {
     // ── Internal: collision processing ──────────────────────────────────
 
     private fun processCollisions() {
-        val events = collisionQueue.toList()
-        collisionQueue.clear()
-
-        for (event in events) {
+        for (event in collisionQueue) {
             val damage = (event.impulse * DAMAGE_MULTIPLIER).toInt()
 
             applyDamageToBody(event.bodyA, damage, event.bodyB)
@@ -412,6 +409,7 @@ class LaunchPhysicsWorld {
             handleChargePenetration(event.bodyA, event.bodyB)
             handleChargePenetration(event.bodyB, event.bodyA)
         }
+        collisionQueue.clear()
     }
 
     private fun applyDamageToBody(body: Body, damage: Int, otherBody: Body) {

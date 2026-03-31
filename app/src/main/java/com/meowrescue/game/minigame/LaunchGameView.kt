@@ -46,6 +46,7 @@ class LaunchGameView @JvmOverloads constructor(
 
         private const val WORLD_WIDTH = LaunchPhysicsWorld.WORLD_WIDTH
         private const val GROUND_HEIGHT = LaunchPhysicsWorld.GROUND_HEIGHT
+        private const val RAD_TO_DEG = (180.0 / Math.PI).toFloat()
     }
 
     // ── Callbacks ────────────────────────────────────────────────────────────
@@ -131,6 +132,10 @@ class LaunchGameView @JvmOverloads constructor(
     private val nextStageRect = RectF()
     private val retryRect = RectF()
     private val menuRect = RectF()
+
+    // ── Reusable Rect/RectF to avoid per-frame allocation ──────────────────
+    private val tmpSrcRect = Rect()
+    private val tmpDstRect = RectF()
 
     // ── Sky gradient cache ───────────────────────────────────────────────────
     private var skyGradient: LinearGradient? = null
@@ -341,12 +346,13 @@ class LaunchGameView @JvmOverloads constructor(
 
         worldOriginScreenX = 0f
 
-        // Cache sky gradient
+        // Cache sky gradient and assign to paint once
         skyGradient = LinearGradient(
             0f, hudHeightPx, 0f, groundScreenY,
             BG_SKY_TOP, BG_SKY_BOTTOM,
             Shader.TileMode.CLAMP
         )
+        skyPaint.shader = skyGradient
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -805,11 +811,8 @@ class LaunchGameView @JvmOverloads constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun drawSky(canvas: Canvas) {
-        val grad = skyGradient
-        if (grad != null) {
-            skyPaint.shader = grad
+        if (skyGradient != null) {
             canvas.drawRect(0f, 0f, width.toFloat(), worldToScreenY(GROUND_HEIGHT), skyPaint)
-            skyPaint.shader = null
         } else {
             canvas.drawColor(BG_SKY_TOP)
         }
@@ -881,13 +884,10 @@ class LaunchGameView @JvmOverloads constructor(
             val catRadius = 12f * density
             val bm = catBitmaps[catId]
             if (bm != null) {
-                canvas.drawBitmap(
-                    bm,
-                    Rect(0, 0, bm.width, bm.height),
-                    RectF(dragCurrentX - catRadius, dragCurrentY - catRadius,
-                          dragCurrentX + catRadius, dragCurrentY + catRadius),
-                    null
-                )
+                tmpSrcRect.set(0, 0, bm.width, bm.height)
+                tmpDstRect.set(dragCurrentX - catRadius, dragCurrentY - catRadius,
+                               dragCurrentX + catRadius, dragCurrentY + catRadius)
+                canvas.drawBitmap(bm, tmpSrcRect, tmpDstRect, null)
             } else {
                 canvas.drawCircle(dragCurrentX, dragCurrentY, catRadius, catFallbackPaint)
             }
@@ -952,7 +952,7 @@ class LaunchGameView @JvmOverloads constructor(
 
             canvas.save()
             canvas.translate(sx, sy)
-            canvas.rotate(-Math.toDegrees(angle.toDouble()).toFloat())
+            canvas.rotate(-angle * RAD_TO_DEG)
 
             obstaclePaint.color = obstacle.material.color
             canvas.drawRoundRect(
@@ -1014,13 +1014,10 @@ class LaunchGameView @JvmOverloads constructor(
             if (bm != null) {
                 canvas.save()
                 canvas.translate(sx, sy)
-                canvas.rotate(-Math.toDegrees(angle.toDouble()).toFloat())
-                canvas.drawBitmap(
-                    bm,
-                    Rect(0, 0, bm.width, bm.height),
-                    RectF(-radiusPx, -radiusPx, radiusPx, radiusPx),
-                    null
-                )
+                canvas.rotate(-angle * RAD_TO_DEG)
+                tmpSrcRect.set(0, 0, bm.width, bm.height)
+                tmpDstRect.set(-radiusPx, -radiusPx, radiusPx, radiusPx)
+                canvas.drawBitmap(bm, tmpSrcRect, tmpDstRect, null)
                 canvas.restore()
             } else {
                 canvas.drawCircle(sx, sy, radiusPx, catFallbackPaint)
@@ -1039,7 +1036,7 @@ class LaunchGameView @JvmOverloads constructor(
 
             canvas.save()
             canvas.translate(sx, sy)
-            canvas.rotate(Math.toDegrees(d.rotation.toDouble()).toFloat())
+            canvas.rotate(d.rotation * RAD_TO_DEG)
             canvas.drawRect(-size / 2f, -size / 2f, size / 2f, size / 2f, debrisPaint)
             canvas.restore()
         }
@@ -1154,12 +1151,9 @@ class LaunchGameView @JvmOverloads constructor(
 
         val bm = catBitmaps[catId]
         if (bm != null) {
-            canvas.drawBitmap(
-                bm,
-                Rect(0, 0, bm.width, bm.height),
-                RectF(sx - catRadius, sy - catRadius, sx + catRadius, sy + catRadius),
-                null
-            )
+            tmpSrcRect.set(0, 0, bm.width, bm.height)
+            tmpDstRect.set(sx - catRadius, sy - catRadius, sx + catRadius, sy + catRadius)
+            canvas.drawBitmap(bm, tmpSrcRect, tmpDstRect, null)
         } else {
             canvas.drawCircle(sx, sy, catRadius, catFallbackPaint)
         }
@@ -1203,13 +1197,10 @@ class LaunchGameView @JvmOverloads constructor(
 
             val bm = catBitmaps[catId]
             if (bm != null) {
-                canvas.drawBitmap(
-                    bm,
-                    Rect(0, 0, bm.width, bm.height),
-                    RectF(cx - size / 2f, cy - size / 2f,
-                          cx + size / 2f, cy + size / 2f),
-                    null
-                )
+                tmpSrcRect.set(0, 0, bm.width, bm.height)
+                tmpDstRect.set(cx - size / 2f, cy - size / 2f,
+                               cx + size / 2f, cy + size / 2f)
+                canvas.drawBitmap(bm, tmpSrcRect, tmpDstRect, null)
             } else {
                 catFallbackPaint.alpha = if (isCurrent) 255 else 180
                 canvas.drawCircle(cx, cy, size / 2f - 2f, catFallbackPaint)

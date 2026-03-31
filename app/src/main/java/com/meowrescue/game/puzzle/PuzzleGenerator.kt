@@ -1,6 +1,6 @@
 package com.meowrescue.game.puzzle
 
-import java.util.LinkedList
+import java.util.ArrayDeque
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -477,11 +477,13 @@ class PuzzleGenerator {
             else -> MAX_STATES_DEFAULT
         }
 
+        val hasLinkedBlocks = infos.any { it.linkId >= 0 }
+
         if (!trackPath) {
             // Depth-only BFS
             val visited = HashSet<Long>(4096)
             visited.add(hashState(initState))
-            val queue = LinkedList<Pair<IntArray, Int>>()
+            val queue = ArrayDeque<Pair<IntArray, Int>>(4096)
             queue.add(initState to 0)
 
             while (queue.isNotEmpty() && visited.size < maxStates) {
@@ -489,20 +491,21 @@ class PuzzleGenerator {
                 if (depth >= MAX_BFS_DEPTH) continue
 
                 val g = buildGrid(state, infos, rows, cols)
-                val processedLinks = mutableSetOf<Int>()
+                val processedLinks = if (hasLinkedBlocks) mutableSetOf<Int>() else null
 
                 for (i in 0 until n) {
                     val info = infos[i]
                     if (info.isWall) continue
                     if (info.linkId >= 0) {
-                        if (info.linkId in processedLinks) continue
-                        processedLinks.add(info.linkId)
+                        if (processedLinks?.contains(info.linkId) == true) continue
+                        processedLinks?.add(info.linkId)
                     }
                     val partnerId = linkPartner[i]
                     val tryHoriz = info.isHorizontal || info.length == 1
                     val tryVert  = !info.isHorizontal || info.length == 1
 
-                    for ((dRow, dCol) in listOf(0 to 1, 0 to -1, 1 to 0, -1 to 0)) {
+                    for (dir in DIRECTIONS) {
+                        val dRow = dir[0]; val dCol = dir[1]
                         val isHoriz = dCol != 0
                         if (isHoriz && !tryHoriz) continue
                         if (!isHoriz && !tryVert) continue
@@ -530,7 +533,7 @@ class PuzzleGenerator {
             nodes.add(Node(initState, -1, null))
             visited[hashState(initState)] = 0
 
-            val queue = LinkedList<Pair<Int, Int>>()
+            val queue = ArrayDeque<Pair<Int, Int>>(4096)
             queue.add(0 to 0)
             var solvedNodeIdx = -1
 
@@ -539,20 +542,21 @@ class PuzzleGenerator {
                 if (depth >= MAX_BFS_DEPTH) continue
                 val state = nodes[nodeIdx].state
                 val g = buildGrid(state, infos, rows, cols)
-                val processedLinks = mutableSetOf<Int>()
+                val processedLinks = if (hasLinkedBlocks) mutableSetOf<Int>() else null
 
                 for (i in 0 until n) {
                     val info = infos[i]
                     if (info.isWall) continue
                     if (info.linkId >= 0) {
-                        if (info.linkId in processedLinks) continue
-                        processedLinks.add(info.linkId)
+                        if (processedLinks?.contains(info.linkId) == true) continue
+                        processedLinks?.add(info.linkId)
                     }
                     val partnerId = linkPartner[i]
                     val tryHoriz = info.isHorizontal || info.length == 1
                     val tryVert  = !info.isHorizontal || info.length == 1
 
-                    for ((dRow, dCol) in listOf(0 to 1, 0 to -1, 1 to 0, -1 to 0)) {
+                    for (dir in DIRECTIONS) {
+                        val dRow = dir[0]; val dCol = dir[1]
                         val isHoriz = dCol != 0
                         if (isHoriz && !tryHoriz) continue
                         if (!isHoriz && !tryVert) continue
@@ -940,12 +944,12 @@ class PuzzleGenerator {
 
         // Random fill to reach target block count
         val target = params.blockCountMin + rng.nextInt(maxOf(1, params.blockCountMax - params.blockCountMin + 1))
-        while (grid.blocks.size < target) {
+        while (grid.blockCount < target) {
             if (!tryPlaceRandom(grid, nextId, size, rng)) break
             nextId++
         }
 
-        if (grid.blocks.size < 3 || grid.isSolved()) return null
+        if (grid.blockCount < 3 || grid.isSolved()) return null
         return grid
     }
 
@@ -1069,5 +1073,6 @@ class PuzzleGenerator {
         private const val MAX_OUTER_ATTEMPTS = 80
         private const val MAX_INNER_ATTEMPTS = 60
         private const val ACCEPT_THRESHOLD = 0.50
+        private val DIRECTIONS = arrayOf(intArrayOf(0, 1), intArrayOf(0, -1), intArrayOf(1, 0), intArrayOf(-1, 0))
     }
 }

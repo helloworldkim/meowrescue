@@ -47,7 +47,8 @@ class PuzzleGrid(
     val hasCheckpoint: Boolean get() = checkpointRow >= 0 && checkpointCol >= 0
     var checkpointReached: Boolean = false
 
-    val blocks: List<PuzzleBlock> get() = _blocks.toList()
+    val blocks: List<PuzzleBlock> get() = _blocks
+    val blockCount: Int get() = _blocks.size
 
     private var moveCount: Int = 0
 
@@ -343,6 +344,12 @@ class PuzzleGrid(
 
     fun getGrid(): Array<IntArray> = Array(rows) { r -> grid[r].copyOf() }
 
+    /** 단일 셀의 블록 ID 조회 (방어적 복사 없이 직접 접근) */
+    fun blockIdAt(row: Int, col: Int): Int {
+        if (row < 0 || row >= rows || col < 0 || col >= cols) return -1
+        return grid[row][col]
+    }
+
     fun clone(): PuzzleGrid {
         val clone = PuzzleGrid(rows, cols, exitRow, exitCol, exitDirection,
                                hasKeyLock, lockRow, lockCol, checkpointRow, checkpointCol,
@@ -357,10 +364,5 @@ class PuzzleGrid(
         }
         clone.checkpointReached = checkpointReached
         return clone
-    }
-
-    fun encodeState(): String {
-        val blocksPart = _blocks.sortedBy { it.id }.joinToString(",") { "${it.row}:${it.col}" }
-        return if (hasCheckpoint) "$blocksPart|cp=$checkpointReached" else blocksPart
     }
 }
