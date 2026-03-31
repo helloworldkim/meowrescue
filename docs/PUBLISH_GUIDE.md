@@ -32,37 +32,17 @@ keytool -genkey -v -keystore meowrescue-upload.jks -keyalg RSA -keysize 2048 -va
 ```
 - 비밀번호, 이름 등 입력
 - `meowrescue-upload.jks` 파일을 프로젝트 루트에 저장 (git에 커밋하지 말 것!)
+- `.gitignore`에 `*.jks`, `*.keystore`는 이미 등록되어 있음
 
-### 2-2. `app/build.gradle.kts`에 서명 설정 추가
-```kotlin
-android {
-    signingConfigs {
-        create("release") {
-            storeFile = file("../meowrescue-upload.jks")
-            storePassword = "YOUR_STORE_PASSWORD"
-            keyAlias = "upload"
-            keyPassword = "YOUR_KEY_PASSWORD"
-        }
-    }
-    buildTypes {
-        release {
-            isMinifyEnabled = true
-            signingConfig = signingConfigs.getByName("release")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-    }
-}
+### 2-2. `local.properties`에 서명 정보 추가
+`build.gradle.kts`에 서명 설정이 이미 적용되어 있습니다. 키를 생성한 후 `local.properties`에 아래 4줄만 추가하면 됩니다:
+```properties
+RELEASE_STORE_FILE=../meowrescue-upload.jks
+RELEASE_STORE_PASSWORD=your_store_password
+RELEASE_KEY_ALIAS=upload
+RELEASE_KEY_PASSWORD=your_key_password
 ```
-> 보안 팁: 비밀번호는 `local.properties`에 저장하고 gradle에서 읽어오는 방식 권장
-
-### 2-3. `.gitignore`에 추가
-```
-*.jks
-*.keystore
-```
+> `local.properties`는 `.gitignore`에 포함되어 있어 git에 커밋되지 않습니다.
 
 ---
 
