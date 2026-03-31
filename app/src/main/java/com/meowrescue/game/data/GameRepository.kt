@@ -117,4 +117,28 @@ class GameRepository(context: Context) {
     fun setTutorialCompleted() {
         prefs.edit().putBoolean("tutorial_completed", true).apply()
     }
+
+    // ── Launch Minigame Progress ──────────────────────────────────────
+
+    suspend fun saveLaunchProgress(stageId: Int, stars: Int) = withContext(Dispatchers.IO) {
+        val existing = db.launchProgressDao().getProgressForStage(stageId)
+        val bestStars = maxOf(stars, existing?.stars ?: 0)
+        val score = stars * 50
+        val bestScore = maxOf(score, existing?.bestScore ?: 0)
+        db.launchProgressDao().saveProgress(
+            LaunchProgress(stageId = stageId, stars = bestStars, completed = bestStars > 0, bestScore = bestScore)
+        )
+    }
+
+    suspend fun getLaunchProgress(stageId: Int): LaunchProgress? = withContext(Dispatchers.IO) {
+        db.launchProgressDao().getProgressForStage(stageId)
+    }
+
+    suspend fun getMaxCompletedLaunchStage(): Int = withContext(Dispatchers.IO) {
+        db.launchProgressDao().getMaxCompletedStage() ?: 0
+    }
+
+    suspend fun getAllLaunchProgress(): List<LaunchProgress> = withContext(Dispatchers.IO) {
+        db.launchProgressDao().getAllProgress()
+    }
 }

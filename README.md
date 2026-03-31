@@ -5,11 +5,11 @@
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Language](https://img.shields.io/badge/Language-Kotlin%202.2.0-purple)
 ![MinSDK](https://img.shields.io/badge/MinSDK-24%20(Android%207.0)-blue)
-![Version](https://img.shields.io/badge/Version-v5.3-orange)
+![Version](https://img.shields.io/badge/Version-v5.4-orange)
 
 ## 소개
 
-Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 게임입니다. 격자판 위에 놓인 블록들을 밀어서 고양이 블록이 출구로 나갈 수 있도록 길을 만들어주세요!
+Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 게임입니다. 격자판 위에 놓인 블록들을 밀어서 고양이 블록이 출구로 나갈 수 있도록 길을 만들어주세요! **Cat Launch** 미니게임에서는 새총으로 고양이를 발사하여 구조물을 파괴하는 Angry Birds 스타일의 물리 기반 액션도 즐길 수 있습니다.
 
 모든 스테이지는 **시드 기반으로 자동 생성**되며, 진행할수록 격자 크기와 블록 수가 증가하여 난이도가 자연스럽게 올라갑니다. 이동 횟수에 따라 1~3성 별점을 받을 수 있습니다.
 
@@ -49,6 +49,54 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 - **진행도 저장**: Room DB로 스테이지 클리어 상태 및 별점 영구 저장
 - **사운드**: 블록 이동, 고양이 구출, 레벨 클리어, BGM 등 효과음
 - **광고**: AdMob 배너 + 보상형 광고 (Solve 버튼, Next Stage 시 3스테이지 간격)
+- **Cat Launch 미니게임**: 새총으로 고양이를 발사하는 물리 기반 미니게임 (JBox2D 엔진)
+
+## Cat Launch 미니게임
+
+Angry Birds 스타일의 물리 기반 새총 미니게임입니다. 메인 메뉴의 "Cat Launch" 버튼으로 진입합니다.
+
+### 게임 규칙
+- 새총을 드래그하여 고양이를 발사, 구조물 속 적(녹색 원)을 모두 처치하면 클리어
+- 사용한 고양이 수에 따라 1~3성 별점 평가
+- 스테이지는 시드 기반 무한 생성 (stageId × 7919)
+
+### 고양이 능력 (5종)
+해금된 13마리 고양이가 5가지 능력으로 분류됩니다:
+
+| 능력 | 고양이 | 효과 |
+|------|--------|------|
+| **일반** | 나비, 봄이, 여름 (1-3) | 기본 투사체 |
+| **방향전환** | 가을, 겨울 (4-5) | 비행 중 탭하면 탭 위치로 방향 변경 |
+| **분열** | 솜이, 꽃이 (6-7) | 비행 중 탭하면 3개로 분열 (30도 산개) |
+| **폭발** | 하늘, 바다, 왕자 (8-9,12) | 충돌 시 자동 폭발 (반경 2.5m, 힘 80) |
+| **돌진** | 무지개, 보석, 공주 (10-11,13) | 2배 크기, 최대 3회 관통 |
+
+### 구조물 & 재료
+
+| 재료 | HP | 밀도 | 특성 |
+|------|-----|------|------|
+| **나무** | 30 | 0.5 | 기본 재료 |
+| **유리** | 15 | 0.3 | 가장 약함 |
+| **돌** | 60 | 1.2 | 가장 강함 |
+
+5종 구조물 템플릿: 타워, 아치, 피라미드, 다리, 요새
+
+### 난이도
+
+| 구간 | 고양이 수 | 적 수 | 구조물 수 | 재료 |
+|------|----------|-------|----------|------|
+| 1~10 | 3 | 2 | 1~2 | 나무, 유리 |
+| 11~25 | 3 | 3 | 1~3 | 나무, 유리 |
+| 26~50 | 4 | 4 | 1~3 | 나무, 유리, 돌 |
+| 51~100 | 4 | 5 | 1~4 | 전체 |
+| 101+ | 5 | 6 | 1~5 | 전체 |
+
+### 물리 엔진
+- **JBox2D** (순수 Java, 네이티브 라이브러리 불필요)
+- 월드 크기: 10m × 15m (세로 모드)
+- 중력: (0, -10) m/s², 60fps 시뮬레이션
+- 충돌 데미지: 충격량 × 10 → HP 감소
+- 장애물 파괴 시 6개 파편 파티클 생성
 
 ## 퍼즐 품질 필터
 
@@ -166,7 +214,8 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 | 빌드 | Gradle 9.0.0 + AGP 8.7.3 |
 | 렌더링 | Android SurfaceView + Canvas (60fps) |
 | 퍼즐 엔진 | 커스텀 (BFS 솔버 + 의존성 체인 생성 + 품질 필터) |
-| 데이터베이스 | Room 2.6.1 + SharedPreferences |
+| 물리 엔진 | JBox2D 2.2.1.1 (순수 Java, Cat Launch 미니게임) |
+| 데이터베이스 | Room 2.6.1 (v2, user_progress + launch_progress) + SharedPreferences |
 | KSP | 2.2.0-2.0.2 |
 | 광고 | Google AdMob SDK |
 | 진동 | Android Vibrator API (HapticManager) |
@@ -182,16 +231,23 @@ com.meowrescue.game
 │   ├── PuzzleGrid.kt              // 격자 상태, 블록 이동/제거, 클리어 판정
 │   └── PuzzleGenerator.kt         // 자동 레벨 생성 + 품질 필터
 ├── ui/
-│   ├── MenuActivity.kt            // 메인 메뉴 (Play, Collection, Sound 토글)
+│   ├── MenuActivity.kt            // 메인 메뉴 (Play, Collection, Cat Launch, Sound 토글)
 │   ├── StageSelectActivity.kt     // 스테이지 선택 (30개 페이지, 스와이프, 도트 인디케이터)
 │   ├── PuzzleActivity.kt          // 게임 진행, 클리어 처리, 고양이 해금, 광고
 │   ├── PuzzleView.kt              // SurfaceView 렌더링 + 드래그 + 스냅/탈출 애니메이션
+│   ├── LaunchGameActivity.kt      // Cat Launch 미니게임 Activity (스테이지 로드/콜백/라이프사이클)
 │   ├── CollectionActivity.kt      // 고양이 컬렉션 (4열 그리드, 13마리)
 │   ├── PuzzleOverlays.kt           // 오버레이 빌더 (로딩/일시정지/축하 다이얼로그)
 │   └── Theme.kt                   // UI 색상 + 파티클 컬러 + 공유 Int 상수
+├── minigame/
+│   ├── CatAbility.kt              // 5종 고양이 능력 sealed class (일반/방향전환/분열/폭발/돌진)
+│   ├── LaunchPhysicsWorld.kt      // JBox2D 월드 래퍼 (충돌/데미지/파편/폭발)
+│   ├── LaunchGameView.kt          // SurfaceView 렌더링 (새총 드래그/궤적/카메라/HUD)
+│   └── LaunchStageGenerator.kt    // 시드 기반 스테이지 생성 (5종 구조물/5단계 난이도)
 ├── data/
-│   ├── AppDatabase.kt             // Room 데이터베이스
-│   ├── UserProgressDao.kt         // 진행도 DAO
+│   ├── AppDatabase.kt             // Room 데이터베이스 (v2: user_progress + launch_progress)
+│   ├── UserProgressDao.kt         // 퍼즐 진행도 DAO
+│   ├── LaunchProgressDao.kt       // 미니게임 진행도 DAO
 │   └── GameRepository.kt          // 데이터 접근 + 고양이 컬렉션 (CatDefinition 13마리)
 ├── ads/
 │   └── AdManager.kt               // AdMob 광고 관리 (배너/전면/보상형)

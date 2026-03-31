@@ -1,0 +1,54 @@
+나는 Android 슬라이딩 퍼즐 게임 "Meow Rescue"를 개발 중이야.
+현재 기술 스택은 Kotlin 2.2.0, Android SurfaceView + Canvas 기반이야.
+
+게임 안에 고양이 새총 발사 게임을 추가하고 싶어.(해금된 고양이를 단순 예쁜게 아니라 사용 할 수 있는 사용처를 주고싶음)
+앵그리버드처럼 새총으로 고양이를 발사해서 장애물을 파괴하는 방식이야.
+
+[기술 조건]
+1. 물리엔진은 libGDX 또는 JBox2D 라이브러리 사용
+   - Android와 호환성 좋은 것으로 선택해줘
+   - build.gradle 의존성 추가 방법도 포함해줘
+2. 기존 SurfaceView + Canvas 구조와 충돌 없도록
+   별도 Activity + View로 분리해서 구현
+3. 기존 고양이 컬렉션(13마리)과 연동
+   - 해금된 고양이만 사용 가능
+   - 각 고양이마다 고유 능력 부여
+
+[고양이 능력 예시 - sealed class로 설계]
+- 일반: 기본 발사
+- 폭발형: 착탄 시 범위 폭발
+- 분열형: 공중에서 3갈래로 분열
+- 돌진형: 크기 2배로 장애물 관통
+- 방향전환형: 발사 후 1회 방향 전환 가능
+
+[무한 스테이지 조건]
+- 스테이지 제한 없이 무한 생성
+- 기존 슬라이딩 퍼즐처럼 시드 기반 절차적 생성
+- 진행할수록 난이도 자동 증가
+  └── 장애물 수 증가
+  └── 장애물 배치 복잡도 증가
+  └── 구조물 강도 증가
+- 별점 시스템 (사용한 고양이 수 기준 1~3성)
+- Room DB로 진행도 저장 (기존 AppDatabase 확장)
+
+[구현 요청 사항]
+1. build.gradle 물리엔진 의존성 추가
+2. 물리 월드 설정 및 장애물 구조물 생성 로직
+3. 고양이 능력 sealed class 설계
+4. 시드 기반 무한 스테이지 생성기
+5. 새총 조준 드래그 + 궤적 미리보기 View
+6. 기존 GameRepository 고양이 컬렉션 연동
+7. 기존 AppDatabase에 미니게임 진행도 테이블 추가
+
+[패키지 구조 예시]
+com.meowrescue.game
+├── minigame/
+│   ├── LaunchGameActivity.kt
+│   ├── LaunchGameView.kt
+│   ├── LaunchStageGenerator.kt
+│   └── CatAbility.kt
+└── data/
+    └── (기존 AppDatabase 확장)
+
+Kotlin 이디엄 적극 활용하고
+기존 코드 구조(com.meowrescue.game 패키지)에 맞게 작성해줘.

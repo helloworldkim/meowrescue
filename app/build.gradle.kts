@@ -64,4 +64,7 @@ dependencies {
     // JSON parsing
     implementation("com.google.code.gson:gson:2.10.1")
 
+    // JBox2D physics engine (pure Java, no native libs)
+    implementation("org.jbox2d:jbox2d-library:2.2.1.1")
+
 }

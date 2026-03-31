@@ -142,6 +142,14 @@ class MenuActivity : AppCompatActivity() {
         }
         contentLayout.addView(endlessBtn)
 
+        // Slingshot minigame button
+        val launchBtn = makeButton("\uD83D\uDE80  Cat Launch", Theme.COLOR_CORAL)
+        launchBtn.setOnClickListener {
+            SoundManager.playButtonTap()
+            startActivity(Intent(this, LaunchGameActivity::class.java))
+        }
+        contentLayout.addView(launchBtn)
+
         // Sound toggle button
         soundButton = makeButton(soundLabel(), Theme.COLOR_TEAL)
         soundButton.setOnClickListener {
