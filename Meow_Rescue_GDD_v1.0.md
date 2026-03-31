@@ -415,7 +415,7 @@ com.meowrescue.game
 │                                       // seedOffsetCache, isQualityPuzzle()
 ├── ui/
 │   ├── MenuActivity.kt                 // 메인 메뉴 (Play, Collection, Sound)
-│   ├── StageSelectActivity.kt          // 스테이지 선택 (4열 그리드, 별점, DEV: 전체 해금)
+│   ├── StageSelectActivity.kt          // 스테이지 선택 (30개씩 페이지 분할, 4열 그리드, 좌우 스와이프, 자동 스크롤, DEV: 전체 해금)
 │   ├── PuzzleActivity.kt              // 게임 진행, 클리어 처리, 고양이 해금
 │   ├── PuzzleView.kt                  // SurfaceView 렌더링 + 드래그 + 애니메이션
 │   │                                   // 스냅, 탈출 시퀀스, 파티클, 승리 오버레이
@@ -521,7 +521,7 @@ enum class PuzzleState {
 | 화면 | 주요 요소 |
 |------|-----------|
 | **메인 메뉴** | Meow Rescue 로고, Play, Endless Mode (200스테이지 클리어 후 해금), Sound 토글 |
-| **스테이지 선택** | 4열 그리드, 별점 표시, 잠금/해금, 스크롤 |
+| **스테이지 선택** | 30개씩 페이지 분할, 4열 그리드, `< 1-30 >` 페이지 네비게이션, 좌우 스와이프, 현재 스테이지 페이지 자동 이동, 별점/잠금 표시 |
 | **퍼즐 화면** | 격자 + 블록 + HUD(Pause/Undo/Reset/이동수) + 배너 광고 |
 | **승리 오버레이** | 별점 + 이동 횟수 + "Next Stage" 버튼 |
 | **일시정지** | Resume / Restart / Quit 버튼 |

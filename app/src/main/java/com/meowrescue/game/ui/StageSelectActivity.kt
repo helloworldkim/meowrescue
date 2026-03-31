@@ -15,6 +15,8 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.ads.AdManager
@@ -29,11 +31,19 @@ class StageSelectActivity : AppCompatActivity() {
 
     companion object {
         const val TOTAL_LEVELS = 200
+        private const val LEVELS_PER_PAGE = 30
+        private val TOTAL_PAGES get() = (TOTAL_LEVELS + LEVELS_PER_PAGE - 1) / LEVELS_PER_PAGE
     }
 
     private lateinit var repository: GameRepository
     private var bannerAd: AdView? = null
-    private lateinit var recycler: RecyclerView
+    private lateinit var pagerRecycler: RecyclerView
+    private lateinit var pagerSnapHelper: PagerSnapHelper
+    private lateinit var pageTitle: TextView
+    private lateinit var prevArrow: TextView
+    private lateinit var nextArrow: TextView
+
+    private var currentPage = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,7 +72,7 @@ class StageSelectActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
+            setPadding((12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt())
         }
 
         val backButton = TextView(this).apply {
@@ -70,7 +80,7 @@ class StageSelectActivity : AppCompatActivity() {
             textSize = 24f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
-            setPadding((8 * dp).toInt(), (4 * dp).toInt(), (16 * dp).toInt(), (4 * dp).toInt())
+            setPadding((8 * dp).toInt(), (4 * dp).toInt(), (12 * dp).toInt(), (4 * dp).toInt())
             setOnClickListener {
                 SoundManager.playButtonTap()
                 finish()
@@ -79,14 +89,57 @@ class StageSelectActivity : AppCompatActivity() {
             isFocusable = true
         }
 
-        val topTitle = TextView(this).apply {
-            text = "Levels"
-            textSize = 20f
+        // Page navigation: [<] [1 - 20] [>]
+        val navContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        prevArrow = TextView(this).apply {
+            text = "<"
+            textSize = 22f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            gravity = Gravity.CENTER
+            setPadding((16 * dp).toInt(), (4 * dp).toInt(), (16 * dp).toInt(), (4 * dp).toInt())
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                SoundManager.playButtonTap()
+                if (currentPage > 0) {
+                    pagerRecycler.smoothScrollToPosition(currentPage - 1)
+                }
+            }
         }
+
+        pageTitle = TextView(this).apply {
+            text = "1 - 20"
+            textSize = 18f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            minWidth = (100 * dp).toInt()
+        }
+
+        nextArrow = TextView(this).apply {
+            text = ">"
+            textSize = 22f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            setPadding((16 * dp).toInt(), (4 * dp).toInt(), (16 * dp).toInt(), (4 * dp).toInt())
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                SoundManager.playButtonTap()
+                if (currentPage < TOTAL_PAGES - 1) {
+                    pagerRecycler.smoothScrollToPosition(currentPage + 1)
+                }
+            }
+        }
+
+        navContainer.addView(prevArrow)
+        navContainer.addView(pageTitle)
+        navContainer.addView(nextArrow)
 
         // Spacer to balance back button
         val topSpacer = View(this).apply {
@@ -94,20 +147,42 @@ class StageSelectActivity : AppCompatActivity() {
         }
 
         topBar.addView(backButton)
-        topBar.addView(topTitle)
+        topBar.addView(navContainer)
         topBar.addView(topSpacer)
         rootLayout.addView(topBar)
 
-        // --- RecyclerView ---
-        recycler = RecyclerView(this).apply {
-            layoutManager = GridLayoutManager(this@StageSelectActivity, 4)
+        // --- Pager RecyclerView (horizontal, snapping pages) ---
+        pagerSnapHelper = PagerSnapHelper()
+        pagerRecycler = RecyclerView(this).apply {
+            layoutManager = LinearLayoutManager(
+                this@StageSelectActivity, LinearLayoutManager.HORIZONTAL, false
+            )
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
             )
-            setPadding((12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt(), (12 * dp).toInt())
-            clipToPadding = false
+            // Disable nested scrolling for smoother paging
+            isNestedScrollingEnabled = false
         }
-        rootLayout.addView(recycler)
+        pagerSnapHelper.attachToRecyclerView(pagerRecycler)
+
+        // Listen for page changes
+        pagerRecycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    val layoutManager = recyclerView.layoutManager as LinearLayoutManager
+                    val snapView = pagerSnapHelper.findSnapView(layoutManager)
+                    if (snapView != null) {
+                        val newPage = layoutManager.getPosition(snapView)
+                        if (newPage != currentPage) {
+                            currentPage = newPage
+                            updatePageIndicator()
+                        }
+                    }
+                }
+            }
+        })
+
+        rootLayout.addView(pagerRecycler)
 
         // --- Banner ad ---
         bannerAd = AdManager.createBannerAd(this)
@@ -121,6 +196,17 @@ class StageSelectActivity : AppCompatActivity() {
         loadStageData()
     }
 
+    private fun updatePageIndicator() {
+        val start = currentPage * LEVELS_PER_PAGE + 1
+        val end = minOf(start + LEVELS_PER_PAGE - 1, TOTAL_LEVELS)
+        pageTitle.text = "$start - $end"
+
+        prevArrow.alpha = if (currentPage > 0) 1f else 0.3f
+        prevArrow.isClickable = currentPage > 0
+        nextArrow.alpha = if (currentPage < TOTAL_PAGES - 1) 1f else 0.3f
+        nextArrow.isClickable = currentPage < TOTAL_PAGES - 1
+    }
+
     private fun loadStageData() {
         lifecycleScope.launch {
             val maxCompleted = repository.getMaxCompletedLevel()
@@ -129,19 +215,29 @@ class StageSelectActivity : AppCompatActivity() {
                     repository.getProgress(levelId)
                 }
             }
-            recycler.adapter = StageAdapter(maxCompleted, allProgress) { levelId ->
+
+            // Set pager adapter
+            pagerRecycler.adapter = PageAdapter(maxCompleted, allProgress) { levelId ->
                 SoundManager.playButtonTap()
                 val intent = Intent(this@StageSelectActivity, PuzzleActivity::class.java)
                 intent.putExtra("stage", levelId)
                 startActivity(intent)
             }
+
+            // Auto-scroll to the page of the current playable stage
+            val targetPage = (maxCompleted / LEVELS_PER_PAGE).coerceIn(0, TOTAL_PAGES - 1)
+            if (targetPage != currentPage) {
+                currentPage = targetPage
+                pagerRecycler.scrollToPosition(currentPage)
+            }
+            updatePageIndicator()
         }
     }
 
     override fun onResume() {
         super.onResume()
         bannerAd?.resume()
-        if (::recycler.isInitialized) loadStageData()
+        if (::pagerRecycler.isInitialized) loadStageData()
     }
 
     override fun onPause() {
@@ -154,20 +250,70 @@ class StageSelectActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    // ---- Adapter ----
+    // ---- Page Adapter (each item = full-width page with a grid of stages) ----
 
-    private inner class StageAdapter(
+    private inner class PageAdapter(
         private val maxCompleted: Int,
         private val progressList: List<UserProgress?>,
         private val onLevelClick: (Int) -> Unit
-    ) : RecyclerView.Adapter<StageAdapter.VH>() {
+    ) : RecyclerView.Adapter<PageAdapter.PageVH>() {
 
-        // Map of stage -> CatDefinition for unlock indicators
+        inner class PageVH(val container: FrameLayout) : RecyclerView.ViewHolder(container)
+
+        override fun getItemCount() = TOTAL_PAGES
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageVH {
+            val container = FrameLayout(parent.context).apply {
+                layoutParams = RecyclerView.LayoutParams(
+                    parent.width,    // full screen width for snap paging
+                    RecyclerView.LayoutParams.MATCH_PARENT
+                )
+            }
+            return PageVH(container)
+        }
+
+        override fun onBindViewHolder(holder: PageVH, position: Int) {
+            holder.container.removeAllViews()
+
+            val dp = resources.displayMetrics.density
+            val gridRecycler = RecyclerView(holder.container.context).apply {
+                layoutManager = GridLayoutManager(this@StageSelectActivity, 4)
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setPadding(
+                    (12 * dp).toInt(), (12 * dp).toInt(),
+                    (12 * dp).toInt(), (12 * dp).toInt()
+                )
+                clipToPadding = false
+                isNestedScrollingEnabled = false
+            }
+
+            gridRecycler.adapter = StageGridAdapter(position, maxCompleted, progressList, onLevelClick)
+            holder.container.addView(gridRecycler)
+        }
+    }
+
+    // ---- Stage Grid Adapter (20 stages per page) ----
+
+    private inner class StageGridAdapter(
+        private val page: Int,
+        private val maxCompleted: Int,
+        private val progressList: List<UserProgress?>,
+        private val onLevelClick: (Int) -> Unit
+    ) : RecyclerView.Adapter<StageGridAdapter.VH>() {
+
         private val catUnlockMap: Map<Int, GameRepository.CatDefinition> = GameRepository.CAT_DEFINITIONS
             .filter { it.requiredStage > 1 }
             .associateBy { it.requiredStage }
 
+        private val offset = page * LEVELS_PER_PAGE
+        private val count = minOf(LEVELS_PER_PAGE, TOTAL_LEVELS - offset)
+
         inner class VH(val cell: FrameLayout) : RecyclerView.ViewHolder(cell)
+
+        override fun getItemCount() = count
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
             val dp = resources.displayMetrics.density
@@ -184,12 +330,10 @@ class StageSelectActivity : AppCompatActivity() {
             return VH(cell)
         }
 
-        override fun getItemCount() = TOTAL_LEVELS
-
         override fun onBindViewHolder(holder: VH, position: Int) {
-            val levelId = position + 1
+            val levelId = offset + position + 1
             val dp = resources.displayMetrics.density
-            val progress = progressList.getOrNull(position)
+            val progress = progressList.getOrNull(offset + position)
             // DEV: all stages unlocked for testing
             val isUnlocked = true // levelId == 1 || levelId <= maxCompleted + 1
             val isCompleted = progress != null && progress.completed
@@ -241,7 +385,6 @@ class StageSelectActivity : AppCompatActivity() {
                         marginEnd = (3 * dp).toInt()
                     }
                     if (!isCompleted) {
-                        // Dark silhouette for uncleared stages (MULTIPLY preserves transparency)
                         colorFilter = android.graphics.PorterDuffColorFilter(
                             0xFF444444.toInt(), android.graphics.PorterDuff.Mode.MULTIPLY
                         )
@@ -253,7 +396,6 @@ class StageSelectActivity : AppCompatActivity() {
 
             if (isUnlocked) {
                 if (isCompleted && stars > 0) {
-                    // Stars row
                     val starsText = TextView(holder.cell.context).apply {
                         text = "★".repeat(stars) + "☆".repeat(3 - stars)
                         textSize = 11f
@@ -270,7 +412,6 @@ class StageSelectActivity : AppCompatActivity() {
 
                 holder.cell.setOnClickListener { onLevelClick(levelId) }
             } else {
-                // Lock icon overlay
                 val lockText = TextView(holder.cell.context).apply {
                     text = "🔒"
                     textSize = 16f
