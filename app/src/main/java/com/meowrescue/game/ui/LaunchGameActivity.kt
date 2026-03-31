@@ -36,8 +36,6 @@ class LaunchGameActivity : AppCompatActivity() {
         SoundManager.init(this)
         repository = GameRepository(this)
 
-        currentStageId = intent.getIntExtra("stage", 1)
-
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
@@ -63,7 +61,13 @@ class LaunchGameActivity : AppCompatActivity() {
         setContentView(rootLayout)
 
         setupCallbacks()
-        loadStage(currentStageId)
+
+        // Resume from last completed stage + 1 (or stage 1 if no progress)
+        lifecycleScope.launch {
+            val maxCompleted = repository.getMaxCompletedLaunchStage()
+            currentStageId = maxCompleted + 1
+            loadStage(currentStageId)
+        }
     }
 
     // ── Callbacks ──────────────────────────────────────────────────────────

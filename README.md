@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Language](https://img.shields.io/badge/Language-Kotlin%202.2.0-purple)
 ![MinSDK](https://img.shields.io/badge/MinSDK-24%20(Android%207.0)-blue)
-![Version](https://img.shields.io/badge/Version-v5.4-orange)
+![Version](https://img.shields.io/badge/Version-v5.5-orange)
 
 ## 소개
 
@@ -59,6 +59,13 @@ Angry Birds 스타일의 물리 기반 새총 미니게임입니다. 메인 메�
 - 새총을 드래그하여 고양이를 발사, 구조물 속 적(녹색 원)을 모두 처치하면 클리어
 - 사용한 고양이 수에 따라 1~3성 별점 평가
 - 스테이지는 시드 기반 무한 생성 (stageId × 7919)
+- 스테이지 진행도 자동 저장 — 재진입 시 마지막 클리어 +1 스테이지부터 이어하기
+- 맵 밖으로 이탈한 투사체/장애물/적은 즉시 소멸 (보이지 않는 벽 없음)
+
+### 능력 표시 UI
+- **대기열 도트**: 고양이 대기열 아래에 능력별 색상 도트 표시
+- **HUD 태그**: 조준 시 현재 고양이의 능력 이름이 라운드 태그로 표시
+- 색상 구분: 일반=회색, 방향전환=파랑, 분열=녹색, 폭발=빨강, 돌진=주황
 
 ### 고양이 능력 (5종)
 해금된 13마리 고양이가 5가지 능력으로 분류됩니다:
@@ -97,6 +104,9 @@ Angry Birds 스타일의 물리 기반 새총 미니게임입니다. 메인 메�
 - 중력: (0, -10) m/s², 60fps 시뮬레이션
 - 충돌 데미지: 충격량 × 10 → HP 감소
 - 장애물 파괴 시 6개 파편 파티클 생성
+- OOB 처리: 투사체 x<-0.5/x>10.5/y<-1 즉시 제거, 장애물/적 y<-1 파괴
+- 물리 감쇠: 지면 friction 0.8, 장애물 linearDamping 0.5/angularDamping 0.8, 적 linearDamping 0.3/angularDamping 0.5
+- 정착 판정: 속도 임계값 0.2 m/s, 15프레임 연속 유지 시 안정화
 
 ## 퍼즐 품질 필터
 

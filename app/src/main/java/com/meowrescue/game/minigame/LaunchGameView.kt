@@ -31,7 +31,7 @@ class LaunchGameView @JvmOverloads constructor(
         private const val MAX_PULL_DISTANCE_DP = 120f
         private const val TRAJECTORY_DOT_COUNT = 30
         private const val CAMERA_LERP = 0.08f
-        private const val SETTLE_VELOCITY_THRESHOLD = 0.1f
+        private const val SETTLE_VELOCITY_THRESHOLD = LaunchPhysicsWorld.SETTLED_VELOCITY_THRESHOLD
 
         private const val BG_SKY_TOP = 0xFF87CEEB.toInt()
         private const val BG_SKY_BOTTOM = 0xFFF0F8FF.toInt()
@@ -105,7 +105,7 @@ class LaunchGameView @JvmOverloads constructor(
 
     // ── Settle timer ─────────────────────────────────────────────────────────
     private var settleFrameCount = 0
-    private val SETTLE_FRAMES_REQUIRED = 30
+    private val SETTLE_FRAMES_REQUIRED = 15
 
     // ── Button rects ─────────────────────────────────────────────────────────
     private val pauseRect = RectF()
@@ -201,6 +201,11 @@ class LaunchGameView @JvmOverloads constructor(
     private val slingshotBasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = SLINGSHOT_COLOR; style = Paint.Style.FILL
     }
+    private val abilityLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+    }
+    private val abilityBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     // ── Render thread ────────────────────────────────────────────────────────
     private var renderThread: Thread? = null
@@ -531,7 +536,7 @@ class LaunchGameView @JvmOverloads constructor(
                     val vel = active.body.linearVelocity
                     val pos = active.body.position
                     val speed = vel.length()
-                    val outOfBounds = pos.x < -1f || pos.x > WORLD_WIDTH + 1f || pos.y < -1f
+                    val outOfBounds = pos.x < -0.5f || pos.x > WORLD_WIDTH + 0.5f || pos.y < -1f
                     if (speed < SETTLE_VELOCITY_THRESHOLD || outOfBounds) {
                         gameState = LaunchGameState.SETTLING
                         settleFrameCount = 0
@@ -951,6 +956,14 @@ class LaunchGameView @JvmOverloads constructor(
         }
     }
 
+    private fun abilityColor(ability: CatAbility): Int = when (ability) {
+        is CatAbility.Normal -> 0xFF9E9E9E.toInt()
+        is CatAbility.Redirect -> 0xFF42A5F5.toInt()
+        is CatAbility.Split -> 0xFF66BB6A.toInt()
+        is CatAbility.Explosive -> 0xFFEF5350.toInt()
+        is CatAbility.Charge -> 0xFFFF7043.toInt()
+    }
+
     private fun drawHud(canvas: Canvas) {
         val w = width.toFloat()
         val hudH = HUD_HEIGHT_DP * density
@@ -976,6 +989,29 @@ class LaunchGameView @JvmOverloads constructor(
         // Cat icon (small circle)
         catFallbackPaint.alpha = 255
         canvas.drawCircle(16f * density + 8f * density, hudH / 2f, 8f * density, catFallbackPaint)
+
+        // Current cat ability label (below stage text)
+        if (config != null && currentCatIndex < config.catIds.size && gameState == LaunchGameState.AIMING) {
+            val catId = config.catIds[currentCatIndex]
+            val ability = CatAbility.forCatId(catId)
+            val abilityName = ability.displayName
+            val abColor = abilityColor(ability)
+
+            abilityLabelPaint.textSize = 11f * density
+            abilityBgPaint.color = abColor
+
+            val tagW = abilityLabelPaint.measureText(abilityName) + 12f * density
+            val tagH = 16f * density
+            val tagX = w / 2f - tagW / 2f
+            val tagY = textY + 6f * density
+
+            canvas.drawRoundRect(
+                RectF(tagX, tagY, tagX + tagW, tagY + tagH),
+                tagH / 2f, tagH / 2f, abilityBgPaint
+            )
+            abilityLabelPaint.color = Color.WHITE
+            canvas.drawText(abilityName, w / 2f, tagY + tagH - 4f * density, abilityLabelPaint)
+        }
 
         // Pause button (right side)
         val pauseSize = 32f * density
@@ -1046,6 +1082,11 @@ class LaunchGameView @JvmOverloads constructor(
                 canvas.drawCircle(cx, cy, portraitSize / 2f - 2f, catFallbackPaint)
                 catFallbackPaint.alpha = 255
             }
+
+            // Ability color dot
+            val ability = CatAbility.forCatId(catId)
+            abilityBgPaint.color = abilityColor(ability)
+            canvas.drawCircle(cx, cy + portraitSize / 2f + 3f * density, 3f * density, abilityBgPaint)
         }
     }
 

@@ -32,9 +32,9 @@ class LaunchPhysicsWorld {
         const val GROUND_HEIGHT = 0.5f
         const val SLINGSHOT_X = 2.0f
         const val SLINGSHOT_Y = 2.5f
-        const val POWER_FACTOR = 25.0f
+        const val POWER_FACTOR = 15.0f
 
-        private const val SETTLED_VELOCITY_THRESHOLD = 0.1f
+        const val SETTLED_VELOCITY_THRESHOLD = 0.2f
         private const val DAMAGE_MULTIPLIER = 10f
         private const val DEBRIS_PER_OBSTACLE = 6
         private const val DEFAULT_PROJECTILE_RADIUS = 0.25f
@@ -96,7 +96,6 @@ class LaunchPhysicsWorld {
 
     init {
         createGround()
-        createWalls()
         setupContactListener()
     }
 
@@ -106,6 +105,7 @@ class LaunchPhysicsWorld {
         world.step(TIME_STEP, VELOCITY_ITERATIONS, POSITION_ITERATIONS)
         processCollisions()
         removeDestroyedBodies()
+        removeOutOfBounds()
         updateDebris()
     }
 
@@ -123,6 +123,8 @@ class LaunchPhysicsWorld {
             type = BodyType.DYNAMIC
             position.set(centerX, centerY)
             angle = Math.toRadians(angleDeg.toDouble()).toFloat()
+            linearDamping = 0.5f
+            angularDamping = 0.8f
         }
         val body = world.createBody(bodyDef)
 
@@ -132,8 +134,8 @@ class LaunchPhysicsWorld {
         val fixtureDef = FixtureDef().apply {
             this.shape = shape
             density = material.density
-            friction = 0.4f
-            restitution = 0.2f
+            friction = 0.6f
+            restitution = 0.1f
         }
         body.createFixture(fixtureDef)
 
@@ -146,6 +148,8 @@ class LaunchPhysicsWorld {
         val bodyDef = BodyDef().apply {
             type = BodyType.DYNAMIC
             position.set(centerX, centerY)
+            linearDamping = 0.3f
+            angularDamping = 0.5f
         }
         val body = world.createBody(bodyDef)
 
@@ -155,8 +159,8 @@ class LaunchPhysicsWorld {
         val fixtureDef = FixtureDef().apply {
             this.shape = shape
             density = 0.8f
-            friction = 0.3f
-            restitution = 0.3f
+            friction = 0.5f
+            restitution = 0.15f
         }
         body.createFixture(fixtureDef)
 
@@ -175,6 +179,7 @@ class LaunchPhysicsWorld {
             type = BodyType.DYNAMIC
             position.set(SLINGSHOT_X, SLINGSHOT_Y)
             bullet = true
+            linearDamping = 0.2f
         }
         val body = world.createBody(bodyDef)
 
@@ -184,8 +189,8 @@ class LaunchPhysicsWorld {
         val fixtureDef = FixtureDef().apply {
             this.shape = shape
             density = 1.0f
-            friction = 0.2f
-            restitution = 0.3f
+            friction = 0.3f
+            restitution = 0.2f
         }
         body.createFixture(fixtureDef)
 
@@ -238,6 +243,7 @@ class LaunchPhysicsWorld {
                 type = BodyType.DYNAMIC
                 position.set(pos.x, pos.y)
                 bullet = true
+                linearDamping = 0.2f
             }
             val body = world.createBody(bodyDef)
 
@@ -329,7 +335,6 @@ class LaunchPhysicsWorld {
 
         // Recreate static environment
         createGround()
-        createWalls()
     }
 
     // ── Internal: static environment ────────────────────────────────────
@@ -346,41 +351,10 @@ class LaunchPhysicsWorld {
         }
         val fixtureDef = FixtureDef().apply {
             this.shape = shape
-            friction = 0.6f
+            friction = 0.8f
+            restitution = 0.05f
         }
         body.createFixture(fixtureDef)
-    }
-
-    private fun createWalls() {
-        val wallThickness = 0.3f
-
-        // Left wall
-        val leftDef = BodyDef().apply {
-            type = BodyType.STATIC
-            position.set(-wallThickness / 2f, WORLD_HEIGHT / 2f)
-        }
-        val leftBody = world.createBody(leftDef)
-        val leftShape = PolygonShape().apply {
-            setAsBox(wallThickness / 2f, WORLD_HEIGHT / 2f)
-        }
-        leftBody.createFixture(FixtureDef().apply {
-            shape = leftShape
-            friction = 0.3f
-        })
-
-        // Right wall
-        val rightDef = BodyDef().apply {
-            type = BodyType.STATIC
-            position.set(WORLD_WIDTH + wallThickness / 2f, WORLD_HEIGHT / 2f)
-        }
-        val rightBody = world.createBody(rightDef)
-        val rightShape = PolygonShape().apply {
-            setAsBox(wallThickness / 2f, WORLD_HEIGHT / 2f)
-        }
-        rightBody.createFixture(FixtureDef().apply {
-            shape = rightShape
-            friction = 0.3f
-        })
     }
 
     // ── Internal: contact listener ──────────────────────────────────────
@@ -448,6 +422,31 @@ class LaunchPhysicsWorld {
         if (hitsObstacle || hitsEnemy) {
             projectile.penetrateCount++
         }
+    }
+
+    // ── Internal: out-of-bounds removal ─────────────────────────────────
+
+    private fun removeOutOfBounds() {
+        val oobProjectiles = projectiles.filter { proj ->
+            val pos = proj.body.position
+            pos.x < -0.5f || pos.x > WORLD_WIDTH + 0.5f || pos.y < -1f
+        }
+        for (proj in oobProjectiles) {
+            world.destroyBody(proj.body)
+        }
+        projectiles.removeAll(oobProjectiles.toSet())
+
+        val oobObstacles = obstacles.filter { it.body.position.y < -1f }
+        for (obstacle in oobObstacles) {
+            world.destroyBody(obstacle.body)
+        }
+        obstacles.removeAll(oobObstacles.toSet())
+
+        val oobEnemies = enemies.filter { it.body.position.y < -1f }
+        for (enemy in oobEnemies) {
+            world.destroyBody(enemy.body)
+        }
+        enemies.removeAll(oobEnemies.toSet())
     }
 
     // ── Internal: body removal and debris ───────────────────────────────
