@@ -28,7 +28,7 @@ class LaunchGameView @JvmOverloads constructor(
         private const val FRAME_MS = 1000L / TARGET_FPS
 
         private const val HUD_HEIGHT_DP = 56f
-        private const val TOOLBAR_HEIGHT_DP = 60f
+
         private const val MAX_PULL_DISTANCE_DP = 120f
         private const val TRAJECTORY_DOT_COUNT = 30
         private const val CAMERA_LERP = 0.08f
@@ -482,6 +482,8 @@ class LaunchGameView @JvmOverloads constructor(
         }
     }
 
+    // x, y 미사용: handleDown/handleMove와 인터페이스 대칭 유지
+    @Suppress("UNUSED_PARAMETER")
     private fun handleUp(x: Float, y: Float): (() -> Unit)? {
         // End camera panning
         if (isPanning) {
@@ -878,7 +880,6 @@ class LaunchGameView @JvmOverloads constructor(
             val catRadius = 12f * density
             val bm = catBitmaps[catId]
             if (bm != null) {
-                val sz = (catRadius * 2).toInt()
                 canvas.drawBitmap(
                     bm,
                     Rect(0, 0, bm.width, bm.height),

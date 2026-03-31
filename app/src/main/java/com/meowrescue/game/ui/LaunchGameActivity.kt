@@ -163,7 +163,7 @@ class LaunchGameActivity : AppCompatActivity() {
     // ── Callbacks ──────────────────────────────────────────────────────────
 
     private fun setupCallbacks() {
-        gameView.onStageClear = { catsUsed, stars ->
+        gameView.onStageClear = { _, stars ->
             lifecycleScope.launch {
                 repository.saveLaunchProgress(currentStageId, stars)
             }

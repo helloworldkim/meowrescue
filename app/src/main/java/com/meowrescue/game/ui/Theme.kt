@@ -1,62 +1,38 @@
 package com.meowrescue.game.ui
 
-import android.graphics.Color
-
 object Theme {
-    const val COLOR_BACKGROUND = "#FFF9FB"
-    const val COLOR_BACKGROUND_GAME = "#FFF5E6"
-    const val COLOR_TOOLBAR = "#FF85A1"
-    const val COLOR_TITLE_TEXT = "#E0246A"
-    const val COLOR_PRIMARY_TEXT = "#333333"
-    const val COLOR_SECONDARY_TEXT = "#555555"
-    const val COLOR_MUTED_TEXT = "#999999"
-    const val COLOR_LEVEL_UNLOCKED = "#2ECC71"
-    const val COLOR_LEVEL_LOCKED = "#CCCCCC"
-    const val COLOR_BUTTON_COLLECTION = "#9B59B6"
-    const val COLOR_BUTTON_BACK = "#FF7043"
-    const val COLOR_RARITY_LEGENDARY = "#FF85A1"
-    const val COLOR_RARITY_RARE = "#9B59B6"
-    const val COLOR_RARITY_COMMON = "#2ECC71"
-    const val COLOR_CARD_BACKGROUND = "#FFFFFF"
+    // ── UI 공통 (String — Color.parseColor 용) ──────────────────────
+    const val COLOR_TOOLBAR = "#FF85A1"              // 툴바 (핑크)
+    const val COLOR_BUTTON_COLLECTION = "#9B59B6"    // 컬렉션 버튼 (퍼플)
+    const val COLOR_MUTED_TEXT = "#999999"            // 흐린 텍스트
 
     // Pastel + Warm Accent palette
-    const val COLOR_CREAM = "#FFF8F0"
-    const val COLOR_LAVENDER = "#EDE7F6"
-    const val COLOR_WARM_BROWN = "#4E342E"
-    const val COLOR_CORAL = "#FF7043"
-    const val COLOR_TEAL = "#26A69A"
-    const val COLOR_ENDLESS_PURPLE = "#9575CD"
-    const val COLOR_STAR_GOLD = "#FFD600"
-    const val COLOR_LOCKED_GRAY = "#BDBDBD"
-    const val COLOR_LEVEL_COMPLETED_BG = "#FFF3E0"
-    const val COLOR_LEVEL_PLAYABLE_BG = "#E8F5E9"
+    const val COLOR_CREAM = "#FFF8F0"                // 크림 배경
+    const val COLOR_LAVENDER = "#EDE7F6"             // 라벤더 배경
+    const val COLOR_WARM_BROWN = "#4E342E"           // 웜브라운 텍스트
+    const val COLOR_CORAL = "#FF7043"                // 코랄 액센트
+    const val COLOR_TEAL = "#26A69A"                 // 틸 액센트
+    const val COLOR_ENDLESS_PURPLE = "#9575CD"       // 엔드리스 퍼플
+    const val COLOR_LOCKED_GRAY = "#BDBDBD"          // 잠금 회색
+    const val COLOR_LEVEL_COMPLETED_BG = "#FFF3E0"   // 완료 셀 배경 (연주황)
+    const val COLOR_LEVEL_PLAYABLE_BG = "#E8F5E9"    // 플레이 가능 셀 배경 (연녹)
 
-    // UI panel colors
-    val COLOR_GOLD = 0xFFFFD700.toInt()
-    val COLOR_PANEL_BG = Color.argb(200, 20, 20, 40)
-    val COLOR_PANEL_BORDER = Color.argb(120, 255, 255, 255)
-
-    // HP bar colors
-    val COLOR_HP_HIGH = 0xFF4CAF50.toInt()
-    val COLOR_HP_MED = 0xFFFF9800.toInt()
-    val COLOR_HP_LOW = 0xFFFF4444.toInt()
-
-    // Particle pastel colors for celebrations
+    // ── 퍼즐 파티클 (Int — Canvas/Paint 용) ─────────────────────────
     val PARTICLE_COLORS = intArrayOf(
-        0xFFFFB3BA.toInt(),  // pastel pink
-        0xFFBAE1FF.toInt(),  // pastel blue
-        0xFFBAFFBA.toInt(),  // pastel green
-        0xFFFFFFBA.toInt(),  // pastel yellow
-        0xFFE8BAFF.toInt(),  // pastel purple
-        0xFFFFD6BA.toInt(),  // pastel orange
+        0xFFFFB3BA.toInt(),  // 파스텔 핑크
+        0xFFBAE1FF.toInt(),  // 파스텔 블루
+        0xFFBAFFBA.toInt(),  // 파스텔 그린
+        0xFFFFFFBA.toInt(),  // 파스텔 옐로
+        0xFFE8BAFF.toInt(),  // 파스텔 퍼플
+        0xFFFFD6BA.toInt(),  // 파스텔 오렌지
     )
 
-    // Shared Int color constants (for Canvas/Paint usage)
-    const val INT_BG_CREAM     = 0xFFFFF8F0.toInt()     // = COLOR_CREAM
-    const val INT_WARM_BROWN   = 0xFF4E342E.toInt()     // = COLOR_WARM_BROWN
-    const val INT_CORAL        = 0xFFFF7043.toInt()     // = COLOR_CORAL
-    const val INT_TEAL         = 0xFF26A69A.toInt()     // = COLOR_TEAL
-    const val INT_GRAY         = 0xFF9E9E9E.toInt()
+    // ── 공유 Int 색상 (Canvas/Paint 직접 사용) ──────────────────────
+    const val INT_BG_CREAM     = 0xFFFFF8F0.toInt()  // 크림 배경
+    const val INT_WARM_BROWN   = 0xFF4E342E.toInt()  // 웜브라운
+    const val INT_CORAL        = 0xFFFF7043.toInt()  // 코랄
+    const val INT_TEAL         = 0xFF26A69A.toInt()  // 틸
+    const val INT_GRAY         = 0xFF9E9E9E.toInt()  // 회색
 
     // ── Cat Launch 미니게임 ─────────────────────────────────────────
     // 배경
@@ -98,14 +74,4 @@ object Theme {
     const val LAUNCH_DIFF_EASY     = 0xFF66BB6A.toInt()  // 쉬움 (그린)
     const val LAUNCH_DIFF_NORMAL   = 0xFFFFA726.toInt()  // 보통 (앰버)
     const val LAUNCH_DIFF_HARD     = 0xFFEF5350.toInt()  // 어려움 (레드)
-
-    // Battle colors
-    const val COLOR_HP_BAR = "#4CAF50"
-    const val COLOR_HP_BAR_BG = "#333333"
-    const val COLOR_BLOCK_ATTACK = "#FF4444"
-    const val COLOR_BLOCK_FIRE = "#FF7043"
-    const val COLOR_BLOCK_WATER = "#2196F3"
-    const val COLOR_BLOCK_HEAL = "#2ECC71"
-    const val COLOR_DAMAGE_TEXT = "#FF4444"
-    const val COLOR_HEAL_TEXT = "#2ECC71"
 }
