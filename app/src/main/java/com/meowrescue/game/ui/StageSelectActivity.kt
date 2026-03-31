@@ -1,16 +1,19 @@
 package com.meowrescue.game.ui
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -19,6 +22,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.gms.ads.AdView
+import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.data.UserProgress
@@ -40,10 +44,16 @@ class StageSelectActivity : AppCompatActivity() {
     private lateinit var pagerRecycler: RecyclerView
     private lateinit var pagerSnapHelper: PagerSnapHelper
     private lateinit var pageTitle: TextView
-    private lateinit var prevArrow: TextView
-    private lateinit var nextArrow: TextView
+    private lateinit var prevArrow: ImageView
+    private lateinit var nextArrow: ImageView
+    private lateinit var dotContainer: LinearLayout
 
     private var currentPage = 0
+
+    private fun wrapWithRipple(content: GradientDrawable): RippleDrawable {
+        val rippleColor = ColorStateList.valueOf(Color.parseColor("#40FF7043"))
+        return RippleDrawable(rippleColor, content, null)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,21 +97,34 @@ class StageSelectActivity : AppCompatActivity() {
             }
             isClickable = true
             isFocusable = true
+            // Ripple on back button
+            val backBg = GradientDrawable().apply {
+                setColor(Color.TRANSPARENT)
+                cornerRadius = 8 * dp
+            }
+            background = wrapWithRipple(backBg)
         }
 
-        // Page navigation: [<] [1 - 20] [>]
+        // Page navigation: [<] [1 - 30] [>]
         val navContainer = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         }
 
-        prevArrow = TextView(this).apply {
-            text = "<"
-            textSize = 22f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            setPadding((16 * dp).toInt(), (4 * dp).toInt(), (16 * dp).toInt(), (4 * dp).toInt())
+        val arrowSize = (36 * dp).toInt()
+
+        prevArrow = ImageView(this).apply {
+            setImageResource(R.drawable.ic_chevron_left)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val arrowBg = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#33FFFFFF"))
+            }
+            background = wrapWithRipple(arrowBg)
+            layoutParams = LinearLayout.LayoutParams(arrowSize, arrowSize).apply {
+                marginEnd = (8 * dp).toInt()
+            }
             isClickable = true
             isFocusable = true
             setOnClickListener {
@@ -113,7 +136,7 @@ class StageSelectActivity : AppCompatActivity() {
         }
 
         pageTitle = TextView(this).apply {
-            text = "1 - 20"
+            text = "1 - 30"
             textSize = 18f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
@@ -121,12 +144,17 @@ class StageSelectActivity : AppCompatActivity() {
             minWidth = (100 * dp).toInt()
         }
 
-        nextArrow = TextView(this).apply {
-            text = ">"
-            textSize = 22f
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.WHITE)
-            setPadding((16 * dp).toInt(), (4 * dp).toInt(), (16 * dp).toInt(), (4 * dp).toInt())
+        nextArrow = ImageView(this).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            val arrowBg = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#33FFFFFF"))
+            }
+            background = wrapWithRipple(arrowBg)
+            layoutParams = LinearLayout.LayoutParams(arrowSize, arrowSize).apply {
+                marginStart = (8 * dp).toInt()
+            }
             isClickable = true
             isFocusable = true
             setOnClickListener {
@@ -160,7 +188,6 @@ class StageSelectActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
             )
-            // Disable nested scrolling for smoother paging
             isNestedScrollingEnabled = false
         }
         pagerSnapHelper.attachToRecyclerView(pagerRecycler)
@@ -184,6 +211,21 @@ class StageSelectActivity : AppCompatActivity() {
 
         rootLayout.addView(pagerRecycler)
 
+        // --- Dot page indicator ---
+        dotContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = (6 * dp).toInt()
+                bottomMargin = (6 * dp).toInt()
+            }
+        }
+        buildDotIndicators()
+        rootLayout.addView(dotContainer)
+
         // --- Banner ad ---
         bannerAd = AdManager.createBannerAd(this)
         rootLayout.addView(bannerAd, LinearLayout.LayoutParams(
@@ -196,15 +238,46 @@ class StageSelectActivity : AppCompatActivity() {
         loadStageData()
     }
 
+    private fun buildDotIndicators() {
+        val dp = resources.displayMetrics.density
+        dotContainer.removeAllViews()
+        for (i in 0 until TOTAL_PAGES) {
+            val isActive = i == currentPage
+            val dotSize = if (isActive) (8 * dp).toInt() else (6 * dp).toInt()
+            val dot = View(this).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(
+                        if (isActive) Color.parseColor(Theme.COLOR_CORAL)
+                        else Color.parseColor("#55FFFFFF")
+                    )
+                }
+            }
+            dotContainer.addView(dot, LinearLayout.LayoutParams(dotSize, dotSize).apply {
+                marginStart = (3 * dp).toInt()
+                marginEnd = (3 * dp).toInt()
+                gravity = Gravity.CENTER_VERTICAL
+            })
+        }
+    }
+
     private fun updatePageIndicator() {
         val start = currentPage * LEVELS_PER_PAGE + 1
         val end = minOf(start + LEVELS_PER_PAGE - 1, TOTAL_LEVELS)
-        pageTitle.text = "$start - $end"
+
+        // Crossfade page title
+        pageTitle.animate().alpha(0f).setDuration(100).withEndAction {
+            pageTitle.text = "$start - $end"
+            pageTitle.animate().alpha(1f).setDuration(150).start()
+        }.start()
 
         prevArrow.alpha = if (currentPage > 0) 1f else 0.3f
         prevArrow.isClickable = currentPage > 0
         nextArrow.alpha = if (currentPage < TOTAL_PAGES - 1) 1f else 0.3f
         nextArrow.isClickable = currentPage < TOTAL_PAGES - 1
+
+        // Update dot indicators
+        buildDotIndicators()
     }
 
     private fun loadStageData() {
@@ -258,6 +331,8 @@ class StageSelectActivity : AppCompatActivity() {
         private val onLevelClick: (Int) -> Unit
     ) : RecyclerView.Adapter<PageAdapter.PageVH>() {
 
+        private val animatedPages = mutableSetOf<Int>()
+
         inner class PageVH(val container: FrameLayout) : RecyclerView.ViewHolder(container)
 
         override fun getItemCount() = TOTAL_PAGES
@@ -265,7 +340,7 @@ class StageSelectActivity : AppCompatActivity() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageVH {
             val container = FrameLayout(parent.context).apply {
                 layoutParams = RecyclerView.LayoutParams(
-                    parent.width,    // full screen width for snap paging
+                    parent.width,
                     RecyclerView.LayoutParams.MATCH_PARENT
                 )
             }
@@ -290,18 +365,22 @@ class StageSelectActivity : AppCompatActivity() {
                 isNestedScrollingEnabled = false
             }
 
-            gridRecycler.adapter = StageGridAdapter(position, maxCompleted, progressList, onLevelClick)
+            val shouldAnimate = !animatedPages.contains(position)
+            if (shouldAnimate) animatedPages.add(position)
+
+            gridRecycler.adapter = StageGridAdapter(position, maxCompleted, progressList, onLevelClick, shouldAnimate)
             holder.container.addView(gridRecycler)
         }
     }
 
-    // ---- Stage Grid Adapter (20 stages per page) ----
+    // ---- Stage Grid Adapter (30 stages per page) ----
 
     private inner class StageGridAdapter(
         private val page: Int,
         private val maxCompleted: Int,
         private val progressList: List<UserProgress?>,
-        private val onLevelClick: (Int) -> Unit
+        private val onLevelClick: (Int) -> Unit,
+        private val animateEntrance: Boolean
     ) : RecyclerView.Adapter<StageGridAdapter.VH>() {
 
         private val catUnlockMap: Map<Int, GameRepository.CatDefinition> = GameRepository.CAT_DEFINITIONS
@@ -347,10 +426,11 @@ class StageSelectActivity : AppCompatActivity() {
                 else -> Color.parseColor(Theme.COLOR_LEVEL_PLAYABLE_BG)
             }
 
-            holder.cell.background = GradientDrawable().apply {
+            val bgDrawable = GradientDrawable().apply {
                 setColor(bgColor)
                 cornerRadius = 16 * dp
             }
+            holder.cell.background = wrapWithRipple(bgDrawable)
             holder.cell.elevation = 3 * dp
 
             // Level number
@@ -395,11 +475,12 @@ class StageSelectActivity : AppCompatActivity() {
             }
 
             if (isUnlocked) {
+                // Star images instead of unicode text
                 if (isCompleted && stars > 0) {
-                    val starsText = TextView(holder.cell.context).apply {
-                        text = "★".repeat(stars) + "☆".repeat(3 - stars)
-                        textSize = 11f
-                        setTextColor(Color.parseColor(Theme.COLOR_STAR_GOLD))
+                    val starSz = (12 * dp).toInt()
+                    val gap = (2 * dp).toInt()
+                    val starRow = LinearLayout(holder.cell.context).apply {
+                        orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER
                         layoutParams = FrameLayout.LayoutParams(
                             FrameLayout.LayoutParams.MATCH_PARENT,
@@ -407,13 +488,35 @@ class StageSelectActivity : AppCompatActivity() {
                             Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
                         ).apply { bottomMargin = (8 * dp).toInt() }
                     }
-                    holder.cell.addView(starsText)
+                    for (i in 1..3) {
+                        val iv = ImageView(holder.cell.context).apply {
+                            setImageResource(
+                                if (i <= stars) R.drawable.star_full else R.drawable.star_empty
+                            )
+                            scaleType = ImageView.ScaleType.FIT_CENTER
+                        }
+                        starRow.addView(iv, LinearLayout.LayoutParams(starSz, starSz).apply {
+                            marginEnd = gap
+                        })
+                    }
+                    holder.cell.addView(starRow)
+                }
+
+                // Scale animation on touch
+                holder.cell.setOnTouchListener { v, event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN ->
+                            v.animate().scaleX(0.93f).scaleY(0.93f).setDuration(80).start()
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                            v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+                    }
+                    false // don't consume, let onClick fire
                 }
 
                 holder.cell.setOnClickListener { onLevelClick(levelId) }
             } else {
                 val lockText = TextView(holder.cell.context).apply {
-                    text = "🔒"
+                    text = "\uD83D\uDD12"
                     textSize = 16f
                     gravity = Gravity.CENTER
                     layoutParams = FrameLayout.LayoutParams(
@@ -425,6 +528,18 @@ class StageSelectActivity : AppCompatActivity() {
                 holder.cell.addView(lockText)
                 holder.cell.setOnClickListener(null)
                 holder.cell.isClickable = false
+            }
+
+            // Stagger entrance animation
+            if (animateEntrance) {
+                holder.cell.alpha = 0f
+                holder.cell.translationY = 30 * dp
+                holder.cell.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(200)
+                    .setStartDelay((position * 30).toLong())
+                    .start()
             }
         }
     }
