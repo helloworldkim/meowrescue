@@ -21,7 +21,7 @@ import kotlin.math.sin
 class LaunchPhysicsWorld {
 
     companion object {
-        const val WORLD_WIDTH = 10f
+        const val WORLD_WIDTH = 20f
         const val WORLD_HEIGHT = 15f
         val GRAVITY = Vec2(0f, -10f)
 
@@ -32,7 +32,8 @@ class LaunchPhysicsWorld {
         const val GROUND_HEIGHT = 0.5f
         const val SLINGSHOT_X = 2.0f
         const val SLINGSHOT_Y = 2.5f
-        const val POWER_FACTOR = 15.0f
+        const val POWER_FACTOR = 10.0f
+        const val MAX_LAUNCH_SPEED = 12.0f
 
         const val SETTLED_VELOCITY_THRESHOLD = 0.2f
         private const val DAMAGE_MULTIPLIER = 10f
@@ -196,6 +197,14 @@ class LaunchPhysicsWorld {
 
         val impulse = Vec2(pullVector.x * POWER_FACTOR, pullVector.y * POWER_FACTOR)
         body.applyLinearImpulse(impulse, body.worldCenter)
+
+        // Clamp launch speed to MAX_LAUNCH_SPEED
+        val vel = body.linearVelocity
+        val speed = vel.length()
+        if (speed > MAX_LAUNCH_SPEED) {
+            val scale = MAX_LAUNCH_SPEED / speed
+            body.linearVelocity = Vec2(vel.x * scale, vel.y * scale)
+        }
 
         val projectile = ProjectileBody(body, catId, ability, radius)
         projectiles.add(projectile)

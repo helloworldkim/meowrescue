@@ -1,15 +1,22 @@
 package com.meowrescue.game.ui
 
+import android.app.AlertDialog
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.Gravity
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
+import com.meowrescue.game.minigame.LaunchDifficulty
 import com.meowrescue.game.minigame.LaunchGameView
 import com.meowrescue.game.minigame.LaunchPhysicsWorld
 import com.meowrescue.game.minigame.LaunchStageGenerator
@@ -26,6 +33,7 @@ class LaunchGameActivity : AppCompatActivity() {
     private val stageGenerator = LaunchStageGenerator()
 
     private var currentStageId: Int = 1
+    private var selectedDifficulty: LaunchDifficulty = LaunchDifficulty.EASY
     private var bannerAd: AdView? = null
     private var physicsWorld: LaunchPhysicsWorld? = null
     private var loadJob: Job? = null
@@ -61,8 +69,90 @@ class LaunchGameActivity : AppCompatActivity() {
         setContentView(rootLayout)
 
         setupCallbacks()
+        showDifficultyDialog()
+    }
 
-        // Resume from last completed stage + 1 (or stage 1 if no progress)
+    // ── Difficulty selection ──────────────────────────────────────────────
+
+    private fun showDifficultyDialog() {
+        val dp = resources.displayMetrics.density
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding((24 * dp).toInt(), (20 * dp).toInt(), (24 * dp).toInt(), (16 * dp).toInt())
+        }
+
+        val title = TextView(this).apply {
+            text = "난이도 선택"
+            textSize = 20f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor("#5D4037"))
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, (12 * dp).toInt())
+        }
+        container.addView(title)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(container)
+            .setCancelable(false)
+            .create()
+
+        for (difficulty in LaunchDifficulty.entries) {
+            val btnColor = when (difficulty) {
+                LaunchDifficulty.EASY -> "#66BB6A"
+                LaunchDifficulty.NORMAL -> "#FFA726"
+                LaunchDifficulty.HARD -> "#EF5350"
+            }
+
+            val btn = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
+                background = GradientDrawable().apply {
+                    setColor(Color.parseColor(btnColor))
+                    cornerRadius = 12 * dp
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = (8 * dp).toInt()
+                }
+
+                val labelText = TextView(this@LaunchGameActivity).apply {
+                    text = difficulty.label
+                    textSize = 18f
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(Color.WHITE)
+                    gravity = Gravity.CENTER
+                }
+                addView(labelText)
+
+                val descText = TextView(this@LaunchGameActivity).apply {
+                    text = difficulty.description
+                    textSize = 12f
+                    setTextColor(Color.parseColor("#E0E0E0"))
+                    gravity = Gravity.CENTER
+                }
+                addView(descText)
+
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    SoundManager.playButtonTap()
+                    selectedDifficulty = difficulty
+                    dialog.dismiss()
+                    startGameWithDifficulty()
+                }
+            }
+            container.addView(btn)
+        }
+
+        dialog.show()
+    }
+
+    private fun startGameWithDifficulty() {
+        gameView.setDifficultyLabel(selectedDifficulty.label)
         lifecycleScope.launch {
             val maxCompleted = repository.getMaxCompletedLaunchStage()
             currentStageId = maxCompleted + 1
@@ -102,7 +192,7 @@ class LaunchGameActivity : AppCompatActivity() {
             val unlockedCatIds = getUnlockedCatIdsForLaunch()
 
             val config = withContext(Dispatchers.Default) {
-                stageGenerator.generate(stageId, unlockedCatIds)
+                stageGenerator.generate(stageId, unlockedCatIds, selectedDifficulty.offset)
             }
 
             // Build physics world on background thread
@@ -142,7 +232,6 @@ class LaunchGameActivity : AppCompatActivity() {
     }
 
     private suspend fun getUnlockedCatIdsForLaunch(): List<Int> {
-        // Cat 1 is always unlocked; add cats whose requiredStage the player has cleared
         val maxCleared = repository.getMaxCompletedLevel()
         return GameRepository.CAT_DEFINITIONS
             .filter { it.requiredStage <= maxCleared }

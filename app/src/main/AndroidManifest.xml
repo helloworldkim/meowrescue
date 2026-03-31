@@ -46,7 +46,8 @@
         <activity
             android:name=".ui.LaunchGameActivity"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:configChanges="orientation|screenSize|screenLayout"
+            android:screenOrientation="fullSensor" />
 
     </application>
 

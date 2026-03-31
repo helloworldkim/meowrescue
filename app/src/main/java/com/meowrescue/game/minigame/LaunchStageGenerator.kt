@@ -38,12 +38,18 @@ enum class StructureTemplate {
     TOWER, ARCH, PYRAMID, BRIDGE, FORTRESS
 }
 
+enum class LaunchDifficulty(val offset: Int, val label: String, val description: String) {
+    EASY(0, "쉬움", "나무·유리 위주, 적 소수"),
+    NORMAL(25, "보통", "돌 재료 등장, 다양한 구조물"),
+    HARD(50, "어려움", "모든 재료·구조물, 적 다수")
+}
+
 class LaunchStageGenerator {
 
     companion object {
         private const val GROUND_HEIGHT = 0.5f
-        private const val STRUCTURE_X_MIN = 5.0f
-        private const val STRUCTURE_X_MAX = 9.0f
+        private const val STRUCTURE_X_MIN = 8.0f
+        private const val STRUCTURE_X_MAX = 18.0f
     }
 
     private data class DifficultyParams(
@@ -107,10 +113,11 @@ class LaunchStageGenerator {
         }
     }
 
-    fun generate(stageId: Int, unlockedCatIds: List<Int>): StageConfig {
+    fun generate(stageId: Int, unlockedCatIds: List<Int>, difficultyOffset: Int = 0): StageConfig {
         val seed = stageId.toLong() * 7919L
         val rng = Random(seed)
-        val params = getDifficultyParams(stageId)
+        val effectiveDifficulty = stageId + difficultyOffset
+        val params = getDifficultyParams(effectiveDifficulty)
 
         val catIds = selectCatIds(rng, unlockedCatIds, params.catCount)
         val structures = buildStructures(rng, params)

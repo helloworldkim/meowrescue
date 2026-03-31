@@ -32,6 +32,9 @@ class LaunchGameView @JvmOverloads constructor(
         private const val TRAJECTORY_DOT_COUNT = 30
         private const val CAMERA_LERP = 0.08f
         private const val SETTLE_VELOCITY_THRESHOLD = LaunchPhysicsWorld.SETTLED_VELOCITY_THRESHOLD
+        private const val VIEW_WIDTH_METERS_PORTRAIT = 10f
+        private const val VIEW_WIDTH_METERS_LANDSCAPE = 14f
+        private const val PAN_THRESHOLD_PX = 15f
 
         private const val BG_SKY_TOP = 0xFF87CEEB.toInt()
         private const val BG_SKY_BOTTOM = 0xFFF0F8FF.toInt()
@@ -71,6 +74,18 @@ class LaunchGameView @JvmOverloads constructor(
     private var cameraOffsetX = 0f
     private var cameraOffsetY = 0f
 
+    // ── Manual camera panning ──────────────────────────────────────────────
+    private var isPanning = false
+    private var panLastX = 0f
+    private var panLastY = 0f
+    private var potentialTap = false
+    private var tapDownX = 0f
+    private var tapDownY = 0f
+    private var manualPanActive = false
+
+    // ── Dynamic view width (adapts to orientation) ─────────────────────────
+    private var viewWidthMeters = VIEW_WIDTH_METERS_PORTRAIT
+
     // ── Coordinate conversion ────────────────────────────────────────────────
     private var pixelsPerMeter = 1f
     private var worldOriginScreenX = 0f
@@ -102,6 +117,9 @@ class LaunchGameView @JvmOverloads constructor(
         var alpha: Float, var startTime: Long
     )
     private val explosions = mutableListOf<ExplosionEffect>()
+
+    // ── Difficulty label ──────────────────────────────────────────────────────
+    private var difficultyLabel: String = ""
 
     // ── Settle timer ─────────────────────────────────────────────────────────
     private var settleFrameCount = 0
@@ -236,6 +254,9 @@ class LaunchGameView @JvmOverloads constructor(
             celebrationParticles.clear()
             explosions.clear()
             pendingStageClear = null
+            isPanning = false
+            potentialTap = false
+            manualPanActive = false
         }
         recalcLayout()
     }
@@ -243,6 +264,12 @@ class LaunchGameView @JvmOverloads constructor(
     fun setCatBitmaps(bitmaps: Map<Int, Bitmap>) {
         synchronized(lock) {
             catBitmaps = bitmaps
+        }
+    }
+
+    fun setDifficultyLabel(label: String) {
+        synchronized(lock) {
+            difficultyLabel = label
         }
     }
 
@@ -301,7 +328,8 @@ class LaunchGameView @JvmOverloads constructor(
         if (w <= 0f || h <= 0f) return
 
         val hudHeightPx = HUD_HEIGHT_DP * density
-        pixelsPerMeter = w / WORLD_WIDTH
+        viewWidthMeters = if (w > h) VIEW_WIDTH_METERS_LANDSCAPE else VIEW_WIDTH_METERS_PORTRAIT
+        pixelsPerMeter = w / viewWidthMeters
         maxPullDistancePx = MAX_PULL_DISTANCE_DP * density
 
         // Ground sits at GROUND_HEIGHT in world coords
@@ -374,14 +402,100 @@ class LaunchGameView @JvmOverloads constructor(
             return null
         }
 
-        // Ability activation on tap during flight
+        // Ability activation / camera pan during flight
         if (gameState == LaunchGameState.FLYING || gameState == LaunchGameState.ABILITY_READY) {
+            potentialTap = true
+            tapDownX = x
+            tapDownY = y
+            panLastX = x
+            panLastY = y
+            return null
+        }
+
+        // Slingshot drag or camera pan in AIMING state
+        if (gameState == LaunchGameState.AIMING) {
+            val anchorScreenX = worldToScreenX(LaunchPhysicsWorld.SLINGSHOT_X)
+            val anchorScreenY = worldToScreenY(LaunchPhysicsWorld.SLINGSHOT_Y)
+            val touchRadius = 80f * density
+            val dx = x - anchorScreenX
+            val dy = y - anchorScreenY
+            if (sqrt(dx * dx + dy * dy) <= touchRadius) {
+                isDragging = true
+                dragStartX = x
+                dragStartY = y
+                dragCurrentX = x
+                dragCurrentY = y
+            } else {
+                // Start camera pan
+                isPanning = true
+                panLastX = x
+                panLastY = y
+            }
+        }
+        return null
+    }
+
+    private fun handleMove(x: Float, y: Float) {
+        // Slingshot dragging
+        if (isDragging) {
+            dragCurrentX = x
+            dragCurrentY = y
+
+            // Clamp pull distance
+            val anchorScreenX = worldToScreenX(LaunchPhysicsWorld.SLINGSHOT_X)
+            val anchorScreenY = worldToScreenY(LaunchPhysicsWorld.SLINGSHOT_Y)
+            val dx = dragCurrentX - anchorScreenX
+            val dy = dragCurrentY - anchorScreenY
+            val dist = sqrt(dx * dx + dy * dy)
+            if (dist > maxPullDistancePx) {
+                val scale = maxPullDistancePx / dist
+                dragCurrentX = anchorScreenX + dx * scale
+                dragCurrentY = anchorScreenY + dy * scale
+            }
+            return
+        }
+
+        // Convert potential tap to pan if moved enough (FLYING/ABILITY_READY)
+        if (potentialTap) {
+            val dx = x - tapDownX
+            val dy = y - tapDownY
+            if (sqrt(dx * dx + dy * dy) > PAN_THRESHOLD_PX * density) {
+                potentialTap = false
+                isPanning = true
+                manualPanActive = true
+                panLastX = x
+                panLastY = y
+            }
+            return
+        }
+
+        // Camera panning
+        if (isPanning) {
+            val dx = panLastX - x
+            val dy = panLastY - y
+            cameraOffsetX += dx / pixelsPerMeter
+            cameraOffsetY -= dy / pixelsPerMeter  // Screen Y is inverted
+            clampCamera()
+            panLastX = x
+            panLastY = y
+        }
+    }
+
+    private fun handleUp(x: Float, y: Float): (() -> Unit)? {
+        // End camera panning
+        if (isPanning) {
+            isPanning = false
+            return null
+        }
+
+        // Ability activation: was a short tap during flight (not a pan)
+        if (potentialTap) {
+            potentialTap = false
             val pw = physicsWorld ?: return null
             val projectiles = pw.getProjectiles()
             val activeProjectile = projectiles.lastOrNull()
             if (activeProjectile != null && !activeProjectile.abilityUsed) {
-                val tapWorldPos = Vec2(screenToWorldX(x), screenToWorldY(y))
-                // Capture position before activation (Explosive destroys the body)
+                val tapWorldPos = Vec2(screenToWorldX(tapDownX), screenToWorldY(tapDownY))
                 val prePos = Vec2(activeProjectile.body.position.x, activeProjectile.body.position.y)
                 pw.activateAbility(activeProjectile, tapWorldPos)
                 if (activeProjectile.ability is CatAbility.Explosive) {
@@ -397,43 +511,7 @@ class LaunchGameView @JvmOverloads constructor(
             return null
         }
 
-        // Slingshot drag start in AIMING state
-        if (gameState == LaunchGameState.AIMING) {
-            val anchorScreenX = worldToScreenX(LaunchPhysicsWorld.SLINGSHOT_X)
-            val anchorScreenY = worldToScreenY(LaunchPhysicsWorld.SLINGSHOT_Y)
-            val touchRadius = 80f * density
-            val dx = x - anchorScreenX
-            val dy = y - anchorScreenY
-            if (sqrt(dx * dx + dy * dy) <= touchRadius) {
-                isDragging = true
-                dragStartX = x
-                dragStartY = y
-                dragCurrentX = x
-                dragCurrentY = y
-            }
-        }
-        return null
-    }
-
-    private fun handleMove(x: Float, y: Float) {
-        if (!isDragging) return
-        dragCurrentX = x
-        dragCurrentY = y
-
-        // Clamp pull distance
-        val anchorScreenX = worldToScreenX(LaunchPhysicsWorld.SLINGSHOT_X)
-        val anchorScreenY = worldToScreenY(LaunchPhysicsWorld.SLINGSHOT_Y)
-        val dx = dragCurrentX - anchorScreenX
-        val dy = dragCurrentY - anchorScreenY
-        val dist = sqrt(dx * dx + dy * dy)
-        if (dist > maxPullDistancePx) {
-            val scale = maxPullDistancePx / dist
-            dragCurrentX = anchorScreenX + dx * scale
-            dragCurrentY = anchorScreenY + dy * scale
-        }
-    }
-
-    private fun handleUp(x: Float, y: Float): (() -> Unit)? {
+        // Slingshot release
         if (!isDragging) return null
         isDragging = false
 
@@ -444,16 +522,14 @@ class LaunchGameView @JvmOverloads constructor(
         val anchorScreenX = worldToScreenX(LaunchPhysicsWorld.SLINGSHOT_X)
         val anchorScreenY = worldToScreenY(LaunchPhysicsWorld.SLINGSHOT_Y)
 
-        // Pull vector = anchor - drag position (direction from drag to anchor = launch direction)
         val pullScreenX = anchorScreenX - dragCurrentX
         val pullScreenY = anchorScreenY - dragCurrentY
 
         val pullDist = sqrt(pullScreenX * pullScreenX + pullScreenY * pullScreenY)
-        if (pullDist < 10f * density) return null // Too small, ignore
+        if (pullDist < 10f * density) return null
 
-        // Convert to world coordinates (note: screen Y is inverted relative to world Y)
         val pullWorldX = pullScreenX / pixelsPerMeter
-        val pullWorldY = -pullScreenY / pixelsPerMeter // Invert Y
+        val pullWorldY = -pullScreenY / pixelsPerMeter
 
         val pullVector = Vec2(pullWorldX, pullWorldY)
 
@@ -464,11 +540,18 @@ class LaunchGameView @JvmOverloads constructor(
         currentCatIndex++
         catsUsed++
         settleFrameCount = 0
+        manualPanActive = false
 
         val hasAbility = ability !is CatAbility.Normal && ability !is CatAbility.Charge
         gameState = if (hasAbility) LaunchGameState.ABILITY_READY else LaunchGameState.FLYING
 
         return null
+    }
+
+    private fun clampCamera() {
+        val maxCamX = (WORLD_WIDTH - viewWidthMeters).coerceAtLeast(0f)
+        cameraOffsetX = cameraOffsetX.coerceIn(0f, maxCamX)
+        cameraOffsetY = cameraOffsetY.coerceIn(0f, 5f)
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -582,6 +665,7 @@ class LaunchGameView @JvmOverloads constructor(
                     } else if (currentCatIndex < config.catIds.size) {
                         // More cats available
                         gameState = LaunchGameState.AIMING
+                        manualPanActive = false
                     } else {
                         // No more cats, not all enemies destroyed
                         gameState = LaunchGameState.STAGE_FAIL
@@ -600,25 +684,33 @@ class LaunchGameView @JvmOverloads constructor(
             }
 
             LaunchGameState.AIMING -> {
-                // Idle state, update camera back to slingshot
-                val targetX = 0f
-                val targetY = 0f
-                cameraOffsetX += (targetX - cameraOffsetX) * CAMERA_LERP
-                cameraOffsetY += (targetY - cameraOffsetY) * CAMERA_LERP
+                // When not manually panning, smoothly return camera to slingshot
+                if (!isPanning) {
+                    manualPanActive = false
+                    val targetX = 0f
+                    val targetY = 0f
+                    cameraOffsetX += (targetX - cameraOffsetX) * CAMERA_LERP
+                    cameraOffsetY += (targetY - cameraOffsetY) * CAMERA_LERP
+                    clampCamera()
+                }
             }
         }
     }
 
     private fun updateCamera(pw: LaunchPhysicsWorld) {
+        // Skip auto-tracking when user is manually panning
+        if (manualPanActive || isPanning) return
+
         val projectiles = pw.getProjectiles()
         if (projectiles.isNotEmpty()) {
             val active = projectiles.last()
             val pos = active.body.position
             // Target camera so projectile is roughly 1/3 from left
-            val targetX = max(0f, pos.x - WORLD_WIDTH * 0.33f)
+            val targetX = max(0f, pos.x - viewWidthMeters * 0.33f)
             val targetY = max(0f, pos.y - 3f)
             cameraOffsetX += (targetX - cameraOffsetX) * CAMERA_LERP
             cameraOffsetY += (targetY - cameraOffsetY) * CAMERA_LERP
+            clampCamera()
         }
     }
 
@@ -811,8 +903,16 @@ class LaunchGameView @JvmOverloads constructor(
         val pullScreenY = anchorScreenY - dragCurrentY
 
         // Convert to world velocity estimate
-        val vx = pullScreenX / pixelsPerMeter * LaunchPhysicsWorld.POWER_FACTOR
-        val vy = -pullScreenY / pixelsPerMeter * LaunchPhysicsWorld.POWER_FACTOR
+        var vx = pullScreenX / pixelsPerMeter * LaunchPhysicsWorld.POWER_FACTOR
+        var vy = -pullScreenY / pixelsPerMeter * LaunchPhysicsWorld.POWER_FACTOR
+
+        // Clamp to MAX_LAUNCH_SPEED (match actual physics)
+        val previewSpeed = sqrt(vx * vx + vy * vy)
+        if (previewSpeed > LaunchPhysicsWorld.MAX_LAUNCH_SPEED) {
+            val scale = LaunchPhysicsWorld.MAX_LAUNCH_SPEED / previewSpeed
+            vx *= scale
+            vy *= scale
+        }
 
         val gx = LaunchPhysicsWorld.GRAVITY.x
         val gy = LaunchPhysicsWorld.GRAVITY.y
@@ -974,9 +1074,10 @@ class LaunchGameView @JvmOverloads constructor(
         hudTextPaint.textSize = 16f * density
         val textY = hudH / 2f + hudTextPaint.textSize / 3f
 
-        // Stage text
+        // Stage text + difficulty label
         val config = stageConfig
-        val stageText = if (config != null) "Stage ${config.stageId}" else "Stage"
+        val diffLabel = if (difficultyLabel.isNotEmpty()) " [$difficultyLabel]" else ""
+        val stageText = if (config != null) "Stage ${config.stageId}$diffLabel" else "Stage"
         canvas.drawText(stageText, w / 2f, textY, hudTextPaint)
 
         // Cats remaining (left side)

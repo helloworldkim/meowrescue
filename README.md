@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Language](https://img.shields.io/badge/Language-Kotlin%202.2.0-purple)
 ![MinSDK](https://img.shields.io/badge/MinSDK-24%20(Android%207.0)-blue)
-![Version](https://img.shields.io/badge/Version-v5.5-orange)
+![Version](https://img.shields.io/badge/Version-v5.6-orange)
 
 ## 소개
 
@@ -50,6 +50,9 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 - **사운드**: 블록 이동, 고양이 구출, 레벨 클리어, BGM 등 효과음
 - **광고**: AdMob 배너 + 보상형 광고 (Solve 버튼, Next Stage 시 3스테이지 간격)
 - **Cat Launch 미니게임**: 새총으로 고양이를 발사하는 물리 기반 미니게임 (JBox2D 엔진)
+- **반응형 화면**: Cat Launch 가로/세로 자동 적응 (가로=14m 넓은 시야, 세로=10m)
+- **난이도 선택**: Cat Launch 진입 시 쉬움/보통/어려움 선택 (시작 난이도 조절)
+- **수동 카메라**: Cat Launch에서 드래그로 자유 카메라 이동
 
 ## Cat Launch 미니게임
 
@@ -61,6 +64,19 @@ Angry Birds 스타일의 물리 기반 새총 미니게임입니다. 메인 메�
 - 스테이지는 시드 기반 무한 생성 (stageId × 7919)
 - 스테이지 진행도 자동 저장 — 재진입 시 마지막 클리어 +1 스테이지부터 이어하기
 - 맵 밖으로 이탈한 투사체/장애물/적은 즉시 소멸 (보이지 않는 벽 없음)
+- **반응형 화면**: 가로/세로 자유 회전, 가로 시 14m 넓은 시야 · 세로 시 10m 시야
+- **수동 카메라 이동**: 빈 영역 드래그로 자유 시점 이동 (발사/능력과 독립)
+
+### 난이도 선택
+진입 시 3단계 난이도를 선택할 수 있습니다:
+
+| 난이도 | 효과 | 설명 |
+|--------|------|------|
+| **쉬움** | offset +0 | 나무·유리 위주, 적 소수 (첫 플레이어 추천) |
+| **보통** | offset +25 | 돌 재료 등장, 다양한 구조물 |
+| **어려움** | offset +50 | 모든 재료·구조물, 적 다수 (숙련자용) |
+
+offset은 스테이지 ID에 더해져 난이도 파라미터를 결정합니다. 시드는 원래 stageId만 사용하여 맵 레이아웃은 동일하되 재료·적 수만 변경됩니다.
 
 ### 능력 표시 UI
 - **대기열 도트**: 고양이 대기열 아래에 능력별 색상 도트 표시
@@ -100,11 +116,13 @@ Angry Birds 스타일의 물리 기반 새총 미니게임입니다. 메인 메�
 
 ### 물리 엔진
 - **JBox2D** (순수 Java, 네이티브 라이브러리 불필요)
-- 월드 크기: 10m × 15m (세로 모드)
+- 월드 크기: 20m × 15m, 뷰 폭: 가로 14m / 세로 10m (반응형)
 - 중력: (0, -10) m/s², 60fps 시뮬레이션
+- 발사 파워: POWER_FACTOR=10, 최대 속도 12 m/s 제한
 - 충돌 데미지: 충격량 × 10 → HP 감소
 - 장애물 파괴 시 6개 파편 파티클 생성
-- OOB 처리: 투사체 x<-0.5/x>10.5/y<-1 즉시 제거, 장애물/적 y<-1 파괴
+- OOB 처리: 투사체 x<-0.5/x>20.5/y<-1 즉시 제거, 장애물/적 y<-1 파괴
+- 카메라: 투사체 자동 추적 (LERP 0.08) + 수동 드래그 패닝 (15px 임계값)
 - 물리 감쇠: 지면 friction 0.8, 장애물 linearDamping 0.5/angularDamping 0.8, 적 linearDamping 0.3/angularDamping 0.5
 - 정착 판정: 속도 임계값 0.2 m/s, 15프레임 연속 유지 시 안정화
 
