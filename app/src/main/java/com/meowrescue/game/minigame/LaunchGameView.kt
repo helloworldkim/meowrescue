@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import com.meowrescue.game.ui.Theme
 import org.jbox2d.common.Vec2
 import kotlin.math.abs
 import kotlin.math.cos
@@ -36,12 +37,12 @@ class LaunchGameView @JvmOverloads constructor(
         private const val VIEW_WIDTH_METERS_LANDSCAPE = 14f
         private const val PAN_THRESHOLD_PX = 15f
 
-        private const val BG_SKY_TOP = 0xFF87CEEB.toInt()
-        private const val BG_SKY_BOTTOM = 0xFFF0F8FF.toInt()
-        private const val BG_GROUND = 0xFF8D6E63.toInt()
-        private const val ENEMY_COLOR = 0xFF66BB6A.toInt()
-        private const val SLINGSHOT_COLOR = 0xFF5D4037.toInt()
-        private const val BAND_COLOR = 0xFF37474F.toInt()
+        private const val BG_SKY_TOP = Theme.LAUNCH_SKY_TOP
+        private const val BG_SKY_BOTTOM = Theme.LAUNCH_SKY_BOTTOM
+        private const val BG_GROUND = Theme.LAUNCH_GROUND
+        private const val ENEMY_COLOR = Theme.LAUNCH_ENEMY
+        private const val SLINGSHOT_COLOR = Theme.LAUNCH_SLINGSHOT
+        private const val BAND_COLOR = Theme.LAUNCH_BAND
 
         private const val WORLD_WIDTH = LaunchPhysicsWorld.WORLD_WIDTH
         private const val GROUND_HEIGHT = LaunchPhysicsWorld.GROUND_HEIGHT
@@ -142,7 +143,7 @@ class LaunchGameView @JvmOverloads constructor(
         color = BG_GROUND
     }
     private val grassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF4CAF50.toInt()
+        color = Theme.LAUNCH_GRASS
     }
     private val slingshotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = SLINGSHOT_COLOR; style = Paint.Style.STROKE
@@ -169,7 +170,7 @@ class LaunchGameView @JvmOverloads constructor(
         color = Color.BLACK
     }
     private val hudBgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xCC000000.toInt()
+        color = Theme.LAUNCH_HUD_SHADOW
     }
     private val hudTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD
@@ -179,14 +180,14 @@ class LaunchGameView @JvmOverloads constructor(
         color = 0x00000000
     }
     private val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFF7043.toInt()
+        color = Theme.INT_CORAL
     }
     private val buttonTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
     }
     private val explosionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFF9800.toInt()
+        color = Theme.LAUNCH_HUD_ORANGE
     }
     private val debrisPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -194,27 +195,27 @@ class LaunchGameView @JvmOverloads constructor(
         color = 0x66000000
     }
     private val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFFD600.toInt()
+        color = Theme.LAUNCH_STAR_GOLD
     }
     private val starEmptyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF9E9E9E.toInt()
+        color = Theme.LAUNCH_ABILITY_NORMAL
     }
     private val skyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val catFallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFF7043.toInt()
+        color = Theme.INT_CORAL
     }
     private val overlayTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD
         textAlign = Paint.Align.CENTER
     }
     private val overlayInfoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFE0E0E0.toInt(); textAlign = Paint.Align.CENTER
+        color = Theme.LAUNCH_LIGHT_GRAY; textAlign = Paint.Align.CENTER
     }
     private val retryButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF78909C.toInt()
+        color = Theme.LAUNCH_BLUE_GRAY
     }
     private val menuButtonPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF78909C.toInt()
+        color = Theme.LAUNCH_BLUE_GRAY
     }
     private val slingshotBasePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = SLINGSHOT_COLOR; style = Paint.Style.FILL
@@ -747,10 +748,7 @@ class LaunchGameView @JvmOverloads constructor(
     private fun spawnCelebrationParticles() {
         val cx = width / 2f
         val cy = height / 3f
-        val colors = intArrayOf(
-            0xFFFF7043.toInt(), 0xFFFFD600.toInt(), 0xFF66BB6A.toInt(),
-            0xFF4FC3F7.toInt(), 0xFFCE93D8.toInt(), 0xFFF48FB1.toInt()
-        )
+        val colors = Theme.LAUNCH_CONFETTI
         for (i in 0 until 40) {
             val angle = (Math.random() * Math.PI * 2).toFloat()
             val speed = (2f + Math.random().toFloat() * 4f)
@@ -1057,11 +1055,11 @@ class LaunchGameView @JvmOverloads constructor(
     }
 
     private fun abilityColor(ability: CatAbility): Int = when (ability) {
-        is CatAbility.Normal -> 0xFF9E9E9E.toInt()
-        is CatAbility.Redirect -> 0xFF42A5F5.toInt()
-        is CatAbility.Split -> 0xFF66BB6A.toInt()
-        is CatAbility.Explosive -> 0xFFEF5350.toInt()
-        is CatAbility.Charge -> 0xFFFF7043.toInt()
+        is CatAbility.Normal -> Theme.LAUNCH_ABILITY_NORMAL
+        is CatAbility.Redirect -> Theme.LAUNCH_ABILITY_REDIRECT
+        is CatAbility.Split -> Theme.LAUNCH_ABILITY_SPLIT
+        is CatAbility.Explosive -> Theme.LAUNCH_ABILITY_EXPLOSIVE
+        is CatAbility.Charge -> Theme.LAUNCH_ABILITY_CHARGE
     }
 
     private fun drawHud(canvas: Canvas) {
@@ -1219,13 +1217,13 @@ class LaunchGameView @JvmOverloads constructor(
         val cornerR = 16f * density
 
         // Panel background
-        buttonPaint.color = 0xFFFFF8F0.toInt()
+        buttonPaint.color = Theme.INT_BG_CREAM
         buttonPaint.alpha = (alpha * 255).toInt()
         canvas.drawRoundRect(panelLeft, panelTop, panelRight, panelBottom, cornerR, cornerR, buttonPaint)
 
         // Title
         overlayTitlePaint.textSize = 28f * density
-        overlayTitlePaint.color = 0xFFFF7043.toInt()
+        overlayTitlePaint.color = Theme.INT_CORAL
         overlayTitlePaint.alpha = (alpha * 255).toInt()
         canvas.drawText("Stage Clear!", w / 2f, panelTop + 50f * density, overlayTitlePaint)
 
@@ -1242,7 +1240,7 @@ class LaunchGameView @JvmOverloads constructor(
                 canvas.drawCircle(sx, starY, starSize / 2f, starPaint)
                 // Draw star symbol
                 overlayTitlePaint.textSize = starSize * 0.7f
-                overlayTitlePaint.color = 0xFFFFF8F0.toInt()
+                overlayTitlePaint.color = Theme.INT_BG_CREAM
                 overlayTitlePaint.alpha = (alpha * 255).toInt()
                 canvas.drawText("\u2605", sx, starY + starSize * 0.2f, overlayTitlePaint)
             } else {
@@ -1272,7 +1270,7 @@ class LaunchGameView @JvmOverloads constructor(
         val nextTop = panelBottom - 150f * density
         val nextBottom = nextTop + btnH
         nextStageRect.set(btnLeft, nextTop, btnRight, nextBottom)
-        buttonPaint.color = 0xFFFF7043.toInt()
+        buttonPaint.color = Theme.INT_CORAL
         buttonPaint.alpha = (alpha * 255).toInt()
         canvas.drawRoundRect(nextStageRect, btnCorner, btnCorner, buttonPaint)
         buttonTextPaint.textSize = btnTextSize
@@ -1323,13 +1321,13 @@ class LaunchGameView @JvmOverloads constructor(
         val cornerR = 16f * density
 
         // Panel background
-        buttonPaint.color = 0xFFFFF8F0.toInt()
+        buttonPaint.color = Theme.INT_BG_CREAM
         buttonPaint.alpha = (alpha * 255).toInt()
         canvas.drawRoundRect(panelLeft, panelTop, panelRight, panelBottom, cornerR, cornerR, buttonPaint)
 
         // Title
         overlayTitlePaint.textSize = 28f * density
-        overlayTitlePaint.color = 0xFFEF5350.toInt()
+        overlayTitlePaint.color = Theme.LAUNCH_ABILITY_EXPLOSIVE
         overlayTitlePaint.alpha = (alpha * 255).toInt()
         canvas.drawText("Stage Failed", w / 2f, panelTop + 60f * density, overlayTitlePaint)
 
@@ -1345,7 +1343,7 @@ class LaunchGameView @JvmOverloads constructor(
         val retryTop = panelBottom - 110f * density
         val retryBottom = retryTop + btnH
         retryRect.set(btnLeft, retryTop, btnRight, retryBottom)
-        buttonPaint.color = 0xFFFF7043.toInt()
+        buttonPaint.color = Theme.INT_CORAL
         buttonPaint.alpha = (alpha * 255).toInt()
         canvas.drawRoundRect(retryRect, btnCorner, btnCorner, buttonPaint)
         buttonTextPaint.textSize = btnTextSize

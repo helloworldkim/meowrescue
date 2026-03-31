@@ -1,5 +1,6 @@
 package com.meowrescue.game.minigame
 
+import com.meowrescue.game.ui.Theme
 import org.jbox2d.callbacks.ContactImpulse
 import org.jbox2d.callbacks.ContactListener
 import org.jbox2d.collision.AABB
@@ -42,9 +43,9 @@ class LaunchPhysicsWorld {
     }
 
     enum class ObstacleMaterial(val maxHp: Int, val color: Int, val density: Float) {
-        WOOD(30, 0xFFA1887F.toInt(), 0.5f),
-        GLASS(15, 0xFF80DEEA.toInt(), 0.3f),
-        STONE(60, 0xFF90A4AE.toInt(), 1.2f)
+        WOOD(30, Theme.LAUNCH_MAT_WOOD, 0.5f),       // 나무 (탄)
+        GLASS(15, Theme.LAUNCH_MAT_GLASS, 0.3f),     // 유리 (시안)
+        STONE(60, Theme.LAUNCH_MAT_STONE, 1.2f)      // 돌 (블루그레이)
     }
 
     data class ObstacleBody(

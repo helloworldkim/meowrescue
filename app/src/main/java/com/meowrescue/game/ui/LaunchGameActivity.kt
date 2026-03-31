@@ -86,7 +86,7 @@ class LaunchGameActivity : AppCompatActivity() {
             text = "난이도 선택"
             textSize = 20f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#5D4037"))
+            setTextColor(Theme.LAUNCH_SLINGSHOT)  // 다크브라운
             gravity = Gravity.CENTER
             setPadding(0, 0, 0, (12 * dp).toInt())
         }
@@ -99,9 +99,9 @@ class LaunchGameActivity : AppCompatActivity() {
 
         for (difficulty in LaunchDifficulty.entries) {
             val btnColor = when (difficulty) {
-                LaunchDifficulty.EASY -> "#66BB6A"
-                LaunchDifficulty.NORMAL -> "#FFA726"
-                LaunchDifficulty.HARD -> "#EF5350"
+                LaunchDifficulty.EASY -> Theme.LAUNCH_DIFF_EASY
+                LaunchDifficulty.NORMAL -> Theme.LAUNCH_DIFF_NORMAL
+                LaunchDifficulty.HARD -> Theme.LAUNCH_DIFF_HARD
             }
 
             val btn = LinearLayout(this).apply {
@@ -109,7 +109,7 @@ class LaunchGameActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 setPadding((16 * dp).toInt(), (12 * dp).toInt(), (16 * dp).toInt(), (12 * dp).toInt())
                 background = GradientDrawable().apply {
-                    setColor(Color.parseColor(btnColor))
+                    setColor(btnColor)
                     cornerRadius = 12 * dp
                 }
                 layoutParams = LinearLayout.LayoutParams(
@@ -131,7 +131,7 @@ class LaunchGameActivity : AppCompatActivity() {
                 val descText = TextView(this@LaunchGameActivity).apply {
                     text = difficulty.description
                     textSize = 12f
-                    setTextColor(Color.parseColor("#E0E0E0"))
+                    setTextColor(Theme.LAUNCH_LIGHT_GRAY)  // 연회색
                     gravity = Gravity.CENTER
                 }
                 addView(descText)
