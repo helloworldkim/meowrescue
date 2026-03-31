@@ -19,11 +19,13 @@ import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
+import com.meowrescue.game.update.UpdateManager
 import com.meowrescue.game.util.SoundManager
 
 class MenuActivity : AppCompatActivity() {
 
     private lateinit var repository: GameRepository
+    private lateinit var updateManager: UpdateManager
     private var bannerAd: AdView? = null
     private lateinit var soundButton: Button
     private lateinit var endlessBtn: Button
@@ -33,6 +35,8 @@ class MenuActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         SoundManager.init(this)
         repository = GameRepository(this)
+        updateManager = UpdateManager(this)
+        updateManager.checkForUpdate()
 
         val dp = resources.displayMetrics.density
 
@@ -190,9 +194,16 @@ class MenuActivity : AppCompatActivity() {
         }
     }
 
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        updateManager.handleUpdateResult(requestCode, resultCode)
+    }
+
     override fun onResume() {
         super.onResume()
         bannerAd?.resume()
+        updateManager.onResume()
         if (repository.isSoundEnabled()) SoundManager.playBgm("menu")
         // Refresh sound button label in case state changed
         if (::soundButton.isInitialized) soundButton.text = soundLabel()
@@ -215,7 +226,8 @@ class MenuActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         bannerAd?.destroy()
-        super.onDestroy()
+        updateManager.onDestroy()
         SoundManager.stopBgm()
+        super.onDestroy()
     }
 }

@@ -53,6 +53,7 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 - **반응형 화면**: Cat Launch 가로/세로 자동 적응 (가로=14m 넓은 시야, 세로=10m)
 - **난이도 선택**: Cat Launch 진입 시 쉬움/보통/어려움 선택 (시작 난이도 조절)
 - **수동 카메라**: Cat Launch에서 드래그로 자유 카메라 이동
+- **인앱 업데이트**: Google Play In-App Updates로 자동 업데이트 안내 (강제/유연 모드)
 
 ## Cat Launch 미니게임
 
@@ -249,6 +250,7 @@ offset은 스테이지 ID에 더해져 난이도 파라미터를 결정합니다
 | 물리 엔진 | JBox2D 2.2.1.1 (순수 Java, Cat Launch 미니게임) |
 | 데이터베이스 | Room 2.6.1 (v2, user_progress + launch_progress) + SharedPreferences |
 | KSP | 2.2.0-2.0.2 |
+| 인앱 업데이트 | Google Play In-App Update 2.1.0 |
 | 광고 | Google AdMob SDK |
 | 진동 | Android Vibrator API (HapticManager) |
 | JDK | 21 |
@@ -281,6 +283,8 @@ com.meowrescue.game
 │   ├── UserProgressDao.kt         // 퍼즐 진행도 DAO
 │   ├── LaunchProgressDao.kt       // 미니게임 진행도 DAO
 │   └── GameRepository.kt          // 데이터 접근 + 고양이 컬렉션 (CatDefinition 13마리)
+├── update/
+│   └── UpdateManager.kt           // Google Play 인앱 업데이트 (IMMEDIATE/FLEXIBLE 자동 분기)
 ├── ads/
 │   └── AdManager.kt               // AdMob 광고 관리 (배너/전면/보상형)
 └── util/
