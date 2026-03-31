@@ -382,7 +382,8 @@ class LaunchStageGenerator {
         repeat(enemyCount) { i ->
             val structureIndex = i % structures.size
             val structure = structures[structureIndex]
-            val enemyPos = getEnemyPosition(structure)
+            val enemyIndex = enemyAssignments[structureIndex].size
+            val enemyPos = getEnemyPosition(structure, enemyIndex)
             enemyAssignments[structureIndex].add(enemyPos)
         }
 
@@ -391,36 +392,44 @@ class LaunchStageGenerator {
         }
     }
 
-    private fun getEnemyPosition(structure: Structure): Pair<Float, Float> {
+    private fun getEnemyPosition(structure: Structure, enemyIndex: Int): Pair<Float, Float> {
+        // 같은 구조물에 복수 적 배치 시 좌우로 분산 (겹침 방지)
+        val xSpread = when (enemyIndex) {
+            0 -> 0f
+            else -> {
+                val side = if (enemyIndex % 2 == 1) 1f else -1f
+                val magnitude = ((enemyIndex + 1) / 2) * 0.6f
+                side * magnitude
+            }
+        }
+
         return when (structure.template) {
             StructureTemplate.TOWER -> {
                 val topBlock = structure.blocks.maxByOrNull { it.offsetY }
-                val x = topBlock?.offsetX ?: 0f
+                val x = (topBlock?.offsetX ?: 0f) + xSpread
                 val y = if (topBlock != null) topBlock.offsetY + topBlock.height else 0f
                 Pair(x, y)
             }
             StructureTemplate.ARCH -> {
                 val cap = structure.blocks.maxByOrNull { it.offsetY }
-                val x = cap?.offsetX ?: 0f
+                val x = (cap?.offsetX ?: 0f) + xSpread
                 val y = if (cap != null) cap.offsetY + cap.height else 0f
                 Pair(x, y)
             }
             StructureTemplate.PYRAMID -> {
                 val topBlock = structure.blocks.maxByOrNull { it.offsetY }
-                val x = topBlock?.offsetX ?: 0f
+                val x = (topBlock?.offsetX ?: 0f) + xSpread
                 val y = if (topBlock != null) topBlock.offsetY + topBlock.height else 0f
                 Pair(x, y)
             }
             StructureTemplate.BRIDGE -> {
-                // Enemy underneath the span
                 val span = structure.blocks.maxByOrNull { it.offsetY }
-                val x = span?.offsetX ?: 0f
+                val x = (span?.offsetX ?: 0f) + xSpread
                 val y = if (span != null) span.offsetY - 0.3f else 0f
                 Pair(x, y)
             }
             StructureTemplate.FORTRESS -> {
-                // Enemy inside the box
-                Pair(0f, 0.4f)
+                Pair(0f + xSpread, 0.4f)
             }
         }
     }

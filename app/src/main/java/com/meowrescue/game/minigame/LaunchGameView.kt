@@ -785,6 +785,7 @@ class LaunchGameView @JvmOverloads constructor(
             drawTrajectoryPreview(canvas)
         }
 
+        drawCurrentCatOnSlingshot(canvas)
         drawProjectiles(canvas, pw)
         drawDebris(canvas, pw)
         drawExplosions(canvas)
@@ -1140,53 +1141,97 @@ class LaunchGameView @JvmOverloads constructor(
         )
     }
 
+    /** AIMING 상태에서 드래그 전에도 새총 위에 현재 고양이 표시 */
+    private fun drawCurrentCatOnSlingshot(canvas: Canvas) {
+        if (gameState != LaunchGameState.AIMING || isDragging) return
+        val config = stageConfig ?: return
+        if (currentCatIndex >= config.catIds.size) return
+
+        val catId = config.catIds[currentCatIndex]
+        val sx = worldToScreenX(LaunchPhysicsWorld.SLINGSHOT_X)
+        val sy = worldToScreenY(LaunchPhysicsWorld.SLINGSHOT_Y)
+        val catRadius = 12f * density
+
+        val bm = catBitmaps[catId]
+        if (bm != null) {
+            canvas.drawBitmap(
+                bm,
+                Rect(0, 0, bm.width, bm.height),
+                RectF(sx - catRadius, sy - catRadius, sx + catRadius, sy + catRadius),
+                null
+            )
+        } else {
+            canvas.drawCircle(sx, sy, catRadius, catFallbackPaint)
+        }
+    }
+
     private fun drawCatQueue(canvas: Canvas) {
         val config = stageConfig ?: return
         if (currentCatIndex >= config.catIds.size) return
 
-        val queueCount = min(config.catIds.size - currentCatIndex - 1, 4) // Show up to 4 queued
-        if (queueCount <= 0) return
+        // 현재 고양이 + 대기 고양이 최대 4마리 표시
+        val remaining = config.catIds.size - currentCatIndex
+        val showCount = min(remaining, 5)
+        if (showCount <= 0) return
 
         val baseX = worldToScreenX(LaunchPhysicsWorld.SLINGSHOT_X)
         val baseY = worldToScreenY(GROUND_HEIGHT) + 8f * density
-        val portraitSize = 20f * density
+        val currentSize = 26f * density  // 현재 고양이는 더 크게
+        val queueSize = 20f * density
         val spacing = 4f * density
 
-        // Background
-        val totalW = queueCount * (portraitSize + spacing) - spacing + 8f * density
+        // 전체 너비 계산: 현재(큰) + 나머지(작은)
+        val totalW = currentSize + spacing +
+            (showCount - 1).coerceAtLeast(0) * (queueSize + spacing) + 8f * density
         val bgRect = RectF(
             baseX - totalW / 2f, baseY,
-            baseX + totalW / 2f, baseY + portraitSize + 8f * density
+            baseX + totalW / 2f, baseY + currentSize + 8f * density
         )
         canvas.drawRoundRect(bgRect, 4f * density, 4f * density, catQueueBgPaint)
 
-        for (i in 0 until queueCount) {
-            val catIdx = currentCatIndex + 1 + i
+        var drawX = bgRect.left + 4f * density
+
+        for (i in 0 until showCount) {
+            val catIdx = currentCatIndex + i
             if (catIdx >= config.catIds.size) break
             val catId = config.catIds[catIdx]
+            val isCurrent = (i == 0)
+            val size = if (isCurrent) currentSize else queueSize
 
-            val cx = bgRect.left + 4f * density + i * (portraitSize + spacing) + portraitSize / 2f
-            val cy = baseY + 4f * density + portraitSize / 2f
+            val cx = drawX + size / 2f
+            val cy = baseY + 4f * density + currentSize / 2f
 
             val bm = catBitmaps[catId]
             if (bm != null) {
                 canvas.drawBitmap(
                     bm,
                     Rect(0, 0, bm.width, bm.height),
-                    RectF(cx - portraitSize / 2f, cy - portraitSize / 2f,
-                          cx + portraitSize / 2f, cy + portraitSize / 2f),
+                    RectF(cx - size / 2f, cy - size / 2f,
+                          cx + size / 2f, cy + size / 2f),
                     null
                 )
             } else {
-                catFallbackPaint.alpha = 180
-                canvas.drawCircle(cx, cy, portraitSize / 2f - 2f, catFallbackPaint)
+                catFallbackPaint.alpha = if (isCurrent) 255 else 180
+                canvas.drawCircle(cx, cy, size / 2f - 2f, catFallbackPaint)
                 catFallbackPaint.alpha = 255
             }
 
-            // Ability color dot
+            // 현재 고양이: 하이라이트 테두리
+            if (isCurrent) {
+                abilityBgPaint.color = Theme.INT_CORAL
+                abilityBgPaint.style = Paint.Style.STROKE
+                abilityBgPaint.strokeWidth = 2f * density
+                canvas.drawCircle(cx, cy, size / 2f, abilityBgPaint)
+                abilityBgPaint.style = Paint.Style.FILL
+            }
+
+            // 능력 색상 도트
             val ability = CatAbility.forCatId(catId)
             abilityBgPaint.color = abilityColor(ability)
-            canvas.drawCircle(cx, cy + portraitSize / 2f + 3f * density, 3f * density, abilityBgPaint)
+            abilityBgPaint.style = Paint.Style.FILL
+            canvas.drawCircle(cx, cy + currentSize / 2f + 3f * density, 3f * density, abilityBgPaint)
+
+            drawX += size + spacing
         }
     }
 
@@ -1202,6 +1247,7 @@ class LaunchGameView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
         val alpha = victoryAlpha
+        val isLandscape = w > h
 
         // Semi-transparent background
         overlayBgPaint.color = Color.argb((alpha * 180).toInt(), 0, 0, 0)
@@ -1209,10 +1255,11 @@ class LaunchGameView @JvmOverloads constructor(
 
         if (alpha < 0.3f) return
 
-        val panelW = w * 0.8f
-        val panelH = h * 0.45f
+        // 가로모드: 패널을 넓고 높게, 세로모드: 기존 비율
+        val panelW = if (isLandscape) w * 0.55f else w * 0.8f
+        val panelH = if (isLandscape) h * 0.82f else h * 0.45f
         val panelLeft = (w - panelW) / 2f
-        val panelTop = (h - panelH) / 2.5f
+        val panelTop = (h - panelH) / 2f
         val panelRight = panelLeft + panelW
         val panelBottom = panelTop + panelH
         val cornerR = 16f * density
@@ -1222,15 +1269,21 @@ class LaunchGameView @JvmOverloads constructor(
         buttonPaint.alpha = (alpha * 255).toInt()
         canvas.drawRoundRect(panelLeft, panelTop, panelRight, panelBottom, cornerR, cornerR, buttonPaint)
 
+        // 패널 내부를 비례 배치 (고정 dp 대신 panelH 비율)
+        val titleY = panelTop + panelH * 0.13f
+        val starCenterY = panelTop + panelH * 0.30f
+        val infoY = panelTop + panelH * 0.44f
+        val btnStartY = panelTop + panelH * 0.55f
+
         // Title
-        overlayTitlePaint.textSize = 28f * density
+        val titleSize = min(28f * density, panelH * 0.10f)
+        overlayTitlePaint.textSize = titleSize
         overlayTitlePaint.color = Theme.INT_CORAL
         overlayTitlePaint.alpha = (alpha * 255).toInt()
-        canvas.drawText("Stage Clear!", w / 2f, panelTop + 50f * density, overlayTitlePaint)
+        canvas.drawText("Stage Clear!", w / 2f, titleY, overlayTitlePaint)
 
         // Stars
-        val starSize = 28f * density
-        val starY = panelTop + 90f * density
+        val starSize = min(28f * density, panelH * 0.10f)
         val starSpacing = starSize * 1.5f
         val starStartX = w / 2f - starSpacing
 
@@ -1238,37 +1291,38 @@ class LaunchGameView @JvmOverloads constructor(
             val sx = starStartX + i * starSpacing
             if (i < victoryStars) {
                 starPaint.alpha = (alpha * 255).toInt()
-                canvas.drawCircle(sx, starY, starSize / 2f, starPaint)
-                // Draw star symbol
+                canvas.drawCircle(sx, starCenterY, starSize / 2f, starPaint)
                 overlayTitlePaint.textSize = starSize * 0.7f
                 overlayTitlePaint.color = Theme.INT_BG_CREAM
                 overlayTitlePaint.alpha = (alpha * 255).toInt()
-                canvas.drawText("\u2605", sx, starY + starSize * 0.2f, overlayTitlePaint)
+                canvas.drawText("\u2605", sx, starCenterY + starSize * 0.2f, overlayTitlePaint)
             } else {
                 starEmptyPaint.alpha = (alpha * 255).toInt()
-                canvas.drawCircle(sx, starY, starSize / 2f, starEmptyPaint)
+                canvas.drawCircle(sx, starCenterY, starSize / 2f, starEmptyPaint)
                 overlayTitlePaint.textSize = starSize * 0.7f
                 overlayTitlePaint.color = Color.WHITE
                 overlayTitlePaint.alpha = (alpha * 150).toInt()
-                canvas.drawText("\u2605", sx, starY + starSize * 0.2f, overlayTitlePaint)
+                canvas.drawText("\u2605", sx, starCenterY + starSize * 0.2f, overlayTitlePaint)
             }
         }
 
         // Cats used info
-        overlayInfoPaint.textSize = 16f * density
+        val infoSize = min(16f * density, panelH * 0.06f)
+        overlayInfoPaint.textSize = infoSize
         overlayInfoPaint.alpha = (alpha * 255).toInt()
-        canvas.drawText("Cats used: $catsUsed", w / 2f, starY + 50f * density, overlayInfoPaint)
+        canvas.drawText("Cats used: $catsUsed", w / 2f, infoY, overlayInfoPaint)
 
-        // Buttons
+        // Buttons — 비례 배치
         val btnW = panelW * 0.7f
-        val btnH = 44f * density
+        val btnH = min(44f * density, panelH * 0.12f)
+        val btnGap = min(10f * density, panelH * 0.03f)
         val btnLeft = (w - btnW) / 2f
         val btnRight = btnLeft + btnW
-        val btnCorner = 22f * density
-        val btnTextSize = 16f * density
+        val btnCorner = btnH / 2f
+        val btnTextSize = min(16f * density, btnH * 0.45f)
 
         // Next Stage button
-        val nextTop = panelBottom - 150f * density
+        val nextTop = btnStartY
         val nextBottom = nextTop + btnH
         nextStageRect.set(btnLeft, nextTop, btnRight, nextBottom)
         buttonPaint.color = Theme.INT_CORAL
@@ -1279,7 +1333,7 @@ class LaunchGameView @JvmOverloads constructor(
         canvas.drawText("Next Stage", w / 2f, nextTop + btnH / 2f + btnTextSize / 3f, buttonTextPaint)
 
         // Retry button
-        val retryTop = nextBottom + 10f * density
+        val retryTop = nextBottom + btnGap
         val retryBottom = retryTop + btnH
         retryRect.set(btnLeft, retryTop, btnRight, retryBottom)
         retryButtonPaint.alpha = (alpha * 255).toInt()
@@ -1288,7 +1342,7 @@ class LaunchGameView @JvmOverloads constructor(
         canvas.drawText("Retry", w / 2f, retryTop + btnH / 2f + btnTextSize / 3f, buttonTextPaint)
 
         // Menu button
-        val menuTop = retryBottom + 10f * density
+        val menuTop = retryBottom + btnGap
         val menuBottom = menuTop + btnH
         menuRect.set(btnLeft, menuTop, btnRight, menuBottom)
         menuButtonPaint.alpha = (alpha * 255).toInt()
@@ -1306,6 +1360,7 @@ class LaunchGameView @JvmOverloads constructor(
         val w = width.toFloat()
         val h = height.toFloat()
         val alpha = victoryAlpha
+        val isLandscape = w > h
 
         // Semi-transparent background
         overlayBgPaint.color = Color.argb((alpha * 180).toInt(), 0, 0, 0)
@@ -1313,10 +1368,11 @@ class LaunchGameView @JvmOverloads constructor(
 
         if (alpha < 0.3f) return
 
-        val panelW = w * 0.8f
-        val panelH = h * 0.35f
+        // 가로모드: 패널 높이 확대, 세로모드: 기존 비율
+        val panelW = if (isLandscape) w * 0.55f else w * 0.8f
+        val panelH = if (isLandscape) h * 0.65f else h * 0.35f
         val panelLeft = (w - panelW) / 2f
-        val panelTop = (h - panelH) / 2.5f
+        val panelTop = (h - panelH) / 2f
         val panelRight = panelLeft + panelW
         val panelBottom = panelTop + panelH
         val cornerR = 16f * density
@@ -1326,22 +1382,24 @@ class LaunchGameView @JvmOverloads constructor(
         buttonPaint.alpha = (alpha * 255).toInt()
         canvas.drawRoundRect(panelLeft, panelTop, panelRight, panelBottom, cornerR, cornerR, buttonPaint)
 
-        // Title
-        overlayTitlePaint.textSize = 28f * density
+        // Title — 비례 배치
+        val titleSize = min(28f * density, panelH * 0.12f)
+        overlayTitlePaint.textSize = titleSize
         overlayTitlePaint.color = Theme.LAUNCH_ABILITY_EXPLOSIVE
         overlayTitlePaint.alpha = (alpha * 255).toInt()
-        canvas.drawText("Stage Failed", w / 2f, panelTop + 60f * density, overlayTitlePaint)
+        canvas.drawText("Stage Failed", w / 2f, panelTop + panelH * 0.25f, overlayTitlePaint)
 
-        // Buttons
+        // Buttons — 비례 배치
         val btnW = panelW * 0.7f
-        val btnH = 44f * density
+        val btnH = min(44f * density, panelH * 0.15f)
+        val btnGap = min(10f * density, panelH * 0.04f)
         val btnLeft = (w - btnW) / 2f
         val btnRight = btnLeft + btnW
-        val btnCorner = 22f * density
-        val btnTextSize = 16f * density
+        val btnCorner = btnH / 2f
+        val btnTextSize = min(16f * density, btnH * 0.45f)
 
         // Retry button
-        val retryTop = panelBottom - 110f * density
+        val retryTop = panelTop + panelH * 0.48f
         val retryBottom = retryTop + btnH
         retryRect.set(btnLeft, retryTop, btnRight, retryBottom)
         buttonPaint.color = Theme.INT_CORAL
@@ -1352,7 +1410,7 @@ class LaunchGameView @JvmOverloads constructor(
         canvas.drawText("Retry", w / 2f, retryTop + btnH / 2f + btnTextSize / 3f, buttonTextPaint)
 
         // Menu button
-        val menuTop = retryBottom + 10f * density
+        val menuTop = retryBottom + btnGap
         val menuBottom = menuTop + btnH
         menuRect.set(btnLeft, menuTop, btnRight, menuBottom)
         menuButtonPaint.alpha = (alpha * 255).toInt()
