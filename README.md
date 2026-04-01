@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Language](https://img.shields.io/badge/Language-Kotlin%202.2.0-purple)
 ![MinSDK](https://img.shields.io/badge/MinSDK-24%20(Android%207.0)-blue)
-![Version](https://img.shields.io/badge/Version-v5.7-orange)
+![Version](https://img.shields.io/badge/Version-v5.8-orange)
 
 ## 소개
 
@@ -31,7 +31,7 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 - **별점 시스템**: 최적 이동 횟수 기준 1~3성 평가
 - **고양이 컬렉션**: 13마리 고양이를 스테이지 클리어로 해금하고 게임에서 사용
 - **고양이 캐릭터 이동**: 블록 대신 고양이 이미지가 직접 이동 (드래그 시 스케일업 피드백)
-- **제스처 보호**: 보드 영역에서 시스템 뒤로가기 제스처 차단 (블록 드래그 시 오작동 방지)
+- **제스처 보호**: 게임 Activity 몰입 모드(Immersive Sticky)로 엣지 스와이프 뒤로가기 완전 차단
 - **탈출 애니메이션**: 벽 열림 -> 고양이 슬라이드 -> 파티클 이펙트 연출
 - **스냅 애니메이션**: 120ms ease-out 블록 스냅 효과
 - **별점 목표 HUD**: 이동 횟수가 색상으로 실시간 피드백 (녹색=3성, 황색=2성, 빨간색=1성) + 별 기준 이동 횟수 미리 표시
@@ -52,7 +52,7 @@ Meow Rescue는 Rush Hour / Unblock Me 스타일의 슬라이딩 블록 퍼즐 �
 - **Cat Launch 미니게임**: 새총으로 고양이를 발사하는 물리 기반 미니게임 (JBox2D 엔진)
 - **반응형 화면**: Cat Launch 가로/세로 자동 적응 (가로=14m 넓은 시야, 세로=10m)
 - **난이도 선택**: Cat Launch 진입 시 쉬움/보통/어려움 선택 (시작 난이도 조절)
-- **수동 카메라**: Cat Launch에서 드래그로 자유 카메라 이동
+- **수동 카메라**: Cat Launch에서 드래그로 자유 카메라 이동 (AIMING 상태에서 맵 패닝 후 위치 유지)
 - **인앱 업데이트**: Google Play In-App Updates로 자동 업데이트 안내 (강제/유연 모드)
 
 ## Cat Launch 미니게임
@@ -127,7 +127,7 @@ offset은 스테이지 ID에 더해져 난이도 파라미터를 결정합니다
 - 충돌 데미지: 충격량 × 10 → HP 감소
 - 장애물 파괴 시 6개 파편 파티클 생성
 - OOB 처리: 투사체 x<-0.5/x>20.5/y<-1 즉시 제거, 장애물/적 y<-1 파괴
-- 카메라: 투사체 자동 추적 (LERP 0.08) + 수동 드래그 패닝 (15px 임계값)
+- 카메라: 투사체 자동 추적 (LERP 0.08) + 수동 드래그 패닝 (15px 임계값) + AIMING 시 패닝 위치 유지
 - 물리 감쇠: 지면 friction 0.8, 장애물 linearDamping 0.5/angularDamping 0.8, 적 linearDamping 0.3/angularDamping 0.5
 - 정착 판정: 속도 임계값 0.2 m/s, 15프레임 연속 유지 시 안정화
 
@@ -265,7 +265,7 @@ com.meowrescue.game
 │   ├── PuzzleGrid.kt              // 격자 상태, 블록 이동/제거, 클리어 판정
 │   └── PuzzleGenerator.kt         // 자동 레벨 생성 + 품질 필터
 ├── ui/
-│   ├── MenuActivity.kt            // 메인 메뉴 (Play, Collection, Cat Launch, Sound 토글)
+│   ├── MenuActivity.kt            // 메인 메뉴 (Play, Collection, Cat Launch, 플로팅 사운드 토글)
 │   ├── StageSelectActivity.kt     // 스테이지 선택 (30개 페이지, 스와이프, 도트 인디케이터)
 │   ├── PuzzleActivity.kt          // 게임 진행, 클리어 처리, 고양이 해금, 광고
 │   ├── PuzzleView.kt              // SurfaceView 렌더링 + 드래그 + 스냅/탈출 애니메이션

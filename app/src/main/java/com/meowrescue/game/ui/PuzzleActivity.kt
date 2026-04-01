@@ -5,6 +5,9 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.ads.AdManager
@@ -112,6 +115,7 @@ class PuzzleActivity : AppCompatActivity() {
         ))
 
         setContentView(frameRoot)
+        enableImmersiveMode()
 
         // Load selected cat bitmap
         val catRes = repository.getSelectedCatDrawable()
@@ -325,6 +329,21 @@ class PuzzleActivity : AppCompatActivity() {
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
         SoundManager.playStarEarn()
+    }
+
+    // ── Immersive mode (엣지 스와이프 뒤로가기 방지) ──────────────────────
+    private fun enableImmersiveMode() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).let { c ->
+            c.hide(WindowInsetsCompat.Type.navigationBars())
+            c.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enableImmersiveMode()
     }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────

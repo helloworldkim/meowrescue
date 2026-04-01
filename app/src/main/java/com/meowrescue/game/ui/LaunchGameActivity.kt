@@ -11,6 +11,9 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
@@ -67,6 +70,7 @@ class LaunchGameActivity : AppCompatActivity() {
         )
 
         setContentView(rootLayout)
+        enableImmersiveMode()
 
         setupCallbacks()
         showDifficultyDialog()
@@ -248,6 +252,21 @@ class LaunchGameActivity : AppCompatActivity() {
             if (bmp != null) map[catId] = bmp
         }
         return map
+    }
+
+    // ── Immersive mode (엣지 스와이프 뒤로가기 방지) ──────────────────────
+    private fun enableImmersiveMode() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).let { c ->
+            c.hide(WindowInsetsCompat.Type.navigationBars())
+            c.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enableImmersiveMode()
     }
 
     // ── Lifecycle ──────────────────────────────────────────────────────────

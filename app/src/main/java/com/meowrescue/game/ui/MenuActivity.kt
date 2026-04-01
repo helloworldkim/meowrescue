@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -51,19 +52,28 @@ class MenuActivity : AppCompatActivity() {
             )
         }
 
-        val rootScroll = ScrollView(this).apply {
+        // Main area: FrameLayout holding scroll + floating sound toggle
+        val mainFrame = FrameLayout(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+        }
+
+        val rootScroll = ScrollView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
             )
         }
 
         val contentLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding((48 * dp).toInt(), (80 * dp).toInt(), (48 * dp).toInt(), (80 * dp).toInt())
+            setPadding((48 * dp).toInt(), (32 * dp).toInt(), (48 * dp).toInt(), (24 * dp).toInt())
         }
         rootScroll.addView(contentLayout)
-        rootLayout.addView(rootScroll)
+        mainFrame.addView(rootScroll)
+        rootLayout.addView(mainFrame)
 
         // Banner ad at bottom
         bannerAd = AdManager.createBannerAd(this)
@@ -75,16 +85,16 @@ class MenuActivity : AppCompatActivity() {
 
         setContentView(rootLayout)
 
-        // Cat mascot image
+        // Cat mascot image (compact)
         catImage = ImageView(this).apply {
             setImageResource(repository.getSelectedCatDrawable())
             scaleType = ImageView.ScaleType.FIT_CENTER
-            val w = (180 * dp).toInt()
-            val h = (240 * dp).toInt()
+            val w = (120 * dp).toInt()
+            val h = (160 * dp).toInt()
             layoutParams = LinearLayout.LayoutParams(w, h).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = (24 * dp).toInt()
-                bottomMargin = (32 * dp).toInt()
+                topMargin = (16 * dp).toInt()
+                bottomMargin = (16 * dp).toInt()
             }
         }
         contentLayout.addView(catImage)
@@ -115,7 +125,7 @@ class MenuActivity : AppCompatActivity() {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (48 * dp).toInt() }
+            ).apply { bottomMargin = (20 * dp).toInt() }
         }
         contentLayout.addView(subtitle)
 
@@ -154,21 +164,41 @@ class MenuActivity : AppCompatActivity() {
         }
         contentLayout.addView(launchBtn)
 
-        // Sound toggle button
-        soundButton = makeButton(soundLabel(), Theme.COLOR_TEAL)
-        soundButton.setOnClickListener {
-            SoundManager.playButtonTap()
-            val newEnabled = !repository.isSoundEnabled()
-            repository.setSoundEnabled(newEnabled)
-            SoundManager.setSoundEnabled(newEnabled)
-            if (newEnabled) SoundManager.playBgm("menu")
-            soundButton.text = soundLabel()
+        // Floating sound toggle (top-right corner)
+        soundButton = Button(this).apply {
+            text = soundIcon()
+            textSize = 20f
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor(Theme.COLOR_TEAL))
+                cornerRadius = 999 * dp
+            }
+            elevation = 4 * dp
+            val size = (44 * dp).toInt()
+            layoutParams = FrameLayout.LayoutParams(size, size).apply {
+                gravity = Gravity.TOP or Gravity.END
+                topMargin = (12 * dp).toInt()
+                marginEnd = (12 * dp).toInt()
+            }
+            setPadding(0, 0, 0, 0)
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            setOnClickListener {
+                SoundManager.playButtonTap()
+                val newEnabled = !repository.isSoundEnabled()
+                repository.setSoundEnabled(newEnabled)
+                SoundManager.setSoundEnabled(newEnabled)
+                if (newEnabled) SoundManager.playBgm("menu")
+                soundButton.text = soundIcon()
+            }
         }
-        contentLayout.addView(soundButton)
+        mainFrame.addView(soundButton)
     }
 
-    private fun soundLabel(): String {
-        return if (repository.isSoundEnabled()) "🔊  Sound: ON" else "🔇  Sound: OFF"
+    private fun soundIcon(): String {
+        return if (repository.isSoundEnabled()) "🔊" else "🔇"
     }
 
     private fun makeButton(text: String, colorHex: String): Button {
@@ -206,7 +236,7 @@ class MenuActivity : AppCompatActivity() {
         updateManager.onResume()
         if (repository.isSoundEnabled()) SoundManager.playBgm("menu")
         // Refresh sound button label in case state changed
-        if (::soundButton.isInitialized) soundButton.text = soundLabel()
+        if (::soundButton.isInitialized) soundButton.text = soundIcon()
         // Refresh cat mascot in case selection changed
         if (::catImage.isInitialized) catImage.setImageResource(repository.getSelectedCatDrawable())
         // Show endless button only if 200 stages cleared

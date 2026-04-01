@@ -428,6 +428,7 @@ class LaunchGameView @JvmOverloads constructor(
             val dy = y - anchorScreenY
             if (sqrt(dx * dx + dy * dy) <= touchRadius) {
                 isDragging = true
+                manualPanActive = false  // 슬링샷 조준 시 카메라 원점 복귀
                 dragStartX = x
                 dragStartY = y
                 dragCurrentX = x
@@ -493,6 +494,10 @@ class LaunchGameView @JvmOverloads constructor(
     private fun handleUp(x: Float, y: Float): (() -> Unit)? {
         // End camera panning
         if (isPanning) {
+            // AIMING 상태: 사용자가 맵을 둘러본 위치 유지
+            if (gameState == LaunchGameState.AIMING) {
+                manualPanActive = true
+            }
             isPanning = false
             return null
         }
@@ -693,9 +698,8 @@ class LaunchGameView @JvmOverloads constructor(
             }
 
             LaunchGameState.AIMING -> {
-                // When not manually panning, smoothly return camera to slingshot
-                if (!isPanning) {
-                    manualPanActive = false
+                // 맵 패닝 중이거나 패닝 후 유지 상태면 카메라 고정
+                if (!isPanning && !manualPanActive) {
                     val targetX = 0f
                     val targetY = 0f
                     cameraOffsetX += (targetX - cameraOffsetX) * CAMERA_LERP
