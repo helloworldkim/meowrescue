@@ -49,6 +49,7 @@ object Theme {
     const val LAUNCH_MAT_WOOD      = 0xFFA1887F.toInt()  // 나무 (탄)
     const val LAUNCH_MAT_GLASS     = 0xFF80DEEA.toInt()  // 유리 (시안)
     const val LAUNCH_MAT_STONE     = 0xFF90A4AE.toInt()  // 돌 (블루그레이)
+    const val LAUNCH_MAT_TNT       = 0xFFE53935.toInt()  // TNT (레드)
     // 능력 색상
     const val LAUNCH_ABILITY_NORMAL    = 0xFF9E9E9E.toInt()  // 일반 (회색)
     const val LAUNCH_ABILITY_REDIRECT  = 0xFF42A5F5.toInt()  // 방향전환 (블루)

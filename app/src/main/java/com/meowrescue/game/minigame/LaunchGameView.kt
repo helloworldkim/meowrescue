@@ -230,6 +230,14 @@ class LaunchGameView @JvmOverloads constructor(
         textAlign = Paint.Align.CENTER
     }
     private val abilityBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val tntMarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; style = Paint.Style.STROKE
+        strokeWidth = 2f; strokeCap = Paint.Cap.ROUND
+    }
+    private val scorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Theme.LAUNCH_STAR_GOLD; typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.RIGHT
+    }
 
     // ── Render thread ────────────────────────────────────────────────────────
     private var renderThread: Thread? = null
@@ -565,7 +573,7 @@ class LaunchGameView @JvmOverloads constructor(
     private fun clampCamera() {
         val maxCamX = (WORLD_WIDTH - viewWidthMeters).coerceAtLeast(0f)
         cameraOffsetX = cameraOffsetX.coerceIn(0f, maxCamX)
-        cameraOffsetY = cameraOffsetY.coerceIn(0f, 5f)
+        cameraOffsetY = cameraOffsetY.coerceIn(0f, 8f)
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -667,6 +675,9 @@ class LaunchGameView @JvmOverloads constructor(
                 if (settleFrameCount >= SETTLE_FRAMES_REQUIRED) {
                     if (pw.allEnemiesDestroyed()) {
                         gameState = LaunchGameState.STAGE_CLEAR
+                        // Add remaining cat bonus to score
+                        val remainingCats = config.catIds.size - currentCatIndex
+                        pw.addRemainingCatBonus(remainingCats)
                         val thresholds = config.starThresholds
                         victoryStars = when {
                             catsUsed <= thresholds.threeStar -> 3
@@ -964,6 +975,15 @@ class LaunchGameView @JvmOverloads constructor(
                 cornerRadius, cornerRadius, obstaclePaint
             )
 
+            // TNT: draw X mark
+            if (obstacle.material == LaunchPhysicsWorld.ObstacleMaterial.TNT) {
+                val mx = halfW * 0.5f
+                val my = halfH * 0.5f
+                tntMarkPaint.strokeWidth = 2f * density
+                canvas.drawLine(-mx, -my, mx, my, tntMarkPaint)
+                canvas.drawLine(mx, -my, -mx, my, tntMarkPaint)
+            }
+
             // Draw cracks if HP < 50%
             val hpRatio = obstacle.hp.toFloat() / obstacle.material.maxHp
             if (hpRatio < 0.5f) {
@@ -1113,6 +1133,14 @@ class LaunchGameView @JvmOverloads constructor(
             )
             abilityLabelPaint.color = Color.WHITE
             canvas.drawText(abilityName, w / 2f, tagY + tagH - 4f * density, abilityLabelPaint)
+        }
+
+        // Score (right side)
+        val pw = physicsWorld
+        if (pw != null) {
+            scorePaint.textSize = 16f * density
+            val scoreX = w - 52f * density
+            canvas.drawText("${pw.score}", scoreX, textY, scorePaint)
         }
 
         // Pause button (right side)
@@ -1265,10 +1293,11 @@ class LaunchGameView @JvmOverloads constructor(
         canvas.drawRoundRect(panelLeft, panelTop, panelRight, panelBottom, cornerR, cornerR, buttonPaint)
 
         // 패널 내부를 비례 배치 (고정 dp 대신 panelH 비율)
-        val titleY = panelTop + panelH * 0.13f
-        val starCenterY = panelTop + panelH * 0.30f
-        val infoY = panelTop + panelH * 0.44f
-        val btnStartY = panelTop + panelH * 0.55f
+        val titleY = panelTop + panelH * 0.10f
+        val starCenterY = panelTop + panelH * 0.24f
+        val infoY = panelTop + panelH * 0.38f
+        val scoreY = panelTop + panelH * 0.47f
+        val btnStartY = panelTop + panelH * 0.56f
 
         // Title
         val titleSize = min(28f * density, panelH * 0.10f)
@@ -1306,6 +1335,16 @@ class LaunchGameView @JvmOverloads constructor(
         overlayInfoPaint.textSize = infoSize
         overlayInfoPaint.alpha = (alpha * 255).toInt()
         canvas.drawText("Cats used: $catsUsed", w / 2f, infoY, overlayInfoPaint)
+
+        // Score
+        val scoreSize = min(20f * density, panelH * 0.08f)
+        scorePaint.textSize = scoreSize
+        scorePaint.textAlign = Paint.Align.CENTER
+        scorePaint.alpha = (alpha * 255).toInt()
+        val totalScore = physicsWorld?.score ?: 0
+        canvas.drawText("Score: $totalScore", w / 2f, scoreY, scorePaint)
+        scorePaint.textAlign = Paint.Align.RIGHT
+        scorePaint.alpha = 255
 
         // Buttons — 비례 배치
         val btnW = panelW * 0.7f

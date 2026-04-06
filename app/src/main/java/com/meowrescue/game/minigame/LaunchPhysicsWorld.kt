@@ -40,12 +40,18 @@ class LaunchPhysicsWorld {
         private const val DAMAGE_MULTIPLIER = 10f
         private const val DEBRIS_PER_OBSTACLE = 6
         private const val DEFAULT_PROJECTILE_RADIUS = 0.25f
+
+        private const val TNT_BLAST_RADIUS = 2.0f
+        private const val TNT_BLAST_FORCE = 50f
+        const val SCORE_ENEMY = 500
+        const val SCORE_REMAINING_CAT = 1000
     }
 
-    enum class ObstacleMaterial(val maxHp: Int, val color: Int, val density: Float) {
-        WOOD(30, Theme.LAUNCH_MAT_WOOD, 0.5f),       // 나무 (탄)
-        GLASS(15, Theme.LAUNCH_MAT_GLASS, 0.3f),     // 유리 (시안)
-        STONE(60, Theme.LAUNCH_MAT_STONE, 1.2f)      // 돌 (블루그레이)
+    enum class ObstacleMaterial(val maxHp: Int, val color: Int, val density: Float, val scoreValue: Int) {
+        WOOD(30, Theme.LAUNCH_MAT_WOOD, 0.5f, 100),       // 나무 (탄)
+        GLASS(15, Theme.LAUNCH_MAT_GLASS, 0.3f, 50),      // 유리 (시안)
+        STONE(60, Theme.LAUNCH_MAT_STONE, 1.2f, 200),     // 돌 (블루그레이)
+        TNT(10, Theme.LAUNCH_MAT_TNT, 0.3f, 150)          // TNT (레드, 폭발)
     }
 
     data class ObstacleBody(
@@ -95,6 +101,14 @@ class LaunchPhysicsWorld {
     )
 
     private val collisionQueue = mutableListOf<CollisionEvent>()
+
+    // ── Score tracking ───────────────────────────────────────────────────
+    private var _score = 0
+    val score: Int get() = _score
+
+    fun addRemainingCatBonus(count: Int) {
+        _score += count * SCORE_REMAINING_CAT
+    }
 
     init {
         createGround()
@@ -342,6 +356,7 @@ class LaunchPhysicsWorld {
         projectiles.clear()
         debris.clear()
         collisionQueue.clear()
+        _score = 0
 
         // Recreate static environment
         createGround()
@@ -462,6 +477,11 @@ class LaunchPhysicsWorld {
     private fun removeDestroyedBodies() {
         val destroyedObstacles = obstacles.filter { it.hp <= 0 }
         for (obstacle in destroyedObstacles) {
+            _score += obstacle.material.scoreValue
+            // TNT chain explosion
+            if (obstacle.material == ObstacleMaterial.TNT) {
+                applyBlast(obstacle.body.position, TNT_BLAST_RADIUS, TNT_BLAST_FORCE)
+            }
             spawnDebris(obstacle)
             world.destroyBody(obstacle.body)
         }
@@ -469,6 +489,7 @@ class LaunchPhysicsWorld {
 
         val destroyedEnemies = enemies.filter { it.hp <= 0 }
         for (enemy in destroyedEnemies) {
+            _score += SCORE_ENEMY
             world.destroyBody(enemy.body)
         }
         enemies.removeAll(destroyedEnemies.toSet())
