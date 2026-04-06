@@ -21,6 +21,8 @@ import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.update.UpdateManager
+import com.meowrescue.game.launch.ui.LaunchGameActivity
+import com.meowrescue.game.puzzle.ui.PuzzleActivity
 import com.meowrescue.game.util.SoundManager
 
 class MenuActivity : AppCompatActivity() {

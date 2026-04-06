@@ -1,5 +1,9 @@
 package com.meowrescue.game.puzzle
 
+import com.meowrescue.game.puzzle.engine.PuzzleGenerator
+import com.meowrescue.game.puzzle.engine.PuzzleGrid
+import com.meowrescue.game.puzzle.model.ExitDirection
+import com.meowrescue.game.puzzle.model.PuzzleBlock
 import org.junit.Test
 import org.junit.Assert.*
 

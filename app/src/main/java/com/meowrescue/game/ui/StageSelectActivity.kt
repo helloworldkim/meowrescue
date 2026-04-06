@@ -8,16 +8,12 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.PagerSnapHelper
 import androidx.recyclerview.widget.RecyclerView
@@ -25,7 +21,7 @@ import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
-import com.meowrescue.game.data.UserProgress
+import com.meowrescue.game.puzzle.ui.PuzzleActivity
 import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -290,12 +286,20 @@ class StageSelectActivity : AppCompatActivity() {
             }
 
             // Set pager adapter
-            pagerRecycler.adapter = PageAdapter(maxCompleted, allProgress) { levelId ->
-                SoundManager.playButtonTap()
-                val intent = Intent(this@StageSelectActivity, PuzzleActivity::class.java)
-                intent.putExtra("stage", levelId)
-                startActivity(intent)
-            }
+            pagerRecycler.adapter = StagePageAdapter(
+                maxCompleted = maxCompleted,
+                progressList = allProgress,
+                onLevelClick = { levelId ->
+                    SoundManager.playButtonTap()
+                    val intent = Intent(this@StageSelectActivity, PuzzleActivity::class.java)
+                    intent.putExtra("stage", levelId)
+                    startActivity(intent)
+                },
+                totalPages = TOTAL_PAGES,
+                totalLevels = TOTAL_LEVELS,
+                levelsPerPage = LEVELS_PER_PAGE,
+                density = resources.displayMetrics.density
+            )
 
             // Auto-scroll to the page of the current playable stage
             val targetPage = (maxCompleted / LEVELS_PER_PAGE).coerceIn(0, TOTAL_PAGES - 1)
@@ -323,224 +327,4 @@ class StageSelectActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    // ---- Page Adapter (each item = full-width page with a grid of stages) ----
-
-    private inner class PageAdapter(
-        private val maxCompleted: Int,
-        private val progressList: List<UserProgress?>,
-        private val onLevelClick: (Int) -> Unit
-    ) : RecyclerView.Adapter<PageAdapter.PageVH>() {
-
-        private val animatedPages = mutableSetOf<Int>()
-
-        inner class PageVH(val container: FrameLayout) : RecyclerView.ViewHolder(container)
-
-        override fun getItemCount() = TOTAL_PAGES
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PageVH {
-            val container = FrameLayout(parent.context).apply {
-                layoutParams = RecyclerView.LayoutParams(
-                    parent.width,
-                    RecyclerView.LayoutParams.MATCH_PARENT
-                )
-            }
-            return PageVH(container)
-        }
-
-        override fun onBindViewHolder(holder: PageVH, position: Int) {
-            holder.container.removeAllViews()
-
-            val dp = resources.displayMetrics.density
-            val gridRecycler = RecyclerView(holder.container.context).apply {
-                layoutManager = GridLayoutManager(this@StageSelectActivity, 4)
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                )
-                setPadding(
-                    (12 * dp).toInt(), (12 * dp).toInt(),
-                    (12 * dp).toInt(), (12 * dp).toInt()
-                )
-                clipToPadding = false
-                isNestedScrollingEnabled = false
-            }
-
-            val shouldAnimate = !animatedPages.contains(position)
-            if (shouldAnimate) animatedPages.add(position)
-
-            gridRecycler.adapter = StageGridAdapter(position, maxCompleted, progressList, onLevelClick, shouldAnimate)
-            holder.container.addView(gridRecycler)
-        }
-    }
-
-    // ---- Stage Grid Adapter (30 stages per page) ----
-
-    private inner class StageGridAdapter(
-        private val page: Int,
-        private val maxCompleted: Int,
-        private val progressList: List<UserProgress?>,
-        private val onLevelClick: (Int) -> Unit,
-        private val animateEntrance: Boolean
-    ) : RecyclerView.Adapter<StageGridAdapter.VH>() {
-
-        private val catUnlockMap: Map<Int, GameRepository.CatDefinition> = GameRepository.CAT_DEFINITIONS
-            .filter { it.requiredStage > 1 }
-            .associateBy { it.requiredStage }
-
-        private val offset = page * LEVELS_PER_PAGE
-        private val count = minOf(LEVELS_PER_PAGE, TOTAL_LEVELS - offset)
-
-        inner class VH(val cell: FrameLayout) : RecyclerView.ViewHolder(cell)
-
-        override fun getItemCount() = count
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val dp = resources.displayMetrics.density
-            val size = (80 * dp).toInt()
-            val cell = FrameLayout(parent.context).apply {
-                layoutParams = RecyclerView.LayoutParams(
-                    RecyclerView.LayoutParams.MATCH_PARENT,
-                    size
-                ).apply {
-                    val margin = (6 * dp).toInt()
-                    setMargins(margin, margin, margin, margin)
-                }
-            }
-            return VH(cell)
-        }
-
-        override fun onBindViewHolder(holder: VH, position: Int) {
-            val levelId = offset + position + 1
-            val dp = resources.displayMetrics.density
-            val progress = progressList.getOrNull(offset + position)
-            // DEV: all stages unlocked for testing
-            val isUnlocked = true // levelId == 1 || levelId <= maxCompleted + 1
-            val isCompleted = progress != null && progress.completed
-            val stars = progress?.stars ?: 0
-
-            holder.cell.removeAllViews()
-
-            val bgColor = when {
-                !isUnlocked -> Color.parseColor(Theme.COLOR_LOCKED_GRAY)
-                isCompleted -> Color.parseColor(Theme.COLOR_LEVEL_COMPLETED_BG)
-                else -> Color.parseColor(Theme.COLOR_LEVEL_PLAYABLE_BG)
-            }
-
-            val bgDrawable = GradientDrawable().apply {
-                setColor(bgColor)
-                cornerRadius = 16 * dp
-            }
-            holder.cell.background = wrapWithRipple(bgDrawable)
-            holder.cell.elevation = 3 * dp
-
-            // Level number
-            val numText = TextView(holder.cell.context).apply {
-                text = levelId.toString()
-                textSize = 18f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(
-                    if (isUnlocked) Color.parseColor(Theme.COLOR_WARM_BROWN)
-                    else Color.parseColor("#888888")
-                )
-                gravity = Gravity.CENTER
-                layoutParams = FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT,
-                    Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                ).apply { topMargin = (8 * dp).toInt() }
-            }
-            holder.cell.addView(numText)
-
-            // Cat unlock thumbnail preview
-            val catDef = catUnlockMap[levelId]
-            if (catDef != null) {
-                val thumbSize = (28 * dp).toInt()
-                val catThumb = ImageView(holder.cell.context).apply {
-                    setImageResource(catDef.drawableRes)
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    layoutParams = FrameLayout.LayoutParams(thumbSize, thumbSize,
-                        Gravity.TOP or Gravity.END
-                    ).apply {
-                        topMargin = (3 * dp).toInt()
-                        marginEnd = (3 * dp).toInt()
-                    }
-                    if (!isCompleted) {
-                        colorFilter = android.graphics.PorterDuffColorFilter(
-                            0xFF444444.toInt(), android.graphics.PorterDuff.Mode.MULTIPLY
-                        )
-                        alpha = 0.6f
-                    }
-                }
-                holder.cell.addView(catThumb)
-            }
-
-            if (isUnlocked) {
-                // Star images instead of unicode text
-                if (isCompleted && stars > 0) {
-                    val starSz = (12 * dp).toInt()
-                    val gap = (2 * dp).toInt()
-                    val starRow = LinearLayout(holder.cell.context).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        gravity = Gravity.CENTER
-                        layoutParams = FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.WRAP_CONTENT,
-                            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                        ).apply { bottomMargin = (8 * dp).toInt() }
-                    }
-                    for (i in 1..3) {
-                        val iv = ImageView(holder.cell.context).apply {
-                            setImageResource(
-                                if (i <= stars) R.drawable.star_full else R.drawable.star_empty
-                            )
-                            scaleType = ImageView.ScaleType.FIT_CENTER
-                        }
-                        starRow.addView(iv, LinearLayout.LayoutParams(starSz, starSz).apply {
-                            marginEnd = gap
-                        })
-                    }
-                    holder.cell.addView(starRow)
-                }
-
-                // Scale animation on touch
-                holder.cell.setOnTouchListener { v, event ->
-                    when (event.action) {
-                        MotionEvent.ACTION_DOWN ->
-                            v.animate().scaleX(0.93f).scaleY(0.93f).setDuration(80).start()
-                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
-                            v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
-                    }
-                    false // don't consume, let onClick fire
-                }
-
-                holder.cell.setOnClickListener { onLevelClick(levelId) }
-            } else {
-                val lockText = TextView(holder.cell.context).apply {
-                    text = "\uD83D\uDD12"
-                    textSize = 16f
-                    gravity = Gravity.CENTER
-                    layoutParams = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.WRAP_CONTENT,
-                        Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                    ).apply { bottomMargin = (6 * dp).toInt() }
-                }
-                holder.cell.addView(lockText)
-                holder.cell.setOnClickListener(null)
-                holder.cell.isClickable = false
-            }
-
-            // Stagger entrance animation
-            if (animateEntrance) {
-                holder.cell.alpha = 0f
-                holder.cell.translationY = 30 * dp
-                holder.cell.animate()
-                    .alpha(1f)
-                    .translationY(0f)
-                    .setDuration(200)
-                    .setStartDelay((position * 30).toLong())
-                    .start()
-            }
-        }
-    }
 }
