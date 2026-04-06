@@ -1,6 +1,5 @@
 package com.meowrescue.game.minigame
 
-import com.meowrescue.game.ui.Theme
 import org.jbox2d.callbacks.ContactImpulse
 import org.jbox2d.callbacks.ContactListener
 import org.jbox2d.collision.AABB
@@ -46,47 +45,6 @@ class LaunchPhysicsWorld {
         const val SCORE_ENEMY = 500
         const val SCORE_REMAINING_CAT = 1000
     }
-
-    enum class ObstacleMaterial(val maxHp: Int, val color: Int, val density: Float, val scoreValue: Int) {
-        WOOD(30, Theme.LAUNCH_MAT_WOOD, 0.5f, 100),       // 나무 (탄)
-        GLASS(15, Theme.LAUNCH_MAT_GLASS, 0.3f, 50),      // 유리 (시안)
-        STONE(60, Theme.LAUNCH_MAT_STONE, 1.2f, 200),     // 돌 (블루그레이)
-        TNT(10, Theme.LAUNCH_MAT_TNT, 0.3f, 150)          // TNT (레드, 폭발)
-    }
-
-    data class ObstacleBody(
-        val body: Body,
-        val material: ObstacleMaterial,
-        var hp: Int,
-        val widthM: Float,
-        val heightM: Float
-    )
-
-    data class EnemyBody(
-        val body: Body,
-        var hp: Int = 20,
-        val radiusM: Float
-    )
-
-    data class ProjectileBody(
-        val body: Body,
-        val catId: Int,
-        val ability: CatAbility,
-        val radiusM: Float,
-        var abilityUsed: Boolean = false,
-        var penetrateCount: Int = 0
-    )
-
-    data class DebrisParticle(
-        var x: Float,
-        var y: Float,
-        var vx: Float,
-        var vy: Float,
-        var rotation: Float,
-        var rotSpeed: Float,
-        var life: Float,
-        val material: ObstacleMaterial
-    )
 
     private val world = World(GRAVITY)
     private val obstacles = mutableListOf<ObstacleBody>()

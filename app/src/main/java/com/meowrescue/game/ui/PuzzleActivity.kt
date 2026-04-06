@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
+import com.meowrescue.game.puzzle.GenerateResult
 import com.meowrescue.game.puzzle.PuzzleGenerator
 import com.meowrescue.game.util.HapticManager
 import com.meowrescue.game.util.SoundManager
@@ -38,7 +39,7 @@ class PuzzleActivity : AppCompatActivity() {
     private val dp by lazy { resources.displayMetrics.density }
 
     // ── Next stage preloading (thread-safe) ──────────────────────────────
-    private data class PreloadedPuzzle(val stage: Int, val result: PuzzleGenerator.GenerateResult)
+    private data class PreloadedPuzzle(val stage: Int, val result: GenerateResult)
     private var preloaded: PreloadedPuzzle? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {

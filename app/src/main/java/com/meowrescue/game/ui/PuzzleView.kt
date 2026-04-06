@@ -19,8 +19,6 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-enum class PuzzleState { PLAYING, ESCAPING, SOLVED, PAUSED }
-
 class PuzzleView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,

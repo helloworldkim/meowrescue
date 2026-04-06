@@ -15,8 +15,6 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-enum class LaunchGameState { AIMING, FLYING, SETTLING, ABILITY_READY, STAGE_CLEAR, STAGE_FAIL }
-
 class LaunchGameView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -976,7 +974,7 @@ class LaunchGameView @JvmOverloads constructor(
             )
 
             // TNT: draw X mark
-            if (obstacle.material == LaunchPhysicsWorld.ObstacleMaterial.TNT) {
+            if (obstacle.material == ObstacleMaterial.TNT) {
                 val mx = halfW * 0.5f
                 val my = halfH * 0.5f
                 tntMarkPaint.strokeWidth = 2f * density

@@ -13,16 +13,6 @@ class PuzzleGenerator {
         val minMoves: Int
     )
 
-    data class GenerateResult(val grid: PuzzleGrid, val optimalMoves: Int)
-
-    data class StageFeatures(
-        val hasKey: Boolean, val hasCheckpoint: Boolean,
-        val hasWalls: Boolean = false,
-        val hasLinkedBlocks: Boolean = false,
-        val hasPortals: Boolean = false,
-        val hasMultiCat: Boolean = false
-    )
-
     // Cache seed offsets for deterministic re-entry
     private val seedOffsetCache = mutableMapOf<Int, Int>()
 

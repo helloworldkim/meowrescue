@@ -3,48 +3,6 @@ package com.meowrescue.game.minigame
 import java.util.Random
 import kotlin.math.ceil
 
-data class StageConfig(
-    val stageId: Int,
-    val seed: Long,
-    val catCount: Int,
-    val catIds: List<Int>,
-    val enemyCount: Int,
-    val structures: List<Structure>,
-    val starThresholds: StarThresholds
-)
-
-data class Structure(
-    val template: StructureTemplate,
-    val baseX: Float,
-    val baseY: Float,
-    val blocks: List<BlockPlacement>,
-    val enemyPositions: List<Pair<Float, Float>>
-)
-
-data class BlockPlacement(
-    val offsetX: Float, val offsetY: Float,
-    val width: Float, val height: Float,
-    val material: LaunchPhysicsWorld.ObstacleMaterial,
-    val angleDeg: Float = 0f
-)
-
-data class StarThresholds(
-    val threeStar: Int,
-    val twoStar: Int,
-    val oneStar: Int
-)
-
-enum class StructureTemplate {
-    TOWER, ARCH, PYRAMID, BRIDGE, FORTRESS,
-    TALL_TOWER, CASTLE, DOUBLE_ARCH, PLATFORM_STACK, L_SHAPE
-}
-
-enum class LaunchDifficulty(val offset: Int, val label: String, val description: String) {
-    EASY(0, "쉬움", "나무·유리 위주, 적 소수"),
-    NORMAL(25, "보통", "돌 재료 등장, 다양한 구조물"),
-    HARD(50, "어려움", "모든 재료·구조물, 적 다수")
-}
-
 class LaunchStageGenerator {
 
     companion object {
@@ -57,13 +15,13 @@ class LaunchStageGenerator {
         val catCount: Int,
         val enemyCount: Int,
         val maxStructures: Int,
-        val materials: List<LaunchPhysicsWorld.ObstacleMaterial>,
+        val materials: List<ObstacleMaterial>,
         val templates: List<StructureTemplate>,
         val tntChance: Float = 0f
     )
 
-    private val nonTntMaterials = LaunchPhysicsWorld.ObstacleMaterial.values()
-        .filter { it != LaunchPhysicsWorld.ObstacleMaterial.TNT }
+    private val nonTntMaterials = ObstacleMaterial.values()
+        .filter { it != ObstacleMaterial.TNT }
 
     private fun getDifficultyParams(stageId: Int): DifficultyParams {
         return when {
@@ -72,8 +30,8 @@ class LaunchStageGenerator {
                 enemyCount = 2,
                 maxStructures = 2,
                 materials = listOf(
-                    LaunchPhysicsWorld.ObstacleMaterial.WOOD,
-                    LaunchPhysicsWorld.ObstacleMaterial.GLASS
+                    ObstacleMaterial.WOOD,
+                    ObstacleMaterial.GLASS
                 ),
                 templates = listOf(StructureTemplate.TOWER, StructureTemplate.ARCH)
             )
@@ -82,8 +40,8 @@ class LaunchStageGenerator {
                 enemyCount = 3,
                 maxStructures = 3,
                 materials = listOf(
-                    LaunchPhysicsWorld.ObstacleMaterial.WOOD,
-                    LaunchPhysicsWorld.ObstacleMaterial.GLASS
+                    ObstacleMaterial.WOOD,
+                    ObstacleMaterial.GLASS
                 ),
                 templates = listOf(
                     StructureTemplate.TOWER, StructureTemplate.ARCH,
@@ -95,9 +53,9 @@ class LaunchStageGenerator {
                 enemyCount = 5,
                 maxStructures = 3,
                 materials = listOf(
-                    LaunchPhysicsWorld.ObstacleMaterial.WOOD,
-                    LaunchPhysicsWorld.ObstacleMaterial.GLASS,
-                    LaunchPhysicsWorld.ObstacleMaterial.STONE
+                    ObstacleMaterial.WOOD,
+                    ObstacleMaterial.GLASS,
+                    ObstacleMaterial.STONE
                 ),
                 templates = listOf(
                     StructureTemplate.TOWER, StructureTemplate.ARCH,
@@ -200,7 +158,7 @@ class LaunchStageGenerator {
         return blocks.map { block ->
             // Don't convert bottom blocks to TNT (structural base)
             if (block.offsetY > 0.01f && rng.nextFloat() < tntChance) {
-                block.copy(material = LaunchPhysicsWorld.ObstacleMaterial.TNT)
+                block.copy(material = ObstacleMaterial.TNT)
             } else {
                 block
             }
@@ -220,7 +178,7 @@ class LaunchStageGenerator {
         template: StructureTemplate,
         baseX: Float,
         baseY: Float,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): Structure {
         val blocks = when (template) {
             StructureTemplate.TOWER -> buildTower(rng, materials)
@@ -243,13 +201,13 @@ class LaunchStageGenerator {
         )
     }
 
-    private fun randomMaterial(rng: Random, materials: List<LaunchPhysicsWorld.ObstacleMaterial>): LaunchPhysicsWorld.ObstacleMaterial {
+    private fun randomMaterial(rng: Random, materials: List<ObstacleMaterial>): ObstacleMaterial {
         return materials[rng.nextInt(materials.size)]
     }
 
     private fun buildTower(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val blockCount = 5 + rng.nextInt(4) // 5-8 blocks (was 3-5)
         val blockWidth = 0.8f
@@ -267,7 +225,7 @@ class LaunchStageGenerator {
 
     private fun buildArch(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val pillarHeight = 1.2f
         val pillarWidth = 0.3f
@@ -302,7 +260,7 @@ class LaunchStageGenerator {
 
     private fun buildPyramid(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val blockWidth = 0.6f
         val blockHeight = 0.3f
@@ -331,7 +289,7 @@ class LaunchStageGenerator {
 
     private fun buildBridge(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val pillarWidth = 0.3f
         val pillarHeight = 0.8f
@@ -366,7 +324,7 @@ class LaunchStageGenerator {
 
     private fun buildFortress(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val wallThickness = 0.2f
         val wallWidth = 1.8f    // wider (was 1.5)
@@ -410,7 +368,7 @@ class LaunchStageGenerator {
 
     private fun buildTallTower(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val blocks = mutableListOf<BlockPlacement>()
         // Wide base
@@ -431,7 +389,7 @@ class LaunchStageGenerator {
 
     private fun buildCastle(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val blocks = mutableListOf<BlockPlacement>()
         val wallThick = 0.2f
@@ -458,7 +416,7 @@ class LaunchStageGenerator {
 
     private fun buildDoubleArch(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val pillarH = 1.2f
         val pillarW = 0.3f
@@ -482,7 +440,7 @@ class LaunchStageGenerator {
 
     private fun buildPlatformStack(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val blocks = mutableListOf<BlockPlacement>()
         val pillarW = 0.2f
@@ -506,7 +464,7 @@ class LaunchStageGenerator {
 
     private fun buildLShape(
         rng: Random,
-        materials: List<LaunchPhysicsWorld.ObstacleMaterial>
+        materials: List<ObstacleMaterial>
     ): List<BlockPlacement> {
         val bw = 0.6f
         val bh = 0.4f

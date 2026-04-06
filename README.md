@@ -5,7 +5,7 @@
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Language](https://img.shields.io/badge/Language-Kotlin%202.2.0-purple)
 ![MinSDK](https://img.shields.io/badge/MinSDK-24%20(Android%207.0)-blue)
-![Version](https://img.shields.io/badge/Version-v5.9-orange)
+![Version](https://img.shields.io/badge/Version-v5.10-orange)
 
 ## 소개
 
@@ -299,24 +299,43 @@ TNT 블록은 난이도 26+ 이상 스테이지에서 10~20% 확률로 구조물
 ```
 com.meowrescue.game
 ├── puzzle/
+│   ├── ExitDirection.kt           // 출구 방향 enum (RIGHT/LEFT/TOP/BOTTOM)
+│   ├── PuzzleBlock.kt             // 퍼즐 블록 data class
 │   ├── PuzzleGrid.kt              // 격자 상태, 블록 이동/제거, 클리어 판정
-│   └── PuzzleGenerator.kt         // 자동 레벨 생성 + 품질 필터
+│   ├── PuzzleGenerator.kt         // 자동 레벨 생성 + 품질 필터
+│   ├── GenerateResult.kt          // 퍼즐 생성 결과 data class
+│   └── StageFeatures.kt           // 스테이지 피처 플래그 data class
 ├── ui/
 │   ├── MenuActivity.kt            // 메인 메뉴 (Play, Collection, Cat Launch, 플로팅 사운드 토글)
 │   ├── StageSelectActivity.kt     // 스테이지 선택 (30개 페이지, 스와이프, 도트 인디케이터)
 │   ├── PuzzleActivity.kt          // 게임 진행, 클리어 처리, 고양이 해금, 광고
 │   ├── PuzzleView.kt              // SurfaceView 렌더링 + 드래그 + 스냅/탈출 애니메이션
+│   ├── PuzzleState.kt             // 퍼즐 게임 상태 enum (PLAYING/ESCAPING/SOLVED/PAUSED)
 │   ├── LaunchGameActivity.kt      // Cat Launch 미니게임 Activity (스테이지 로드/콜백/라이프사이클)
 │   ├── CollectionActivity.kt      // 고양이 컬렉션 (4열 그리드, 13마리)
-│   ├── PuzzleOverlays.kt           // 오버레이 빌더 (로딩/일시정지/축하 다이얼로그)
+│   ├── PuzzleOverlays.kt          // 오버레이 빌더 (로딩/일시정지/축하 다이얼로그)
 │   └── Theme.kt                   // UI 색상 + 파티클 컬러 + 공유 Int 상수
 ├── minigame/
 │   ├── CatAbility.kt              // 5종 고양이 능력 sealed class (일반/방향전환/분열/폭발/돌진)
+│   ├── ObstacleMaterial.kt        // 장애물 재료 enum (WOOD/GLASS/STONE/TNT)
+│   ├── ObstacleBody.kt            // 장애물 물리 바디 data class
+│   ├── EnemyBody.kt               // 적 물리 바디 data class
+│   ├── ProjectileBody.kt          // 투사체 물리 바디 data class
+│   ├── DebrisParticle.kt          // 파편 파티클 data class
 │   ├── LaunchPhysicsWorld.kt      // JBox2D 월드 래퍼 (충돌/데미지/파편/폭발/TNT연쇄/점수)
+│   ├── LaunchGameState.kt         // 미니게임 상태 enum (AIMING/FLYING/SETTLING 등)
 │   ├── LaunchGameView.kt          // SurfaceView 렌더링 (새총 드래그/궤적/카메라/HUD)
+│   ├── StructureTemplate.kt       // 10종 구조물 템플릿 enum
+│   ├── LaunchDifficulty.kt        // 난이도 enum (EASY/NORMAL/HARD)
+│   ├── StageConfig.kt             // 스테이지 설정 data class
+│   ├── Structure.kt               // 구조물 배치 data class
+│   ├── BlockPlacement.kt          // 블록 배치 data class
+│   ├── StarThresholds.kt          // 별점 기준 data class
 │   └── LaunchStageGenerator.kt    // 시드 기반 스테이지 생성 (10종 구조물/5단계 난이도/TNT 배치)
 ├── data/
 │   ├── AppDatabase.kt             // Room 데이터베이스 (v2: user_progress + launch_progress)
+│   ├── UserProgress.kt            // 퍼즐 진행도 Room Entity
+│   ├── LaunchProgress.kt          // 미니게임 진행도 Room Entity
 │   ├── UserProgressDao.kt         // 퍼즐 진행도 DAO
 │   ├── LaunchProgressDao.kt       // 미니게임 진행도 DAO
 │   └── GameRepository.kt          // 데이터 접근 + 고양이 컬렉션 (CatDefinition 13마리)
