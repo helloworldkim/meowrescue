@@ -7,13 +7,13 @@ date: 2026-04-16
 # Economy Expansion — Coin Sinks
 
 > **Status**: In Design
-> **Implements**: Economy closed loop (resolves 8.8x surplus)
+> **Implements**: Economy closed loop (resolves 9.2x surplus)
 > **Prerequisite**: economy-system.md (base economy)
 
 ## A. Overview
 
 The Economy Expansion adds 4 coin sink categories to close the economy's open loop
-(currently 8.8x surplus). These sinks serve both core modes and create the first
+(currently 9.2x surplus). These sinks serve both core modes and create the first
 aspirational purchases (items costing 150-500 coins vs. the current max of 50).
 The target post-expansion surplus ratio is 2-3x — generous enough for casual mobile
 but scarce enough for spending decisions to matter.
@@ -23,13 +23,13 @@ but scarce enough for spending decisions to matter.
 | # | Sink | Mode | Price Range | Total Capacity |
 |---|------|------|-------------|---------------|
 | 1 | Additional Hints | Puzzle | 20 coins/hint | ~4,000 coins |
-| 2 | Cat Cosmetics | Both | 150-300 coins/variant | ~5,200 coins |
+| 2 | Cat Cosmetics | Both | 150-300 coins/variant | ~5,850 coins |
 | 3 | Stage Skip | Puzzle | 100 coins/skip | ~700 coins |
 | 4 | Grid Themes | Puzzle | 300-500 coins/theme | ~2,400 coins |
-| | **Total sink capacity** | | | **~12,300 coins** |
+| | **Total sink capacity** | | | **~12,950 coins** |
 
-Against ~24,000 total income (puzzle + launch + achievements), this yields a
-~2.0x surplus ratio — within the 2-3x target.
+Against ~22,180 total income (puzzle 18,180 + launch 4,000 assuming 50 stages, all 3★),
+this yields a ~1.7x surplus ratio — within the 2-3x target.
 
 ## B. Player Fantasy
 
@@ -105,7 +105,11 @@ Purchased via a new **Themes** section in Settings or Collection screen.
 | Grid Themes (6 items) | 2,400 |
 | **Total** | **12,950** |
 
-Post-expansion surplus: ~24,000 / 12,950 ≈ **1.85x** (within 2-3x target).
+Post-expansion surplus: ~22,180 / 12,950 ≈ **1.7x** (within 2-3x target).
+
+> **Note**: Income assumes 50 Cat Launch stages (all 3★). Launch stages are
+> procedurally unlimited — a dedicated Launch player can exceed this. See
+> cross-review D-1 for the income cap design decision.
 
 ## D. Formulas
 
@@ -124,7 +128,7 @@ totalSinkCapacity = (200 * 20) + (13 * 150 + 13 * 300) + (7 * 100) + (2*300 + 2*
                   = 4,000 + 5,850 + 700 + 2,400 = 12,950
 
 postExpansionSurplusRatio = totalIncome / totalSinkCapacity
-                          ≈ 24,000 / 12,950 ≈ 1.85x
+                          ≈ 22,180 / 12,950 ≈ 1.7x
 ```
 
 ---

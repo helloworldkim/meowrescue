@@ -36,6 +36,9 @@ class GameRepository(context: Context) {
             CatDefinition(12, "왕자", 185, R.drawable.cat_19),
             CatDefinition(13, "공주", 200, R.drawable.cat_20),
         )
+
+        /** Maximum number of unique Launch stages that earn the first-clear bonus. */
+        const val LAUNCH_FIRST_CLEAR_CAP = 50
     }
 
     // ── Progress ────────────────────────────────────────────────────────
@@ -130,7 +133,7 @@ class GameRepository(context: Context) {
 
     // ── Launch Mode Progress ─────────────────────────────────────────
 
-    suspend fun saveLaunchProgress(stageId: Int, stars: Int) = withContext(Dispatchers.IO) {
+    suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float = 1.0f) = withContext(Dispatchers.IO) {
         require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
         val existing = db.launchProgressDao().getProgressForStage(stageId)
         val bestStars = maxOf(stars, existing?.stars ?: 0)
@@ -141,10 +144,12 @@ class GameRepository(context: Context) {
             LaunchProgress(stageId = stageId, stars = bestStars, completed = bestStars > 0, bestScore = bestScore)
         )
 
-        // Award coins (equal-weight mode: same rates and first-clear bonus as Puzzle)
-        val starCoins = when (stars) { 3 -> 30; 2 -> 20; 1 -> 10; else -> 0 }
-        val firstClearBonus = if (isFirstClear) 50 else 0
-        addCoins(starCoins + firstClearBonus)
+        // Award coins with difficulty multiplier + first-clear cap (50 unique stages)
+        val baseStarCoins = when (stars) { 3 -> 30; 2 -> 20; 1 -> 10; else -> 0 }
+        val scaledStarCoins = Math.round(baseStarCoins * coinMultiplier)
+        val completedCount = db.launchProgressDao().getCompletedCount()
+        val firstClearBonus = if (isFirstClear && completedCount <= LAUNCH_FIRST_CLEAR_CAP) 50 else 0
+        addCoins(scaledStarCoins + firstClearBonus)
     }
 
     suspend fun getLaunchProgress(stageId: Int): LaunchProgress? = withContext(Dispatchers.IO) {

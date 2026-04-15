@@ -1,7 +1,7 @@
-## Session Extract — /review-all-gdds 2026-04-15
-- Verdict: FAIL
-- GDDs reviewed: 4
-- Flagged for revision: economy-system.md, cat-launch-system.md, puzzle-system.md, progression-system.md
-- Blocking issues: 5 — Launch achievements unreachable in code; Cat Launch identity contradiction; 3 stale code-fix notes in Economy GDD; Cat Launch structurally subordinate despite "equal-weight" claim; Economy has no functional closed loop (7.8x surplus)
-- Recommended next: Decide Cat Launch identity (equal-weight vs bonus mode), then revise flagged GDDs
-- Report: design/gdd/gdd-cross-review-2026-04-15.md
+## Session Extract — /review-all-gdds 2026-04-16 (Re-review)
+- Verdict: CONCERNS (improved from FAIL on 2026-04-15)
+- GDDs reviewed: 5
+- Flagged for revision: economy-system.md, economy-expansion.md, cat-launch-system.md, puzzle-system.md, progression-system.md
+- Blocking issues: 3 consistency (B-1 arithmetic, B-2 stale table, B-3 stale parity) + 2 design decisions (D-1 uncapped Launch income, D-2 no pillars)
+- Recommended next: Fix B-1/B-2/B-3 quick edits, then decide Launch income cap
+- Report: design/gdd/gdd-cross-review-2026-04-16.md

@@ -31,10 +31,10 @@ Cat Launch must achieve structural parity with Puzzle mode across these dimensio
 |-----------|--------------|-------------|--------|
 | Cat unlocks | Puzzle-only (13 cats gated behind puzzle stages) | Launch-specific unlock path (TBD) | Not Started |
 | Coin sinks | None in Launch | Launch-specific sinks (ability boosts, cosmetics) | Not Started |
-| First-clear bonus | 30 (lower than Puzzle's 50) | **50** (parity with Puzzle) | **Done** |
-| Achievements | 3/30 (5% of total rewards) | 8-10 Launch achievements | Not Started |
+| First-clear bonus | 30 (lower than Puzzle's 50) | **50** (parity with Puzzle), capped at 50 stages | **Done** |
+| Achievements | 3/3 existing triggers implemented | 8-10 Launch achievements (expand from 3) | Partially Done |
 | Visual progression | No themes | World themes or visual stage progression | Not Started |
-| Difficulty rewards | Easy/Normal/Hard award identical coins | Coin multiplier by difficulty | Not Started |
+| Difficulty rewards | Easy/Normal/Hard award identical coins | Coin multiplier by difficulty (×1.0/×1.5/×2.0) | **Done** |
 | Code terminology | "minigame" throughout codebase | "mode" throughout codebase | **Done** |
 
 > Items marked "Not Started" require dedicated design sessions. Use
@@ -165,13 +165,20 @@ TNT is inserted by replacing non-base blocks (blocks with `offsetY > 0`) at the 
 
 ### Difficulty Selector
 
-| Level | Offset | Description |
-|-------|--------|-------------|
-| Easy (쉬움) | +0 | Wood/Glass focus, fewer enemies |
-| Normal (보통) | +25 | Stone appears, varied structures |
-| Hard (어려움) | +50 | All materials/structures, many enemies |
+| Level | Offset | Coin Multiplier | Description |
+|-------|--------|----------------|-------------|
+| Easy (쉬움) | +0 | ×1.0 | Wood/Glass focus, fewer enemies |
+| Normal (보통) | +25 | ×1.5 | Stone appears, varied structures |
+| Hard (어려움) | +50 | ×2.0 | All materials/structures, many enemies |
 
 The offset is added to the stage ID when selecting difficulty parameters.
+The coin multiplier is applied to star coins: Easy 10/20/30, Normal 15/30/45, Hard 20/40/60.
+
+### First-Clear Bonus Cap
+
+First-clear bonus (50 coins) is awarded for the first **50 unique** Launch stage IDs cleared.
+After 50 unique stages, clears earn star coins (with difficulty multiplier) but no first-clear bonus.
+Total capped first-clear income: 50 × 50 = 2,500 coins.
 
 ### Cat Selection
 
@@ -329,6 +336,8 @@ oneStar = catCount
 | TNT chance per tier | 0/0/10/15/20% | `getDifficultyParams()` |
 | Structure X range | 8.0-19.0m | `STRUCTURE_X_MIN/MAX` |
 | Difficulty offsets | 0/25/50 | `LaunchDifficulty` enum |
+| Difficulty coin multipliers | 1.0/1.5/2.0 | `LaunchDifficulty` enum |
+| First-clear bonus cap | 50 unique stages | `GameRepository.saveLaunchProgress()` |
 
 ---
 
@@ -356,7 +365,8 @@ oneStar = catCount
 11. **OOB no-score**: Enemies destroyed by falling out of bounds (y < -1 or x outside world) must not award the 500 enemy score.
 
 ### Coin Rewards
-12. **Launch coin awards**: `saveLaunchProgress(stageId, stars)` must award `starCoins(stars)` (10/20/30) plus 50 first-clear bonus on first completion (parity with Puzzle). `totalCoinsEarned` must increase accordingly.
+12. **Launch coin awards**: `saveLaunchProgress(stageId, stars, difficulty)` must award `starCoins(stars) * coinMultiplier(difficulty)` plus 50 first-clear bonus (if unique clears < 50) on first completion. Multipliers: Easy ×1.0, Normal ×1.5, Hard ×2.0. Star coins are rounded to nearest integer after multiplication. `totalCoinsEarned` must increase accordingly.
+12a. **First-clear cap**: First-clear bonus (50 coins) is only awarded for the first 50 unique Launch stage IDs. After 50 unique clears, `isFirstClear` is forced false regardless of stage history. `getCompletedLaunchCount()` is used to check the cap.
 
 ### TNT
 13. **Chain propagation**: Destroying a TNT obstacle triggers `applyBlast(pos, 2.0, 50)`. If the blast destroys another TNT, that TNT also triggers a blast. Chains must propagate until no more TNTs are destroyed.

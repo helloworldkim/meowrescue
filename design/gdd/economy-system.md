@@ -169,23 +169,27 @@ Income (first 200 puzzle stages, best case):
   - Achievement rewards = 2,180
   Puzzle subtotal: ~18,180 coins
 
-Cat Launch income (example: 50 stages):
-  - 50 * 30 star coins = 1,500
-  - 50 * 30 first-clear bonus = 1,500
-  Launch subtotal: ~3,000 coins
+Cat Launch income (capped at 50 unique first-clears):
+  - 50 * 30 star coins (Easy, all 3★) = 1,500
+  - 50 * 50 first-clear bonus = 2,500
+  Launch first-clear subtotal: 4,000 coins
+  Additional replays (uncapped, no bonus): ~1,000 est.
+  Launch subtotal: ~5,000 coins
+  Note: Difficulty multiplier (Easy ×1.0, Normal ×1.5, Hard ×2.0) can increase
+  star coins but first-clear bonus is flat 50 regardless of difficulty.
 
 Current sinks:
   - Power-up usage: 30-50 per use
   - Estimated: 3 uses per stuck stage, ~20 stuck stages: ~2,400 coins
 
-Surplus: ~21,180 coins (puzzle+launch+achievements) vs ~2,400 spending
-= 8.8x income-to-sink ratio
+Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
+= 9.7x income-to-sink ratio (pre-expansion)
 ```
 
-> **Balance Concern — OPEN**: The economy has a ~8.8x income-to-sink ratio. Power-ups
-> alone cannot absorb the coin supply. New sinks must be designed before the player
-> base stockpiles. Priority: Cat Launch ability boosts, cosmetic tokens, hint expansion.
-> Use `/design-system economy-expansion` to design these sinks.
+> **Balance Concern — MITIGATED**: Pre-expansion surplus is ~9.7x (power-ups only).
+> Economy Expansion (economy-expansion.md) adds 12,950 coins of sink capacity,
+> bringing the post-expansion ratio to ~23,180/12,950 ≈ **1.8x** (within 2-3x target).
+> Cat Launch first-clear is capped at 50 unique stages to prevent unbounded income.
 
 ---
 
