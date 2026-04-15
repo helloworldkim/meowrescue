@@ -537,7 +537,7 @@ class LaunchPhysicsWorld {
             if (distance < 0.01f || distance > radius) continue
 
             direction.mulLocal(1f / distance)
-            val falloff = 1f - (distance / radius)
+            val falloff = maxOf(0f, 1f - (distance / radius))
             val impulse = Vec2(
                 direction.x * force * falloff,
                 direction.y * force * falloff

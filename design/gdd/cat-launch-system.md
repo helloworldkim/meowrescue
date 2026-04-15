@@ -234,10 +234,13 @@ Applied to both bodies in the collision.
 ### Blast Damage & Force
 
 ```
-falloff = 1.0 - (distance / blastRadius)
+falloff = max(0.0, 1.0 - (distance / blastRadius))
 blastDamage = floor(blastForce * falloff * 0.5)
 impulseVector = direction.normalized * blastForce * falloff
 ```
+
+Note: `max(0, ...)` clamp ensures bodies at or beyond `blastRadius` receive zero
+damage and zero impulse. The query also skips `distance > radius` as an early-out.
 
 ### TNT Blast Parameters
 
