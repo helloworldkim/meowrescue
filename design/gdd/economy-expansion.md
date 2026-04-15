@@ -76,6 +76,19 @@ rewards."
 - Skip button appears on the **stage fail** screen (not always visible — only when stuck).
 - `skipUsed[worldIndex]` tracked in SharedPreferences.
 
+#### Skip Interaction Rules
+
+Skip is treated as a **real 1★ completion** — no special-case logic needed:
+
+| Interaction | Result | Mechanism |
+|-------------|--------|-----------|
+| Cat unlock (e.g., skip stage 75 → cat #6) | **YES — triggers** | `saveProgress` writes `completed=true`; `getNewlyUnlockedCat(75)` finds matching cat |
+| Progress achievements (clear_30, clear_60…) | **YES — triggers** | `checkAchievements` checks `maxCompletedLevel ≥ threshold`; skip advances this |
+| Mastery achievements (star3_10…) | **No — naturally blocked** | Skip awards 1★; 3★ required for mastery achievements |
+| Gameplay achievements (speed_5s, no_undo…) | **No — naturally blocked** | Skip has no play data (moves=0, time=0); conditions unmet |
+| First-clear bonus (50 coins) | **No — forced blocked** | `isFirstClear` forced false in skip flow |
+| Replaying skipped stage later | Full normal play | Player can earn 2★/3★, first-clear bonus, and proper score on replay |
+
 ### Sink 4: Grid Themes (Puzzle Mode)
 
 - 6 purchasable alternative grid themes beyond the 7 world defaults.
@@ -101,11 +114,11 @@ Purchased via a new **Themes** section in Settings or Collection screen.
 |------|----------|
 | Hints (est. 200 purchases) | 4,000 |
 | Cat Cosmetics (26 items) | 5,850 |
-| Stage Skip (7 max) | 700 |
+| Stage Skip (7 max, effective cost 150 each) | 1,050 |
 | Grid Themes (6 items) | 2,400 |
-| **Total** | **12,950** |
+| **Total** | **13,300** |
 
-Post-expansion surplus: ~22,180 / 12,950 ≈ **1.7x** (within 2-3x target).
+Post-expansion surplus: ~22,180 / 13,300 ≈ **1.67x** (within 2-3x target).
 
 > **Note**: Income assumes 50 Cat Launch stages (all 3★). Launch stages are
 > procedurally unlimited — a dedicated Launch player can exceed this. See
@@ -124,11 +137,12 @@ skipFirstClearBonus = 0
 
 themeCost(tier) = { standard: 300, premium: 400, deluxe: 500 }
 
-totalSinkCapacity = (200 * 20) + (13 * 150 + 13 * 300) + (7 * 100) + (2*300 + 2*400 + 2*500)
-                  = 4,000 + 5,850 + 700 + 2,400 = 12,950
+totalSinkCapacity = (200 * 20) + (13 * 150 + 13 * 300) + (7 * 150) + (2*300 + 2*400 + 2*500)
+                  = 4,000 + 5,850 + 1,050 + 2,400 = 13,300
+                  (skip effective cost = 100 paid + 50 lost first-clear = 150 per skip)
 
 postExpansionSurplusRatio = totalIncome / totalSinkCapacity
-                          ≈ 22,180 / 12,950 ≈ 1.7x
+                          ≈ 22,180 / 13,300 ≈ 1.67x
 ```
 
 ---
@@ -142,6 +156,9 @@ postExpansionSurplusRatio = totalIncome / totalSinkCapacity
 5. **Theme applied to Endless**: Purchased themes override Endless mode's cycling themes. Player can revert to default in Settings.
 6. **Cosmetic display in Launch**: Cosmetic overlay is applied to the cat's projectile bitmap. If bitmap fails to load, fall back to base cat sprite.
 7. **Refund on failed hint**: Same as existing — if solver returns null, `refundCoins(20)` is called.
+8. **Skip on cat unlock stage** (e.g., stage 75): Cat #6 unlocks immediately. Congratulations dialog shown. The cat is available in Cat Launch and Collection. Player can replay stage 75 later for proper stars — the cat stays unlocked regardless.
+9. **Skip on stage 200**: `clear_200` ("전설의 구조대원") achievement triggers because it checks `maxCompletedLevel >= 200`. This is intentional — the player paid 100 coins and cleared all prior worlds. The achievement title is "Legendary Rescuer," not "Perfect Rescuer."
+10. **Skip preserves first-clear opportunity on replay**: Skip writes `isFirstClear = false`, but since `completed` is now `true`, a later replay also gets `isFirstClear = false` (existing record exists with `completed = true`). Net cost of skip: 100 coins paid + 50 coins first-clear bonus permanently lost = **150 effective cost**. This is documented and intentional — it makes skips a meaningful trade-off.
 
 ---
 
@@ -184,3 +201,7 @@ postExpansionSurplusRatio = totalIncome / totalSinkCapacity
 8. **Theme override in play**: When a purchased theme is selected, `PuzzleRenderer` uses the custom palette instead of `WorldTheme.forStage()` colors.
 9. **Surplus ratio**: Total first-clear income (puzzle + launch) + achievement income must not exceed 2.5× total sink capacity. Verified by formula, not runtime.
 10. **No gameplay advantage from cosmetics**: Cat cosmetics must not change hitbox size, ability parameters, or any gameplay-affecting property.
+11. **Skip triggers cat unlock**: Given stage 75 is uncompleted and cat #6 is locked, skipping stage 75 must call `saveProgress(75, 1, null, 0)` then `getNewlyUnlockedCat(75)` must return cat #6. Congratulations dialog shown.
+12. **Skip triggers progress achievements**: Given `maxCompletedLevel == 89`, skipping stage 90 must trigger `clear_90` ("숲 졸업") achievement and award its 50-coin reward.
+13. **Skip does NOT trigger mastery/gameplay achievements**: Given skip on any stage, `star3_*` achievements must not trigger (skip awards 1★, not 3★). `speed_*`, `no_undo`, `optimal_clear` must not trigger (no play data).
+14. **Skip effective cost = 150 coins**: Skip costs 100 coins and permanently forfeits the 50-coin first-clear bonus. A later replay of the skipped stage must NOT award first-clear bonus (`existing.completed == true` → `isFirstClear = false`).
