@@ -8,5 +8,6 @@ data class ProjectileBody(
     val ability: CatAbility,
     val radiusM: Float,
     var abilityUsed: Boolean = false,
-    var penetrateCount: Int = 0
+    var penetrateCount: Int = 0,
+    val penetratedBodies: MutableSet<Body> = mutableSetOf()
 )

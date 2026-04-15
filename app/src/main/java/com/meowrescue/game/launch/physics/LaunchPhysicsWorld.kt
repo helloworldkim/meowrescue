@@ -269,10 +269,9 @@ class LaunchPhysicsWorld {
             direction.mulLocal(1f / len)
         }
         val speed = projectile.body.linearVelocity.length()
-        val impulse = Vec2(direction.x * speed * 1.5f, direction.y * speed * 1.5f)
-
-        projectile.body.linearVelocity = Vec2(0f, 0f)
-        projectile.body.applyLinearImpulse(impulse, projectile.body.worldCenter)
+        val redirectSpeed = speed * 1.5f
+        // Set velocity directly (not impulse) so result matches the GDD formula exactly
+        projectile.body.linearVelocity = Vec2(direction.x * redirectSpeed, direction.y * redirectSpeed)
     }
 
     private fun activateExplosive(projectile: ProjectileBody, ability: CatAbility.Explosive) {
@@ -412,7 +411,8 @@ class LaunchPhysicsWorld {
 
         val hitsObstacle = obstacles.any { it.body === otherBody }
         val hitsEnemy = enemies.any { it.body === otherBody }
-        if (hitsObstacle || hitsEnemy) {
+        if ((hitsObstacle || hitsEnemy) && otherBody !in projectile.penetratedBodies) {
+            projectile.penetratedBodies.add(otherBody)
             projectile.penetrateCount++
         }
     }

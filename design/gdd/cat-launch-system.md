@@ -337,7 +337,7 @@ oneStar = catCount
 ### Launch & Physics
 1. **Speed clamp**: `body.linearVelocity.length()` must never exceed `MAX_LAUNCH_SPEED` (12.0) after launch, regardless of pull distance.
 2. **Damage symmetry**: On collision with impulse > 0.1, `damage = impulse * 10` is applied to **both** bodies independently.
-3. **Settling detection**: `isSettled()` returns true only when every dynamic body has velocity < 0.2 m/s. If no bodies settle within 30 seconds of the last cat launch, the stage auto-resolves (win/lose check).
+3. **Settling detection**: `isSettled()` returns true when all dynamic body velocities are < 0.2 m/s for 15 consecutive physics frames (~0.25s at 60 Hz). After settling, win/lose is evaluated.
 
 ### Abilities
 4. **One-time activation**: Each ability fires exactly once per shot. After `abilityUsed = true`, subsequent taps or collisions must not re-trigger.
@@ -360,8 +360,8 @@ oneStar = catCount
 
 ### TNT
 13. **Chain propagation**: Destroying a TNT obstacle triggers `applyBlast(pos, 2.0, 50)`. If the blast destroys another TNT, that TNT also triggers a blast. Chains must propagate until no more TNTs are destroyed.
-14. **TNT base protection**: TNT insertion during generation must skip blocks with `offsetY ≤ 0.01` (structural base blocks).
+14. **TNT base protection (generation-time)**: TNT insertion during stage generation must skip blocks with `offsetY ≤ 0.01` (structural base blocks). Blast-time damage has no base-block immunity — all dynamic bodies within blast radius take damage regardless of position.
 
 ### Achievements
 15. **launch_1cat**: Triggers when all enemies are destroyed and `catsUsed == 1` at stage clear.
-16. **launch_tnt**: Triggers when `pendingTntExplosions >= 3` in a single stage.
+16. **launch_tnt**: Triggers when `totalTntExplosions >= 3` at stage clear. `totalTntExplosions` accumulates across all chains in the stage and is never reset mid-stage.
