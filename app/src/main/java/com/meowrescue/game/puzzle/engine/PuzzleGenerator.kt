@@ -19,20 +19,21 @@ class PuzzleGenerator {
         val minMoves: Int
     )
 
-    // Cache seed offsets for deterministic re-entry
-    private val seedOffsetCache = mutableMapOf<Int, Int>()
+    // Cache seed offsets for deterministic re-entry (thread-safe for concurrent preload + on-demand)
+    private val seedOffsetCache = java.util.concurrent.ConcurrentHashMap<Int, Int>()
 
     private fun difficultyFor(stage: Int): DifficultyParams {
         // 1x1 cat is much more mobile than 2-cell → realistic move targets are lower
         val minMoves = if (stage <= 5) {
             stage + 1
         } else {
-            (sqrt(stage.toDouble()) * 1.5 + 2).toInt().coerceAtMost(16)
+            // Floor of 6 ensures monotonicity at the stage 5→6 boundary (linear branch yields 6 at stage 5)
+            maxOf(6, (sqrt(stage.toDouble()) * 1.5 + 2).toInt()).coerceAtMost(16)
         }
         return when {
             stage <= 5   -> DifficultyParams(5, 3, 5, minMoves)
-            stage <= 15  -> DifficultyParams(5, 5, 8, minMoves)
-            stage <= 30  -> DifficultyParams(6, 6, 10, minMoves)
+            stage <= 10  -> DifficultyParams(5, 5, 8, minMoves)   // 5x5 until stage 10
+            stage <= 30  -> DifficultyParams(6, 6, 10, minMoves)  // 6x6 from stage 11 (grid change before features)
             stage <= 50  -> DifficultyParams(6, 8, 12, minMoves)
             stage <= 75  -> DifficultyParams(7, 9, 14, minMoves)
             stage <= 100 -> DifficultyParams(7, 10, 15, minMoves)
@@ -41,10 +42,12 @@ class PuzzleGenerator {
     }
 
     fun featuresForStage(stage: Int): StageFeatures {
+        // Scaffolded introduction: grid 6x6 at 11, Keys at 16, Checkpoints at 22
         if (stage < 16) return StageFeatures(false, false)
         val rng = java.util.Random(stage.toLong() * SEED_PRIME + 42)
-        if (stage <= 30) return StageFeatures(rng.nextBoolean(), false)
-        if (stage <= 50) { val k = rng.nextBoolean(); return StageFeatures(k, !k) }
+        if (stage < 22) return StageFeatures(hasKey = rng.nextBoolean(), hasCheckpoint = false)  // Keys only
+        if (stage <= 30) return StageFeatures(hasKey = false, hasCheckpoint = rng.nextBoolean())  // Checkpoints only
+        if (stage <= 50) { val k = rng.nextBoolean(); return StageFeatures(k, !k) }  // Keys XOR Checkpoints
         val hasKey = rng.nextBoolean()
         val hasCp = rng.nextBoolean()
         return StageFeatures(
@@ -85,12 +88,25 @@ class PuzzleGenerator {
 
         seedOffsetCache[stage] = bestOffset
         val result = bestResult ?: generateCore(stage, 0)
-        // Safety net: optimalMoves must be at least 2 for meaningful star thresholds
-        if (result.optimalMoves < 2) {
-            val minFloor = maxOf(2, difficultyFor(stage).minMoves)
-            return result.copy(optimalMoves = minFloor)
-        }
-        return result
+        if (result.optimalMoves >= 2) return result
+
+        // Best result has < 2 moves — BFS-verify fallback puzzles instead of fabricating optimalMoves
+        val params = difficultyFor(stage)
+        val dirRng = java.util.Random(stage.toLong() * SEED_PRIME)
+        val exitDir = ExitDirection.entries[dirRng.nextInt(4)]
+        val exitLine = (1 + dirRng.nextInt(maxOf(1, params.gridSize - 2))).coerceIn(1, params.gridSize - 2)
+        val features = featuresForStage(stage)
+
+        val fallback = buildFallback(params.gridSize, exitDir, exitLine, features)
+        val fallbackMoves = solveFast(fallback)
+        if (fallbackMoves >= 2) return GenerateResult(fallback, fallbackMoves)
+
+        val simpleFallback = buildFallback(params.gridSize, exitDir, exitLine)
+        val simpleMoves = solveFast(simpleFallback)
+        if (simpleMoves >= 2) return GenerateResult(simpleFallback, simpleMoves)
+
+        // Last resort: return simple fallback with BFS-confirmed moves (minimum 2)
+        return GenerateResult(simpleFallback, maxOf(2, simpleMoves))
     }
 
     fun generate(stage: Int): PuzzleGrid = generateWithResult(stage).grid
@@ -121,6 +137,8 @@ class PuzzleGenerator {
 
             val minMoves = solveFast(grid)
             if (minMoves < 0) return@repeat
+            // Reject puzzles exceeding solver depth cap — hints/auto-solve would fail
+            if (minMoves > MAX_ACCEPTED_DEPTH) return@repeat
 
             if (minMoves > bestMoves) {
                 bestMoves = minMoves
@@ -577,5 +595,7 @@ class PuzzleGenerator {
         private const val MAX_OUTER_ATTEMPTS = 80
         private const val MAX_INNER_ATTEMPTS = 60
         private const val ACCEPT_THRESHOLD = 0.50
+        // Must match PuzzleSolver.MAX_BFS_DEPTH — puzzles deeper than this can't be solved/hinted
+        private const val MAX_ACCEPTED_DEPTH = 45
     }
 }

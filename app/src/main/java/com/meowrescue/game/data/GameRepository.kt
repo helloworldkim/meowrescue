@@ -40,17 +40,27 @@ class GameRepository(context: Context) {
 
     // ── Progress ────────────────────────────────────────────────────────
 
-    suspend fun saveProgress(levelId: Int, stars: Int, catId: String?) = withContext(Dispatchers.IO) {
+    suspend fun saveProgress(levelId: Int, stars: Int, catId: String?, score: Int = 0) = withContext(Dispatchers.IO) {
+        require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
         val existing = db.userProgressDao().getProgressForLevel(levelId)
         val bestStars = maxOf(stars, existing?.stars ?: 0)
         val bestCat = catId ?: existing?.catUnlocked
+        val bestScore = maxOf(score, existing?.bestScore ?: 0)
+        val isFirstClear = existing == null || !existing.completed
         val progress = UserProgress(
             levelId = levelId,
             stars = bestStars,
             completed = bestStars > 0,
-            catUnlocked = bestCat
+            catUnlocked = bestCat,
+            bestScore = bestScore
         )
         db.userProgressDao().saveProgress(progress)
+
+        // Award coins
+        val starCoins = when (stars) { 3 -> 30; 2 -> 20; 1 -> 10; else -> 0 }
+        val firstClearBonus = if (isFirstClear) 50 else 0
+        val totalCoins = starCoins + firstClearBonus
+        addCoins(totalCoins)
     }
 
     suspend fun getProgress(levelId: Int): UserProgress? = withContext(Dispatchers.IO) {
@@ -98,7 +108,7 @@ class GameRepository(context: Context) {
 
     // ── Endless Mode ─────────────────────────────────────────────────
 
-    fun getEndlessCount(): Int = prefs.getInt("endless_count", 1)
+    fun getEndlessCount(): Int = prefs.getInt("endless_count", 0)
 
     fun setEndlessCount(count: Int) {
         prefs.edit().putInt("endless_count", count).apply()
@@ -121,13 +131,20 @@ class GameRepository(context: Context) {
     // ── Launch Minigame Progress ──────────────────────────────────────
 
     suspend fun saveLaunchProgress(stageId: Int, stars: Int) = withContext(Dispatchers.IO) {
+        require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
         val existing = db.launchProgressDao().getProgressForStage(stageId)
         val bestStars = maxOf(stars, existing?.stars ?: 0)
         val score = stars * 50
         val bestScore = maxOf(score, existing?.bestScore ?: 0)
+        val isFirstClear = existing == null || !existing.completed
         db.launchProgressDao().saveProgress(
             LaunchProgress(stageId = stageId, stars = bestStars, completed = bestStars > 0, bestScore = bestScore)
         )
+
+        // Award coins (same star rates as puzzle; lower first-clear bonus since Launch stages are unlimited)
+        val starCoins = when (stars) { 3 -> 30; 2 -> 20; 1 -> 10; else -> 0 }
+        val firstClearBonus = if (isFirstClear) 30 else 0
+        addCoins(starCoins + firstClearBonus)
     }
 
     suspend fun getLaunchProgress(stageId: Int): LaunchProgress? = withContext(Dispatchers.IO) {
@@ -140,5 +157,92 @@ class GameRepository(context: Context) {
 
     suspend fun getAllLaunchProgress(): List<LaunchProgress> = withContext(Dispatchers.IO) {
         db.launchProgressDao().getAllProgress()
+    }
+
+    suspend fun getCompletedLaunchCount(): Int = withContext(Dispatchers.IO) {
+        db.launchProgressDao().getCompletedCount()
+    }
+
+    // ── Coin Economy ──────────────────────────────────────────────
+
+    private suspend fun ensurePlayerStats() = withContext(Dispatchers.IO) {
+        if (db.playerStatsDao().getStats() == null) {
+            db.playerStatsDao().saveStats(PlayerStats())
+        }
+    }
+
+    suspend fun getCoins(): Int = withContext(Dispatchers.IO) {
+        ensurePlayerStats()
+        db.playerStatsDao().getCoins() ?: 0
+    }
+
+    suspend fun addCoins(amount: Int) = withContext(Dispatchers.IO) {
+        require(amount > 0) { "addCoins amount must be positive (got $amount)" }
+        ensurePlayerStats()
+        db.playerStatsDao().addCoins(amount)
+    }
+
+    suspend fun spendCoins(amount: Int): Boolean = withContext(Dispatchers.IO) {
+        require(amount > 0) { "spendCoins amount must be positive (got $amount)" }
+        ensurePlayerStats()
+        db.playerStatsDao().spendCoins(amount) > 0
+    }
+
+    /** Refund coins without inflating totalCoinsEarned. */
+    suspend fun refundCoins(amount: Int) = withContext(Dispatchers.IO) {
+        require(amount > 0) { "refundCoins amount must be positive (got $amount)" }
+        ensurePlayerStats()
+        db.playerStatsDao().refundCoins(amount)
+    }
+
+    suspend fun getTotalCoinsEarned(): Int = withContext(Dispatchers.IO) {
+        ensurePlayerStats()
+        db.playerStatsDao().getStats()?.totalCoinsEarned ?: 0
+    }
+
+    // ── Achievements ──────────────────────────────────────────────
+
+    suspend fun unlockAchievement(id: String): Boolean = withContext(Dispatchers.IO) {
+        val time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+            .format(java.util.Date())
+        db.achievementDao().insert(Achievement(achievementId = id))
+        val unlocked = db.achievementDao().unlock(id, time) > 0
+        if (unlocked) {
+            val def = AchievementDefs.get(id)
+            if (def != null) addCoins(def.coinReward)
+        }
+        unlocked
+    }
+
+    suspend fun isAchievementUnlocked(id: String): Boolean = withContext(Dispatchers.IO) {
+        db.achievementDao().get(id)?.unlocked == true
+    }
+
+    suspend fun getUnlockedAchievements(): List<Achievement> = withContext(Dispatchers.IO) {
+        db.achievementDao().getUnlocked()
+    }
+
+    suspend fun getUnlockedAchievementCount(): Int = withContext(Dispatchers.IO) {
+        db.achievementDao().getUnlockedCount()
+    }
+
+    // ── Best Score ────────────────────────────────────────────────
+
+    suspend fun getBestScore(levelId: Int): Int = withContext(Dispatchers.IO) {
+        db.userProgressDao().getProgressForLevel(levelId)?.bestScore ?: 0
+    }
+
+    // ── Power-Up Tracking ─────────────────────────────────────────
+
+    fun getPowerUpUseCount(): Int = prefs.getInt("powerup_use_count", 0)
+
+    fun incrementPowerUpUseCount() {
+        prefs.edit().putInt("powerup_use_count", getPowerUpUseCount() + 1).apply()
+    }
+
+    // ── Star Count ────────────────────────────────────────────────
+
+    suspend fun getThreeStarCount(): Int = withContext(Dispatchers.IO) {
+        db.userProgressDao().getAllProgress().count { it.stars >= 3 }
     }
 }

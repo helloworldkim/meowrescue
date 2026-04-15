@@ -6,6 +6,7 @@ import com.meowrescue.game.launch.model.LaunchGameState
 import com.meowrescue.game.launch.model.ObstacleMaterial
 import com.meowrescue.game.launch.physics.LaunchPhysicsWorld
 import com.meowrescue.game.ui.Theme
+import com.meowrescue.game.util.ScreenShake
 import kotlin.math.min
 
 class LaunchRenderer(
@@ -40,10 +41,22 @@ class LaunchRenderer(
 
     fun render(canvas: Canvas) {
         canvas.drawColor(Color.BLACK)
+
+        // Apply screen shake
+        val shakeX = ScreenShake.offsetX
+        val shakeY = ScreenShake.offsetY
+        if (shakeX != 0f || shakeY != 0f) {
+            canvas.save()
+            canvas.translate(shakeX, shakeY)
+        }
+
         drawSky(canvas)
         drawGround(canvas)
 
-        val pw = view.physicsWorld ?: return
+        val pw = view.physicsWorld ?: run {
+            if (shakeX != 0f || shakeY != 0f) canvas.restore()
+            return
+        }
 
         drawObstacles(canvas, pw)
         drawEnemies(canvas, pw)
@@ -61,6 +74,11 @@ class LaunchRenderer(
         drawHud(canvas)
         drawCatQueue(canvas)
         drawCelebration(canvas)
+
+        // Restore shake transform before overlays
+        if (shakeX != 0f || shakeY != 0f) {
+            canvas.restore()
+        }
 
         when (view.gameState) {
             LaunchGameState.STAGE_CLEAR -> drawVictoryOverlay(canvas)
@@ -398,14 +416,24 @@ class LaunchRenderer(
         val sy = worldToScreenY(LaunchPhysicsWorld.SLINGSHOT_Y)
         val catRadius = 12f * view.density
 
+        // Apply squash/stretch
+        val sq = view.catSquash
+        val scaleX = if (sq < 1f) 1f + (1f - sq) * 0.3f else 1f / sq.coerceAtLeast(0.5f)
+        val scaleY = sq
+
+        canvas.save()
+        canvas.translate(sx, sy)
+        canvas.scale(scaleX, scaleY)
+
         val bm = view.catBitmaps[catId]
         if (bm != null) {
             tmpSrcRect.set(0, 0, bm.width, bm.height)
-            tmpDstRect.set(sx - catRadius, sy - catRadius, sx + catRadius, sy + catRadius)
+            tmpDstRect.set(-catRadius, -catRadius, catRadius, catRadius)
             canvas.drawBitmap(bm, tmpSrcRect, tmpDstRect, null)
         } else {
-            canvas.drawCircle(sx, sy, catRadius, paints.catFallbackPaint)
+            canvas.drawCircle(0f, 0f, catRadius, paints.catFallbackPaint)
         }
+        canvas.restore()
     }
 
     private fun drawCatQueue(canvas: Canvas) {

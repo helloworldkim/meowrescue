@@ -118,6 +118,52 @@ class PuzzlePaints(density: Float) {
     val slideOutFallbackPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = PuzzleView.CAT_COLOR; alpha = 200
     }
+
+    // ── Combo text ──────────────────────────────────────────────────
+    val comboTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
+    }
+    val comboShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0x66000000; typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
+    }
+
+    // ── Coin HUD ────────────────────────────────────────────────────
+    val coinTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFD600.toInt(); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.LEFT
+    }
+    val coinIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFD600.toInt()
+    }
+    val coinAnimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFFD600.toInt(); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
+    }
+
+    // ── Power-up buttons ────────────────────────────────────────────
+    val powerUpBgPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val powerUpIconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
+    val powerUpLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE; textAlign = Paint.Align.CENTER; typeface = Typeface.DEFAULT_BOLD
+    }
+
+    // ── Score / New Record ──────────────────────────────────────────
+    val scorePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF4E342E.toInt(); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
+    }
+    val newRecordPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFFFF1744.toInt(); typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
+    }
+
+    // ── Share button ────────────────────────────────────────────────
+    val shareBtnPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF26A69A.toInt()
+    }
+
+    // ── Cat expression overlay ──────────────────────────────────────
+    val expressionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+    }
     val victoryPanelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = 0xFFFFF8F0.toInt()
         setShadowLayer(12f, 0f, 4f, 0x44000000)

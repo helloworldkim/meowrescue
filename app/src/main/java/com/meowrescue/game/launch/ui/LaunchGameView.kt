@@ -9,6 +9,8 @@ import android.view.SurfaceView
 import com.meowrescue.game.launch.model.*
 import com.meowrescue.game.launch.physics.LaunchPhysicsWorld
 import com.meowrescue.game.ui.Theme
+import com.meowrescue.game.util.HapticManager
+import com.meowrescue.game.util.ScreenShake
 import kotlin.math.max
 import kotlin.math.min
 
@@ -39,7 +41,7 @@ class LaunchGameView @JvmOverloads constructor(
     }
 
     // ── Callbacks ────────────────────────────────────────────────────────────
-    var onStageClear: ((catsUsed: Int, stars: Int) -> Unit)? = null
+    var onStageClear: ((catsUsed: Int, stars: Int, tntExplosions: Int) -> Unit)? = null
     var onNextStageClicked: (() -> Unit)? = null
     var onRetryClicked: (() -> Unit)? = null
     var onMenuClicked: (() -> Unit)? = null
@@ -91,7 +93,7 @@ class LaunchGameView @JvmOverloads constructor(
     internal var victoryStars = 0
 
     // ── Pending callback deferral ────────────────────────────────────────────
-    private var pendingStageClear: Pair<Int, Int>? = null
+    private var pendingStageClear: Triple<Int, Int, Int>? = null
 
     // ── Celebration particles ────────────────────────────────────────────────
     internal data class CelebrationParticle(
@@ -115,6 +117,11 @@ class LaunchGameView @JvmOverloads constructor(
     // ── Settle timer ─────────────────────────────────────────────────────────
     internal var settleFrameCount = 0
     private val SETTLE_FRAMES_REQUIRED = 15
+
+    // ── Slow-motion + squash/stretch ─────────────────────────────────────────
+    internal var timeScale = 1f
+    internal var slowMoTimer = 0L
+    internal var catSquash = 1f  // 1 = normal, <1 = squash, >1 = stretch
 
     // ── Button rects ─────────────────────────────────────────────────────────
     internal val pauseRect = RectF()
@@ -165,6 +172,10 @@ class LaunchGameView @JvmOverloads constructor(
             isPanning = false
             potentialTap = false
             manualPanActive = false
+            timeScale = 1f
+            slowMoTimer = 0L
+            catSquash = 1f
+            ScreenShake.reset()
         }
         recalcLayout()
     }
@@ -290,7 +301,7 @@ class LaunchGameView @JvmOverloads constructor(
         val h = holder
         if (!h.surface.isValid) return
         val canvas = h.lockCanvas() ?: return
-        var stageClearData: Pair<Int, Int>? = null
+        var stageClearData: Triple<Int, Int, Int>? = null
         try {
             synchronized(lock) {
                 pendingStageClear = null
@@ -301,8 +312,8 @@ class LaunchGameView @JvmOverloads constructor(
         } finally {
             h.unlockCanvasAndPost(canvas)
         }
-        stageClearData?.let { (cats, stars) ->
-            onStageClear?.invoke(cats, stars)
+        stageClearData?.let { (cats, stars, tntExplosions) ->
+            onStageClear?.invoke(cats, stars, tntExplosions)
         }
     }
 
@@ -311,12 +322,27 @@ class LaunchGameView @JvmOverloads constructor(
     // ─────────────────────────────────────────────────────────────────────────
 
     private fun update() {
+        ScreenShake.update()
         val pw = physicsWorld ?: return
         val config = stageConfig ?: return
+
+        // Slow-mo decay
+        if (timeScale < 1f) {
+            val elapsed = System.currentTimeMillis() - slowMoTimer
+            if (elapsed > 500L) timeScale = min(1f, timeScale + 0.05f)
+        }
+        // Squash/stretch decay
+        catSquash += (1f - catSquash) * 0.15f
 
         when (gameState) {
             LaunchGameState.FLYING, LaunchGameState.ABILITY_READY -> {
                 pw.step()
+                // Check for TNT explosions → screen shake
+                val tntCount = pw.consumeTntExplosions()
+                if (tntCount > 0) {
+                    ScreenShake.trigger(ScreenShake.Intensity.HEAVY)
+                    HapticManager.vibrateImpact()
+                }
                 updateCamera(pw)
                 updateExplosions()
 
@@ -346,6 +372,11 @@ class LaunchGameView @JvmOverloads constructor(
 
             LaunchGameState.SETTLING -> {
                 pw.step()
+                val tntCount2 = pw.consumeTntExplosions()
+                if (tntCount2 > 0) {
+                    ScreenShake.trigger(ScreenShake.Intensity.HEAVY)
+                    HapticManager.vibrateImpact()
+                }
                 updateCamera(pw)
                 updateExplosions()
 
@@ -368,7 +399,9 @@ class LaunchGameView @JvmOverloads constructor(
                         }
                         victoryAlpha = 0f
                         spawnCelebrationParticles()
-                        pendingStageClear = Pair(catsUsed, victoryStars)
+                        ScreenShake.trigger(ScreenShake.Intensity.MEDIUM)
+                        HapticManager.vibrateStageClear()
+                        pendingStageClear = Triple(catsUsed, victoryStars, pw.totalTntExplosions)
                     } else if (currentCatIndex < config.catIds.size) {
                         gameState = LaunchGameState.AIMING
                         manualPanActive = false

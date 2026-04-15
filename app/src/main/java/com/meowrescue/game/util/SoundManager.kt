@@ -78,9 +78,9 @@ object SoundManager {
 
     // --- SFX playback ---
 
-    private fun playSfx(id: Int, volume: Float = 1f) {
+    private fun playSfx(id: Int, volume: Float = 1f, rate: Float = 1f) {
         if (!soundEnabled || id == 0) return
-        soundPool?.play(id, volume, volume, 1, 0, 1f)
+        soundPool?.play(id, volume, volume, 1, 0, rate.coerceIn(0.5f, 2.0f))
     }
 
     fun playCatRescue() = playSfx(sfxCatRescue)
@@ -94,6 +94,12 @@ object SoundManager {
     fun playAttackHit() = playSfx(sfxAttackHit)
     fun playEnemyAttack() = playSfx(sfxEnemyAttack)
     fun playHeal() = playSfx(sfxHeal)
+
+    /** Play block match with pitch shift for combo feedback. */
+    fun playBlockMatchCombo(combo: Int) {
+        val pitch = 1.0f + (combo - 1).coerceAtLeast(0) * 0.1f
+        playSfx(sfxBlockMatch, 1f, pitch)
+    }
 
     // --- BGM playback ---
 

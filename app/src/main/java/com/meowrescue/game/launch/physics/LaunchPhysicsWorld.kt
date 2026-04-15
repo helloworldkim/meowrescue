@@ -65,6 +65,17 @@ class LaunchPhysicsWorld {
     private var _score = 0
     val score: Int get() = _score
 
+    // ── TNT explosion events (consumed by game view for shake/effects) ───
+    var pendingTntExplosions = 0
+        private set
+    var totalTntExplosions = 0
+        private set
+    fun consumeTntExplosions(): Int {
+        val count = pendingTntExplosions
+        pendingTntExplosions = 0
+        return count
+    }
+
     fun addRemainingCatBonus(count: Int) {
         _score += count * SCORE_REMAINING_CAT
     }
@@ -440,6 +451,8 @@ class LaunchPhysicsWorld {
             // TNT chain explosion
             if (obstacle.material == ObstacleMaterial.TNT) {
                 applyBlast(obstacle.body.position, TNT_BLAST_RADIUS, TNT_BLAST_FORCE)
+                pendingTntExplosions++
+                totalTntExplosions++
             }
             spawnDebris(obstacle)
             world.destroyBody(obstacle.body)

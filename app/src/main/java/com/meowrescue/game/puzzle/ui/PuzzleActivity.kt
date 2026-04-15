@@ -1,26 +1,33 @@
 package com.meowrescue.game.puzzle.ui
 
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.ads.AdManager
+import com.meowrescue.game.data.AchievementDefs
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.puzzle.engine.PuzzleGenerator
 import com.meowrescue.game.puzzle.engine.PuzzleSolver
 import com.meowrescue.game.puzzle.model.GenerateResult
+import com.meowrescue.game.puzzle.model.WorldTheme
 import com.meowrescue.game.util.HapticManager
 import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.widget.Toast
+import java.io.File
 import kotlin.random.Random
 
 class PuzzleActivity : AppCompatActivity() {
@@ -147,6 +154,21 @@ class PuzzleActivity : AppCompatActivity() {
 
             puzzleView.setGrid(result.grid, stage, result.optimalMoves, isEndless, endlessCount)
             puzzleView.hintCount = 2
+
+            // Load best score for new record detection
+            if (!isEndless) {
+                puzzleView.previousBestScore = withContext(Dispatchers.IO) {
+                    repository.getBestScore(stage)
+                }
+                puzzleView.displayCoins = withContext(Dispatchers.IO) {
+                    repository.getCoins()
+                }
+            }
+
+            // Play world-themed BGM
+            val theme = WorldTheme.forStage(stage)
+            SoundManager.playBgm(theme.bgmKey)
+
             loadingOverlay.visibility = View.GONE
             puzzleView.visibility = View.VISIBLE
 
@@ -201,9 +223,12 @@ class PuzzleActivity : AppCompatActivity() {
         }
         puzzleView.onHintClicked = { handleHintRequest() }
         puzzleView.onSolveClicked = { handleSolveRequest() }
+        puzzleView.onShareClicked = { shareScoreCard() }
+        puzzleView.onPowerUpClicked = { index -> handlePowerUp(index) }
     }
 
     private fun handleStageClear(moves: Int, stars: Int) {
+        val score = puzzleView.score
         lifecycleScope.launch {
             if (isEndless) {
                 endlessCount++
@@ -211,10 +236,16 @@ class PuzzleActivity : AppCompatActivity() {
                 if (endlessCount > repository.getEndlessBest()) {
                     repository.setEndlessBest(endlessCount)
                 }
+                // Award coins in endless mode too
+                val starCoins = when (stars) { 3 -> 30; 2 -> 20; else -> 10 }
+                repository.addCoins(starCoins)
                 AdManager.onStageClear()
+                // Endless achievements
+                if (endlessCount >= 10) repository.unlockAchievement("endless_10")
+                if (endlessCount >= 50) repository.unlockAchievement("endless_50")
             } else {
                 val prevMax = repository.getMaxCompletedLevel()
-                repository.saveProgress(currentStage, stars, null)
+                repository.saveProgress(currentStage, stars, null, score)
                 AdManager.onStageClear()
 
                 // Check for new cat unlock (only on first-time clear)
@@ -224,8 +255,53 @@ class PuzzleActivity : AppCompatActivity() {
                         showCongratsDialog(newCat)
                     }
                 }
+
+                // Check achievements
+                checkAchievements(stars)
             }
         }
+    }
+
+    private suspend fun checkAchievements(stars: Int) {
+        // Progress achievements
+        val clearIds = mapOf(1 to "clear_1", 10 to "clear_10", 30 to "clear_30",
+            60 to "clear_60", 90 to "clear_90", 120 to "clear_120",
+            150 to "clear_150", 180 to "clear_180", 200 to "clear_200")
+        for ((stage, id) in clearIds) {
+            if (currentStage >= stage) repository.unlockAchievement(id)
+        }
+
+        // Star mastery
+        val threeStarCount = repository.getThreeStarCount()
+        if (threeStarCount >= 10) repository.unlockAchievement("star3_10")
+        if (threeStarCount >= 50) repository.unlockAchievement("star3_50")
+        if (threeStarCount >= 100) repository.unlockAchievement("star3_100")
+        if (threeStarCount >= 200) repository.unlockAchievement("star3_200")
+
+        // Efficiency achievements (solve in fewer moves than optimal)
+        val g = puzzleView.getCurrentGrid()
+        val moves = g?.getMoveCount() ?: 0
+        if (moves > 0 && moves <= puzzleView.optimalMoves) repository.unlockAchievement("optimal_clear")
+        if (moves <= 2) repository.unlockAchievement("two_move")
+
+        // No-undo 3-star
+        if (stars == 3 && !puzzleView.undoUsed) repository.unlockAchievement("no_undo")
+
+        // Speed achievements
+        val elapsed = (System.currentTimeMillis() - puzzleView.stageStartTime) / 1000f
+        if (elapsed <= 10f) repository.unlockAchievement("speed_10s")
+        if (elapsed <= 5f) repository.unlockAchievement("speed_5s")
+
+        // Cat collection
+        val unlockedCats = repository.getUnlockedCats()
+        if (unlockedCats.size >= 3) repository.unlockAchievement("cat_3")
+        if (unlockedCats.size >= 7) repository.unlockAchievement("cat_7")
+        if (unlockedCats.size >= 13) repository.unlockAchievement("cat_all")
+
+        // Coin achievements
+        val totalCoins = repository.getTotalCoinsEarned()
+        if (totalCoins >= 100) repository.unlockAchievement("coins_100")
+        if (totalCoins >= 1000) repository.unlockAchievement("coins_1000")
     }
 
     private fun handleNextStage() {
@@ -333,6 +409,114 @@ class PuzzleActivity : AppCompatActivity() {
         SoundManager.playStarEarn()
     }
 
+    // ── Power-ups ────────────────────────────────────────────────────
+    private fun handlePowerUp(index: Int) {
+        val costs = intArrayOf(30, 40, 50)
+        val cost = costs.getOrNull(index) ?: return
+
+        lifecycleScope.launch {
+            val success = repository.spendCoins(cost)
+            if (!success) {
+                Toast.makeText(this@PuzzleActivity, "코인이 부족합니다!", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+            repository.incrementPowerUpUseCount()
+            val useCount = repository.getPowerUpUseCount()
+            if (useCount >= 1) repository.unlockAchievement("powerup_1")
+            if (useCount >= 10) repository.unlockAchievement("powerup_10")
+
+            puzzleView.displayCoins = repository.getCoins()
+
+            when (index) {
+                0 -> { // Magnet: highlight movable blocks (toggle)
+                    puzzleView.magnetActive = !puzzleView.magnetActive
+                    HapticManager.vibrateButtonTap()
+                }
+                1 -> { // Ice: remove 1 non-cat block (thread-safe)
+                    val removed = puzzleView.applyIcePowerUp()
+                    if (removed) {
+                        HapticManager.vibrateImpact()
+                    } else {
+                        // Refund if nothing to remove
+                        repository.refundCoins(cost)
+                        puzzleView.displayCoins = repository.getCoins()
+                    }
+                }
+                2 -> { // Shuffle: random moves on non-cat blocks (thread-safe)
+                    puzzleView.applyShufflePowerUp()
+                    HapticManager.vibrateBlockMove()
+                }
+            }
+        }
+    }
+
+    // ── Share score card ───────────────────────────────────────────────
+    private fun shareScoreCard() {
+        try {
+            val w = 600
+            val h = 400
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val c = Canvas(bmp)
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+            // Background
+            paint.color = 0xFFFFF8F0.toInt()
+            c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+
+            // Title
+            paint.color = 0xFFFF7043.toInt()
+            paint.textSize = 36f
+            paint.typeface = android.graphics.Typeface.DEFAULT_BOLD
+            paint.textAlign = android.graphics.Paint.Align.CENTER
+            c.drawText("Meow Rescue", w / 2f, 60f, paint)
+
+            // Stage
+            paint.color = 0xFF4E342E.toInt()
+            paint.textSize = 28f
+            val stageText = if (isEndless) "Endless #$endlessCount" else "Stage $currentStage"
+            c.drawText(stageText, w / 2f, 110f, paint)
+
+            // Stars
+            paint.textSize = 40f
+            paint.color = 0xFFFFD600.toInt()
+            val starText = "\u2605".repeat(puzzleView.victoryStars) + "\u2606".repeat(3 - puzzleView.victoryStars)
+            c.drawText(starText, w / 2f, 170f, paint)
+
+            // Score
+            paint.textSize = 24f
+            paint.color = 0xFF4E342E.toInt()
+            c.drawText("Score: ${puzzleView.score}", w / 2f, 220f, paint)
+
+            if (puzzleView.isNewRecord) {
+                paint.color = 0xFFFF1744.toInt()
+                paint.textSize = 20f
+                c.drawText("\u2605 NEW RECORD! \u2605", w / 2f, 260f, paint)
+            }
+
+            // Footer
+            paint.color = 0xFF9E9E9E.toInt()
+            paint.textSize = 16f
+            c.drawText("Meow Rescue - 고양이 구출 퍼즐", w / 2f, h - 30f, paint)
+
+            // Save to cache and share
+            val shareDir = File(cacheDir, "share").also { it.mkdirs() }
+            val file = File(shareDir, "score_card.png")
+            file.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 95, it) }
+            bmp.recycle()
+
+            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/png"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TEXT, "Meow Rescue - $stageText - Score: ${puzzleView.score} $starText")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(intent, "Share Score"))
+        } catch (e: Exception) {
+            android.util.Log.w("PuzzleActivity", "Share failed", e)
+        }
+    }
+
     // ── Immersive mode (엣지 스와이프 뒤로가기 방지) ──────────────────────
     private fun enableImmersiveMode() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -354,7 +538,8 @@ class PuzzleActivity : AppCompatActivity() {
         super.onResume()
         puzzleView.resume()
         bannerAd?.resume()
-        SoundManager.playBgm("beginner")
+        val theme = WorldTheme.forStage(currentStage)
+        SoundManager.playBgm(theme.bgmKey)
     }
 
     override fun onPause() {

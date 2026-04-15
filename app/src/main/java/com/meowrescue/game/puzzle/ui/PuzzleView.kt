@@ -11,7 +11,9 @@ import com.meowrescue.game.R
 import com.meowrescue.game.puzzle.engine.PuzzleGrid
 import com.meowrescue.game.puzzle.engine.PuzzleSolver
 import com.meowrescue.game.puzzle.model.PuzzleState
+import com.meowrescue.game.puzzle.model.WorldTheme
 import com.meowrescue.game.util.HapticManager
+import com.meowrescue.game.util.ScreenShake
 import com.meowrescue.game.util.SoundManager
 import kotlin.math.abs
 import kotlin.math.max
@@ -33,6 +35,7 @@ class PuzzleView @JvmOverloads constructor(
 ) : SurfaceView(context, attrs, defStyleAttr), SurfaceHolder.Callback {
 
     companion object {
+        private const val MAX_SHUFFLE_ATTEMPTS = 5
         val BLOCK_COLORS = intArrayOf(
             0xFF78909C.toInt(),  // dusty blue
             0xFF81C784.toInt(),  // sage green
@@ -89,6 +92,8 @@ class PuzzleView @JvmOverloads constructor(
     var onPauseClicked: (() -> Unit)? = null
     var onHintClicked: (() -> Unit)? = null
     var onSolveClicked: (() -> Unit)? = null
+    var onShareClicked: (() -> Unit)? = null
+    var onPowerUpClicked: ((index: Int) -> Unit)? = null
 
     // ── Hint state ─────────────────────────────────────────────────────────
     internal var hintBlockId: Int = -1
@@ -189,7 +194,44 @@ class PuzzleView @JvmOverloads constructor(
     private var autoSolveIndex = 0
     private var autoSolveNextTime = 0L
 
-    // ── HUD button rects ────────────────────────────────────────────────
+    // ── Combo system ──────────────────────────────────────────────────
+    internal var comboCount = 0
+    internal var lastMoveTime = 0L
+    internal var comboDisplayAlpha = 0f
+    internal var comboDisplayScale = 1f
+    internal var comboDisplayY = 0f
+    internal var maxCombo = 0
+    internal var score = 0
+
+    // ── Slow-motion ─────────────────────────────────────────────────
+    internal var timeScale = 1f
+
+    // ── World Theme ─────────────────────────────────────────────────
+    internal var worldTheme: WorldTheme = WorldTheme.forStage(1)
+
+    // ── Coin animation ──────────────────────────────────────────────
+    internal var coinAnimActive = false
+    internal var coinAnimStartTime = 0L
+    internal var coinAnimAmount = 0
+    internal var displayCoins = 0
+
+    // ── Power-ups ───────────────────────────────────────────────────
+    internal var magnetActive = false
+    internal var iceActive = false
+
+    // ── Cat expression ──────────────────────────────────────────────
+    internal var catExpression = 0  // 0=idle, 1=happy, 2=worried
+    internal var blinkTimer = 0f
+
+    // ── Best score / New Record ─────────────────────────────────────
+    internal var previousBestScore = 0
+    internal var isNewRecord = false
+
+    // ── Stage start time ────────────────────────────────────────────
+    internal var stageStartTime = 0L
+    internal var undoUsed = false
+
+    // ── HUD button rects ────────────────────────────────────────────
     internal val pauseRect      = RectF()
     internal val undoRect       = RectF()
     internal val resetRect      = RectF()
@@ -198,6 +240,8 @@ class PuzzleView @JvmOverloads constructor(
     internal val nextStageRect    = RectF()
     internal val retryRect        = RectF()
     internal val levelSelectRect  = RectF()
+    internal val shareRect        = RectF()
+    internal val powerUpRects     = arrayOf(RectF(), RectF(), RectF())
 
     // ── Resources ─────────────────────────────────────────────────────────
     internal var pauseBitmap: Bitmap? = null
@@ -232,6 +276,7 @@ class PuzzleView @JvmOverloads constructor(
             this.optimalMoves = optimalMoves
             this.isEndless    = endless
             this.endlessCount = endlessCount
+            this.worldTheme   = WorldTheme.forStage(stage)
             resetAnimationState()
         }
         recalcLayout()
@@ -268,6 +313,7 @@ class PuzzleView @JvmOverloads constructor(
     fun undoMove() {
         synchronized(lock) {
             if (state != PuzzleState.PLAYING || snapAnimating) return
+            undoUsed = true
             val g = grid ?: return
             val blocksBefore = g.blocks.associateBy { it.id }
             val moved = g.undoLastMove()
@@ -298,6 +344,53 @@ class PuzzleView @JvmOverloads constructor(
         SoundManager.playButtonTap()
     }
 
+    /** Ice power-up: remove one random non-cat, non-key, non-wall block. Returns true if removed. */
+    fun applyIcePowerUp(): Boolean {
+        synchronized(lock) {
+            val g = grid ?: return false
+            if (state != PuzzleState.PLAYING) return false
+            val removable = g.blocks.filter { !it.isCat && !it.isKey && !it.isWall }
+            if (removable.isEmpty()) return false
+            g.removeBlock(removable.random().id)
+            return true
+        }
+    }
+
+    /** Shuffle power-up: randomly move non-cat blocks by 1 step. BFS-verified solvable. */
+    fun applyShufflePowerUp() {
+        synchronized(lock) {
+            val g = grid ?: return
+            if (state != PuzzleState.PLAYING) return
+            val backup = g.clone()
+            val solver = PuzzleSolver()
+            val rng = java.util.Random()
+
+            for (attempt in 0 until MAX_SHUFFLE_ATTEMPTS) {
+                // Restore to backup state before each retry (skip on first attempt)
+                if (attempt > 0) {
+                    restoreGrid(backup)
+                }
+                val current = grid ?: return
+                val movable = current.blocks.filter { !it.isCat && !it.isWall && !it.isKey }
+                for (b in movable) {
+                    val dir = if (rng.nextBoolean()) 1 else -1
+                    val horizontal = if (b.length == 1) rng.nextBoolean() else b.isHorizontal
+                    if (!current.moveBlockInDir(b.id, dir, horizontal)) {
+                        current.moveBlockInDir(b.id, -dir, horizontal)
+                    }
+                }
+                // Verify solvability (lightweight: cap at 50K states)
+                if (solver.solveFast(current) >= 1) return
+            }
+            // All attempts failed — restore original grid
+            restoreGrid(backup)
+        }
+    }
+
+    private fun restoreGrid(source: PuzzleGrid) {
+        grid = source.clone()
+    }
+
     fun pause() {
         synchronized(lock) { if (state == PuzzleState.PLAYING) state = PuzzleState.PAUSED }
     }
@@ -322,6 +415,14 @@ class PuzzleView @JvmOverloads constructor(
         hintBlockId = -1; autoSolving = false
         autoSolveSteps = emptyList(); autoSolveIndex = 0
         autoSolveNextTime = 0L; screenFlashAlpha = 0f
+        // New state
+        comboCount = 0; lastMoveTime = 0L; comboDisplayAlpha = 0f
+        comboDisplayScale = 1f; comboDisplayY = 0f; maxCombo = 0; score = 0
+        timeScale = 1f; coinAnimActive = false
+        magnetActive = false; iceActive = false
+        isNewRecord = false; stageStartTime = System.currentTimeMillis()
+        undoUsed = false
+        ScreenShake.reset()
     }
 
     // ── Pulse utility ─────────────────────────────────────────────────────
@@ -376,6 +477,9 @@ class PuzzleView @JvmOverloads constructor(
             else                              -> 1
         }
         escapeMoves = moves
+        // Score: fewer moves = higher score (based on how far under the 2-star limit)
+        val star2Limit = (optimalMoves * 1.5f).toInt()
+        score = ((star2Limit - moves + 1).coerceAtLeast(0)) * 100 + escapeStars * 200
         state = PuzzleState.ESCAPING
         escapePhase = 1
         escapeStartTime = System.currentTimeMillis()
@@ -491,8 +595,12 @@ class PuzzleView @JvmOverloads constructor(
             val elapsed = now - snapStartTime
             if (elapsed >= SNAP_DURATION_MS) {
                 snapAnimating = false
+
+                // Sound + haptic + shake on block snap
                 SoundManager.playBlockMatch()
                 HapticManager.vibrateBlockMove()
+                ScreenShake.trigger(ScreenShake.Intensity.LIGHT)
+
                 if (snapPendingSolveCheck) {
                     snapPendingSolveCheck = false
                     val g = grid
@@ -513,15 +621,19 @@ class PuzzleView @JvmOverloads constructor(
                     if (elapsed >= WALL_OPEN_MS) {
                         escapePhase = 2
                         escapeStartTime = now
+                        timeScale = 0.3f  // slow-motion during cat slide
                     }
                 }
                 2 -> {
-                    if (elapsed >= CAT_SLIDE_MS) {
+                    val scaledElapsed = elapsed * timeScale
+                    if (scaledElapsed >= CAT_SLIDE_MS) {
                         escapePhase = 3
                         escapeStartTime = now
+                        timeScale = 1f  // restore normal speed
                         spawnParticles()
                         SoundManager.playLevelClear()
                         HapticManager.vibrateStageClear()
+                        ScreenShake.trigger(ScreenShake.Intensity.MEDIUM)
                     }
                 }
                 3 -> {
@@ -606,7 +718,15 @@ class PuzzleView @JvmOverloads constructor(
         }
     }
 
+    private fun updateCoinAnimation() {
+        if (coinAnimActive) {
+            val elapsed = System.currentTimeMillis() - coinAnimStartTime
+            if (elapsed > 800L) coinAnimActive = false
+        }
+    }
+
     private fun update() {
+        ScreenShake.update()
         updateDragInterpolation()
         updateSnapAnimation()
         updateEscapeSequence()
@@ -614,6 +734,7 @@ class PuzzleView @JvmOverloads constructor(
         updateTutorial()
         updateScreenFlash()
         updateAutoSolve()
+        updateCoinAnimation()
     }
 
     internal var pendingTutorialDismiss = false
@@ -624,6 +745,8 @@ class PuzzleView @JvmOverloads constructor(
     private fun triggerVictory() {
         victoryStars = escapeStars
         state = PuzzleState.SOLVED
+        // Check new record
+        isNewRecord = score > previousBestScore
         pendingStageClear = Pair(escapeMoves, escapeStars)
     }
 

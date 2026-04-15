@@ -156,6 +156,10 @@ class LaunchInputHandler(private val view: LaunchGameView) {
                         alpha = 1f,
                         startTime = System.currentTimeMillis()
                     ))
+                    com.meowrescue.game.util.ScreenShake.trigger(
+                        com.meowrescue.game.util.ScreenShake.Intensity.HEAVY
+                    )
+                    com.meowrescue.game.util.HapticManager.vibrateImpact()
                 }
             }
             return null
@@ -186,6 +190,7 @@ class LaunchInputHandler(private val view: LaunchGameView) {
         val catId = config.catIds[view.currentCatIndex]
         val ability = CatAbility.forCatId(catId)
         pw.launchProjectile(catId, ability, pullVector)
+        view.catSquash = 1.4f  // stretch on launch
 
         view.currentCatIndex++
         view.catsUsed++

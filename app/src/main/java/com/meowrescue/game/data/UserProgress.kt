@@ -8,5 +8,6 @@ data class UserProgress(
     @PrimaryKey val levelId: Int,
     val stars: Int,
     val completed: Boolean,
-    val catUnlocked: String?
+    val catUnlocked: String?,
+    val bestScore: Int = 0
 )

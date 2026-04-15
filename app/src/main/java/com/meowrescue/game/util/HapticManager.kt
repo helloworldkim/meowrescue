@@ -43,6 +43,12 @@ object HapticManager {
         vibrate(12L, VibrationEffect.EFFECT_CLICK)
     }
 
+    /** Heavy thud for impacts (TNT explosion, heavy collisions). */
+    fun vibrateImpact() {
+        if (!hapticEnabled) return
+        vibratePattern(longArrayOf(0, 30, 20, 50, 20, 30))
+    }
+
     private fun vibrate(ms: Long, predefinedEffect: Int) {
         val v = vibrator ?: return
         if (!v.hasVibrator()) return

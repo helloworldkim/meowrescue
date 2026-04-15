@@ -19,4 +19,7 @@ interface LaunchProgressDao {
 
     @Query("SELECT MAX(stageId) FROM launch_progress WHERE completed = 1")
     fun getMaxCompletedStage(): Int?
+
+    @Query("SELECT COUNT(*) FROM launch_progress WHERE completed = 1")
+    fun getCompletedCount(): Int
 }

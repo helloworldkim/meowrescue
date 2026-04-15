@@ -21,6 +21,7 @@ import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.GameRepository
+import com.meowrescue.game.puzzle.model.WorldTheme
 import com.meowrescue.game.puzzle.ui.PuzzleActivity
 import com.meowrescue.game.util.SoundManager
 import kotlinx.coroutines.Dispatchers
@@ -261,9 +262,13 @@ class StageSelectActivity : AppCompatActivity() {
         val start = currentPage * LEVELS_PER_PAGE + 1
         val end = minOf(start + LEVELS_PER_PAGE - 1, TOTAL_LEVELS)
 
+        // Show world name alongside page range
+        val worldTheme = WorldTheme.forStage(start)
+        val worldName = worldTheme.name
+
         // Crossfade page title
         pageTitle.animate().alpha(0f).setDuration(100).withEndAction {
-            pageTitle.text = "$start - $end"
+            pageTitle.text = "$worldName  $start-$end"
             pageTitle.animate().alpha(1f).setDuration(150).start()
         }.start()
 

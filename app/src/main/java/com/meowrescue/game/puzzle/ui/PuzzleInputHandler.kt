@@ -43,6 +43,11 @@ class PuzzleInputHandler(private val view: PuzzleView) {
                 val cb = view.onLevelSelectClicked
                 return { cb?.invoke() }
             }
+            if (view.shareRect.contains(x, y)) {
+                SoundManager.playButtonTap()
+                val cb = view.onShareClicked
+                return { cb?.invoke() }
+            }
             return null
         }
         if (view.state != PuzzleState.PLAYING || view.snapAnimating) return null
@@ -63,6 +68,15 @@ class PuzzleInputHandler(private val view: PuzzleView) {
             SoundManager.playButtonTap()
             val cb = view.onSolveClicked
             return { cb?.invoke() }
+        }
+        // Power-up buttons
+        for (i in view.powerUpRects.indices) {
+            if (view.powerUpRects[i].contains(x, y) && !view.powerUpRects[i].isEmpty) {
+                SoundManager.playButtonTap()
+                val cb = view.onPowerUpClicked
+                val idx = i
+                return { cb?.invoke(idx) }
+            }
         }
 
         if (view.autoSolving) return null  // Block drag during auto-solve

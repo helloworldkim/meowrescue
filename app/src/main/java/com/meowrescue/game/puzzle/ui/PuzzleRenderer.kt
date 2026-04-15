@@ -5,6 +5,8 @@ import com.meowrescue.game.puzzle.engine.PuzzleGrid
 import com.meowrescue.game.puzzle.model.ExitDirection
 import com.meowrescue.game.puzzle.model.PuzzleBlock
 import com.meowrescue.game.puzzle.model.PuzzleState
+import com.meowrescue.game.util.ScreenShake
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.sin
 
@@ -17,8 +19,17 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
     private val tmpMatrix = Matrix()
 
     fun render(canvas: Canvas) {
-        canvas.drawColor(PuzzleView.BG_COLOR)
+        // Use world theme background
+        canvas.drawColor(view.worldTheme.bgTop)
         val g = view.grid ?: return
+
+        // Apply screen shake
+        val shakeX = ScreenShake.offsetX
+        val shakeY = ScreenShake.offsetY
+        if (shakeX != 0f || shakeY != 0f) {
+            canvas.save()
+            canvas.translate(shakeX, shakeY)
+        }
 
         val keyAtLock = g.let { grid ->
             if (!grid.hasKeyLock) true
@@ -47,6 +58,7 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         }
 
         drawBlocks(canvas, g)
+        if (view.magnetActive) drawMagnetHighlights(canvas, g)
         drawLockOverlay(canvas, g, keyAtLock)
         drawCheckpointOverlay(canvas, g)
         drawToolbar(canvas)
@@ -61,6 +73,11 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         // Draw particles on top
         if (view.escapePhase == 3 || view.particles.isNotEmpty()) {
             drawParticles(canvas)
+        }
+
+        // Restore shake transform
+        if (shakeX != 0f || shakeY != 0f) {
+            canvas.restore()
         }
 
         if (view.state == PuzzleState.SOLVED && view.victoryAlpha > 0f) {
@@ -86,7 +103,20 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         paints.hudTextPaint.textSize = 18 * density
         paints.hudTextPaint.textAlign = Paint.Align.LEFT
         val stageLabel = if (view.isEndless) "Endless #${view.endlessCount}" else "Stage ${view.stageNumber}"
-        canvas.drawText(stageLabel, 16 * density, hudTop + hudH * 0.65f, paints.hudTextPaint)
+        canvas.drawText(stageLabel, 16 * density, hudTop + hudH * 0.45f, paints.hudTextPaint)
+
+        // Coin display
+        paints.coinTextPaint.textSize = 12 * density
+        canvas.drawText("\uD83E\uDE99 ${view.displayCoins}", 16 * density, hudTop + hudH * 0.82f, paints.coinTextPaint)
+
+        // Score display
+        if (view.score > 0) {
+            paints.scorePaint.textSize = 12 * density
+            paints.scorePaint.color = 0xFFFFD600.toInt()
+            paints.scorePaint.textAlign = Paint.Align.LEFT
+            canvas.drawText("Score: ${view.score}", 16 * density + 80 * density, hudTop + hudH * 0.82f, paints.scorePaint)
+            paints.scorePaint.textAlign = Paint.Align.CENTER
+        }
 
         // Move count + color based on star tracking
         val moves = g.getMoveCount()
@@ -176,6 +206,10 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
     // ── Board ─────────────────────────────────────────────────────────────
 
     private fun drawBoard(canvas: Canvas, g: PuzzleGrid) {
+        // Apply world theme colors
+        paints.gridBgPaint.color = view.worldTheme.gridBg
+        paints.linePaint.color = view.worldTheme.cellLine
+
         tmpRect1.set(view.boardLeft, view.boardTop, view.boardLeft + view.boardSize, view.boardTop + view.boardSize)
         canvas.drawRoundRect(tmpRect1, 8f, 8f, paints.gridBgPaint)
 
@@ -186,6 +220,36 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         for (j in 0..g.cols) {
             val x = view.boardLeft + j * view.cellSize
             canvas.drawLine(x, view.boardTop, x, view.boardTop + view.boardSize, paints.linePaint)
+        }
+    }
+
+    // ── Magnet highlight ─────────────────────────────────────────────────
+
+    private fun drawMagnetHighlights(canvas: Canvas, g: PuzzleGrid) {
+        val density = view.resources.displayMetrics.density
+        val pulse = view.pulse(400.0, 0.3f, 0.7f)
+
+        for (block in g.blocks) {
+            if (block.isCat || block.isWall) continue
+            // Check if block can move in any direction (both axes for 1-cell blocks)
+            var canMove = g.canMoveInDir(block.id, 1, block.isHorizontal) ||
+                          g.canMoveInDir(block.id, -1, block.isHorizontal)
+            if (!canMove && block.length == 1) {
+                canMove = g.canMoveInDir(block.id, 1, !block.isHorizontal) ||
+                          g.canMoveInDir(block.id, -1, !block.isHorizontal)
+            }
+            if (!canMove) continue
+
+            val left = view.boardLeft + block.col * view.cellSize
+            val top = view.boardTop + block.row * view.cellSize
+            val right = left + (if (block.isHorizontal) block.length else 1) * view.cellSize
+            val bottom = top + (if (block.isHorizontal) 1 else block.length) * view.cellSize
+
+            paints.hintGlowPaint.color = 0xFFFFD600.toInt()
+            paints.hintGlowPaint.alpha = (pulse * 200).toInt()
+            paints.hintGlowPaint.strokeWidth = 3f * density
+            canvas.drawRoundRect(left + 2, top + 2, right - 2, bottom - 2,
+                6f * density, 6f * density, paints.hintGlowPaint)
         }
     }
 
@@ -497,7 +561,7 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         val color = when {
             block.isKey -> PuzzleView.KEY_COLOR
             block.linkId >= 0 -> PuzzleView.LINK_COLOR
-            else -> PuzzleView.BLOCK_COLORS[(block.id - 1) % PuzzleView.BLOCK_COLORS.size]
+            else -> view.worldTheme.blockColors[(block.id - 1) % view.worldTheme.blockColors.size]
         }
 
         if (isDragging || isSnapping) {
@@ -607,8 +671,8 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
             val isSnapping = (block.id == view.snapBlockId && view.snapAnimating)
 
             if (block.isCat && view.escapePhase == 2) {
-                val elapsed = (System.currentTimeMillis() - view.escapeStartTime).toFloat() / PuzzleView.CAT_SLIDE_MS
-                val t = elapsed.coerceIn(0f, 1f)
+                val rawElapsed = (System.currentTimeMillis() - view.escapeStartTime).toFloat()
+                val t = (rawElapsed * view.timeScale / PuzzleView.CAT_SLIDE_MS).coerceIn(0f, 1f)
                 val easeT = t * t
                 drawCatSlideOut(canvas, g, block, padding, cr, easeT)
                 continue
@@ -860,6 +924,38 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
             view.resetRect.centerX(), view.resetRect.centerY() + paints.buttonTextPaint.textSize * 0.35f,
             paints.buttonTextPaint
         )
+
+        // ── Power-up buttons (below toolbar) ─────────────────────────
+        if (view.state == PuzzleState.PLAYING && !view.isEndless) {
+            val puTop = toolbarTop + btnH + 8 * density
+            val puSize = 38 * density
+            val puGap = 10 * density
+            val puTotalW = puSize * 3 + puGap * 2
+            var puX = (view.width - puTotalW) / 2f
+
+            val powerUps = arrayOf(
+                Triple("\uD83E\uDDF2", "30", 0xFF42A5F5.toInt()),  // Magnet
+                Triple("\u2744", "40", 0xFF4DD0E1.toInt()),         // Ice
+                Triple("\uD83D\uDD00", "50", 0xFFAB47BC.toInt())   // Shuffle
+            )
+
+            paints.powerUpIconPaint.textSize = 16 * density
+            paints.powerUpLabelPaint.textSize = 9 * density
+
+            for (i in powerUps.indices) {
+                val (icon, cost, color) = powerUps[i]
+                view.powerUpRects[i].set(puX, puTop, puX + puSize, puTop + puSize)
+
+                paints.powerUpBgPaint.color = color
+                paints.powerUpBgPaint.alpha = if (view.displayCoins >= cost.toInt()) 255 else 100
+                canvas.drawRoundRect(view.powerUpRects[i], 10 * density, 10 * density, paints.powerUpBgPaint)
+
+                canvas.drawText(icon, puX + puSize / 2f, puTop + puSize * 0.5f, paints.powerUpIconPaint)
+                canvas.drawText("\uD83E\uDE99$cost", puX + puSize / 2f, puTop + puSize * 0.85f, paints.powerUpLabelPaint)
+
+                puX += puSize + puGap
+            }
+        }
     }
 
     // ── Victory overlay ───────────────────────────────────────────────────
@@ -876,7 +972,7 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         val cy      = view.height * 0.36f
 
         val panelW  = view.width * 0.82f
-        val panelH  = view.height * 0.48f
+        val panelH  = view.height * 0.55f
         val panelL  = cx - panelW / 2f
         val panelT  = cy - panelH / 2f
         canvas.drawRoundRect(
@@ -886,16 +982,30 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
 
         paints.victoryTitlePaint.textSize = 28 * density
         val clearTitle = if (view.isEndless) "Endless #${view.endlessCount} Clear!" else "Stage Clear!"
-        canvas.drawText(clearTitle, cx, panelT + 52 * density, paints.victoryTitlePaint)
+        canvas.drawText(clearTitle, cx, panelT + 46 * density, paints.victoryTitlePaint)
 
         paints.victoryMovePaint.textSize = 16 * density
-        canvas.drawText("Moves: ${g.getMoveCount()}", cx, panelT + 78 * density, paints.victoryMovePaint)
+        canvas.drawText("Moves: ${g.getMoveCount()}", cx, panelT + 70 * density, paints.victoryMovePaint)
 
-        val starSize = 36 * density
+        // Score display
+        paints.scorePaint.textSize = 18 * density
+        paints.scorePaint.color = 0xFFFFD600.toInt()
+        canvas.drawText("Score: ${view.score}", cx, panelT + 90 * density, paints.scorePaint)
+
+        // NEW RECORD banner
+        if (view.isNewRecord && view.starAnimPhase > 1f) {
+            val recAlpha = ((view.starAnimPhase - 1f) / 0.5f).coerceIn(0f, 1f)
+            val pulse = 1f + 0.05f * sin(view.starAnimPhase * 4.0).toFloat()
+            paints.newRecordPaint.textSize = 14 * density * pulse
+            paints.newRecordPaint.alpha = (recAlpha * 255).toInt()
+            canvas.drawText("\u2605 NEW RECORD! \u2605", cx, panelT + 108 * density, paints.newRecordPaint)
+        }
+
+        val starSize = 34 * density
         val starGap  = 8 * density
         val totalW   = 3 * starSize + 2 * starGap
         var starX    = cx - totalW / 2f
-        val starY    = panelT + 98 * density
+        val starY    = panelT + 116 * density
         val pulseAmp = if (view.victoryStars == 3) 0.18f else 0.08f
         val pulsed   = 1f + pulseAmp * sin(view.starAnimPhase.toDouble()).toFloat()
 
@@ -918,11 +1028,11 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
             }
             val scale   = if (earned) popScale else minOf(popScale, 1f)
             val scaledS = starSize * scale
-            val offsetX = (scaledS - starSize) / 2f
-            val offsetY = (scaledS - starSize) / 2f
+            val offsetX2 = (scaledS - starSize) / 2f
+            val offsetY2 = (scaledS - starSize) / 2f
             val rect    = RectF(
-                starX - offsetX, starY - offsetY,
-                starX + starSize + offsetX, starY + starSize + offsetY
+                starX - offsetX2, starY - offsetY2,
+                starX + starSize + offsetX2, starY + starSize + offsetY2
             )
             if (scale > 0f) {
                 val bmp = if (earned) view.starFullBitmap else view.starEmptyBitmap
@@ -944,15 +1054,15 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         }
 
         val btnW  = panelW * 0.7f
-        val btnH2 = 44 * density
-        val btnGap = 10 * density
+        val btnH2 = 40 * density
+        val btnGap = 8 * density
         val btnL  = cx - btnW / 2f
-        var btnY  = starY + starSize + 20 * density
+        var btnY  = starY + starSize + 16 * density
 
         view.nextStageRect.set(btnL, btnY, btnL + btnW, btnY + btnH2)
         paints.buttonPaint.color = 0xFFFF7043.toInt()
         canvas.drawRoundRect(view.nextStageRect, 12 * density, 12 * density, paints.buttonPaint)
-        paints.buttonTextPaint.textSize = 17 * density
+        paints.buttonTextPaint.textSize = 16 * density
         canvas.drawText(
             if (view.isEndless) "Next Puzzle  \u25B6" else "Next Stage  \u25B6",
             view.nextStageRect.centerX(),
@@ -972,11 +1082,28 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         )
 
         btnY += btnH2 + btnGap
-        view.levelSelectRect.set(btnL, btnY, btnL + btnW, btnY + btnH2)
+
+        // Share button
+        val shareBtnW = btnW * 0.48f
+        val menuBtnW = btnW * 0.48f
+        val shareL = cx - btnW / 2f
+        val menuL = shareL + shareBtnW + btnGap
+
+        view.shareRect.set(shareL, btnY, shareL + shareBtnW, btnY + btnH2)
+        paints.shareBtnPaint.color = 0xFF42A5F5.toInt()
+        canvas.drawRoundRect(view.shareRect, 12 * density, 12 * density, paints.shareBtnPaint)
+        canvas.drawText(
+            "\uD83D\uDCE4 Share",
+            view.shareRect.centerX(),
+            view.shareRect.centerY() + paints.buttonTextPaint.textSize * 0.35f,
+            paints.buttonTextPaint
+        )
+
+        view.levelSelectRect.set(menuL, btnY, menuL + menuBtnW, btnY + btnH2)
         paints.buttonPaint.color = 0xFF78909C.toInt()
         canvas.drawRoundRect(view.levelSelectRect, 12 * density, 12 * density, paints.buttonPaint)
         canvas.drawText(
-            if (view.isEndless) "\u2630  Menu" else "\u2630  Level Select",
+            if (view.isEndless) "Menu" else "Levels",
             view.levelSelectRect.centerX(),
             view.levelSelectRect.centerY() + paints.buttonTextPaint.textSize * 0.35f,
             paints.buttonTextPaint

@@ -167,9 +167,10 @@ class LaunchGameActivity : AppCompatActivity() {
     // ── Callbacks ──────────────────────────────────────────────────────────
 
     private fun setupCallbacks() {
-        gameView.onStageClear = { _, stars ->
+        gameView.onStageClear = { catsUsed, stars, tntExplosions ->
             lifecycleScope.launch {
                 repository.saveLaunchProgress(currentStageId, stars)
+                checkLaunchAchievements(catsUsed, tntExplosions)
             }
         }
 
@@ -185,6 +186,26 @@ class LaunchGameActivity : AppCompatActivity() {
         gameView.onMenuClicked = {
             finish()
         }
+    }
+
+    // ── Launch achievements ─────────────────────────────────────────────────
+
+    private suspend fun checkLaunchAchievements(catsUsed: Int, tntExplosions: Int) {
+        // Launch-specific achievements
+        val launchClears = repository.getCompletedLaunchCount()
+        if (launchClears >= 10) repository.unlockAchievement("launch_10")
+        if (catsUsed == 1) repository.unlockAchievement("launch_1cat")
+        if (tntExplosions >= 3) repository.unlockAchievement("launch_tnt")
+
+        // Shared achievements (cat collection, economy)
+        val unlockedCats = repository.getUnlockedCats()
+        if (unlockedCats.size >= 3) repository.unlockAchievement("cat_3")
+        if (unlockedCats.size >= 7) repository.unlockAchievement("cat_7")
+        if (unlockedCats.size >= 13) repository.unlockAchievement("cat_all")
+
+        val totalCoins = repository.getTotalCoinsEarned()
+        if (totalCoins >= 100) repository.unlockAchievement("coins_100")
+        if (totalCoins >= 1000) repository.unlockAchievement("coins_1000")
     }
 
     // ── Stage loading ──────────────────────────────────────────────────────
