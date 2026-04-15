@@ -23,6 +23,24 @@ abilities, TNT chain explosions, and a procedural stage generator with difficult
 scaling. Cat Launch is an **equal-weight core mode** alongside the Puzzle game —
 not a minigame.
 
+### Equal-Weight Parity Requirements
+
+Cat Launch must achieve structural parity with Puzzle mode across these dimensions:
+
+| Dimension | Current State | Target State | Status |
+|-----------|--------------|-------------|--------|
+| Cat unlocks | Puzzle-only (13 cats gated behind puzzle stages) | Launch-specific unlock path (TBD) | Not Started |
+| Coin sinks | None in Launch | Launch-specific sinks (ability boosts, cosmetics) | Not Started |
+| First-clear bonus | 30 (lower than Puzzle's 50) | **50** (parity with Puzzle) | **Done** |
+| Achievements | 3/30 (5% of total rewards) | 8-10 Launch achievements | Not Started |
+| Visual progression | No themes | World themes or visual stage progression | Not Started |
+| Difficulty rewards | Easy/Normal/Hard award identical coins | Coin multiplier by difficulty | Not Started |
+| Code terminology | "minigame" throughout codebase | "mode" throughout codebase | **Done** |
+
+> Items marked "Not Started" require dedicated design sessions. Use
+> `/design-system launch-progression` and `/design-system economy-expansion`
+> when ready.
+
 ---
 
 ## B. Player Fantasy
@@ -273,7 +291,7 @@ oneStar = catCount
 |--------|-------------|
 | **Progression System** | Reads unlocked cats for selection; writes stage clear / star count |
 | **Cat Collection** | Cat IDs determine which abilities are available |
-| **Economy System** | Shared coin pool; awards coins on stage clears (10/20/30 + 30 first-clear) |
+| **Economy System** | Shared coin pool; awards coins on stage clears (10/20/30 + 50 first-clear) |
 | **Achievement System** | Triggers launch-specific achievements (launch_10, launch_1cat, launch_tnt) |
 | **Sound System** | Launch SFX, collision sounds, explosion effects |
 | **Puzzle System** | Independent sibling mode; shares cat collection |
@@ -335,7 +353,7 @@ oneStar = catCount
 11. **OOB no-score**: Enemies destroyed by falling out of bounds (y < -1 or x outside world) must not award the 500 enemy score.
 
 ### Coin Rewards
-12. **Launch coin awards**: `saveLaunchProgress(stageId, stars)` must award `starCoins(stars)` (10/20/30) plus 30 first-clear bonus on first completion. `totalCoinsEarned` must increase accordingly.
+12. **Launch coin awards**: `saveLaunchProgress(stageId, stars)` must award `starCoins(stars)` (10/20/30) plus 50 first-clear bonus on first completion (parity with Puzzle). `totalCoinsEarned` must increase accordingly.
 
 ### TNT
 13. **Chain propagation**: Destroying a TNT obstacle triggers `applyBlast(pos, 2.0, 50)`. If the blast destroys another TNT, that TNT also triggers a blast. Chains must propagate until no more TNTs are destroyed.

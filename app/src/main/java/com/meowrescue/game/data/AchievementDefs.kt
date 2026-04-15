@@ -38,7 +38,7 @@ object AchievementDefs {
         AchievementDef("speed_10s",  "번개손",         "10초 안에 클리어",         "\u26A1", 30),
         AchievementDef("speed_5s",   "찰나의 구출",     "5초 안에 클리어",          "\u26A1", 80),
 
-        // ── Launch Minigame ────────────────────────────────────────
+        // ── Launch Mode ───────────────────────────────────────────
         AchievementDef("launch_10",  "런처 루키",       "Cat Launch 10 스테이지 클리어", "\uD83D\uDE80", 30),
         AchievementDef("launch_1cat","원샷 원킬",       "고양이 1마리로 클리어",       "\uD83C\uDFAF", 50),
         AchievementDef("launch_tnt", "폭파 전문가",      "TNT 연쇄 3회 이상",         "\uD83D\uDCA5", 30),

@@ -128,7 +128,7 @@ class GameRepository(context: Context) {
         prefs.edit().putBoolean("tutorial_completed", true).apply()
     }
 
-    // ── Launch Minigame Progress ──────────────────────────────────────
+    // ── Launch Mode Progress ─────────────────────────────────────────
 
     suspend fun saveLaunchProgress(stageId: Int, stars: Int) = withContext(Dispatchers.IO) {
         require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
@@ -141,9 +141,9 @@ class GameRepository(context: Context) {
             LaunchProgress(stageId = stageId, stars = bestStars, completed = bestStars > 0, bestScore = bestScore)
         )
 
-        // Award coins (same star rates as puzzle; lower first-clear bonus since Launch stages are unlimited)
+        // Award coins (equal-weight mode: same rates and first-clear bonus as Puzzle)
         val starCoins = when (stars) { 3 -> 30; 2 -> 20; 1 -> 10; else -> 0 }
-        val firstClearBonus = if (isFirstClear) 30 else 0
+        val firstClearBonus = if (isFirstClear) 50 else 0
         addCoins(starCoins + firstClearBonus)
     }
 

@@ -77,8 +77,7 @@ Cat Launch clears award coins at the same star-based rates as Puzzle mode:
 | 2★ | 20 |
 | 1★ | 10 |
 
-**First-clear bonus**: +30 coins on first completion of any Launch stage (lower than
-Puzzle's 50 since Launch stages are procedurally unlimited).
+**First-clear bonus**: +50 coins on first completion of any Launch stage (parity with Puzzle).
 
 > **Implemented** (2026-04-15): `GameRepository.saveLaunchProgress()` calls
 > `addCoins(starCoins + firstClearBonus)` with `require(stars in 1..3)` guard.
@@ -143,7 +142,7 @@ where starCoins = { 3: 30, 2: 20, 1: 10 }
 ### Cat Launch Earnings Per Stage
 
 ```
-launchFirstClearCoins(stars) = starCoins(stars) + 30
+launchFirstClearCoins(stars) = starCoins(stars) + 50
 launchReplayCoins(stars) = starCoins(stars)
 
 where starCoins = { 3: 30, 2: 20, 1: 10 }
@@ -211,7 +210,7 @@ Surplus: ~21,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 |--------|-------------|
 | **Puzzle System** | Primary coin source (stage clears) and primary coin sink (power-ups) |
 | **Progression System** | Achievement unlocks trigger coin rewards |
-| **Cat Launch System** | Shares coin pool; awards coins on stage clears (10/20/30 + 30 first-clear) |
+| **Cat Launch System** | Shares coin pool; awards coins on stage clears (10/20/30 + 50 first-clear) |
 | **Ad System** | No direct monetization tie — ads gate hints/solve, not coins |
 | **UI System** | Displays coin balance in HUD; power-up buttons show costs |
 
@@ -229,7 +228,7 @@ Surplus: ~21,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 | Achievement rewards | 10-500 | `AchievementDefs.ALL` |
 | Endless star coins | 10 / 20 / 30 | `PuzzleActivity.handleStageClear()` |
 | Launch star coins | 10 / 20 / 30 | `GameRepository.saveLaunchProgress()` |
-| Launch first-clear bonus | 30 | `GameRepository.saveLaunchProgress()` |
+| Launch first-clear bonus | 50 | `GameRepository.saveLaunchProgress()` |
 
 ---
 
@@ -244,7 +243,7 @@ Surplus: ~21,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 ### Cat Launch Coin Sources (2)
 
 4. **Launch star coins**: `saveLaunchProgress(stageId, stars)` must award `starCoins(stars)` on every clear. Star-to-coin mapping is identical to Puzzle: `{3: 30, 2: 20, 1: 10}`.
-5. **Launch first-clear bonus**: First completion of a Launch stage awards +30 bonus coins. Subsequent clears of the same stage award 0 bonus. `totalCoinsEarned` must increase by `starCoins + bonus`.
+5. **Launch first-clear bonus**: First completion of a Launch stage awards +50 bonus coins (parity with Puzzle). Subsequent clears of the same stage award 0 bonus. `totalCoinsEarned` must increase by `starCoins + bonus`.
 
 ### Achievement Coin Sources (2)
 
