@@ -222,6 +222,9 @@ Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 
 ## G. Tuning Knobs
 
+> **Ownership**: Economy GDD is the single source of truth for all coin/reward values.
+> Other GDDs (Puzzle, Cat Launch, Progression) reference these values but do not redefine them.
+
 | Parameter | Current Value | Location |
 |-----------|--------------|----------|
 | Star coin rewards | 10 / 20 / 30 | `GameRepository.saveProgress()` |
