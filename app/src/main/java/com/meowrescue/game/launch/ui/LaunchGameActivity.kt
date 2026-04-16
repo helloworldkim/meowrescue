@@ -167,10 +167,10 @@ class LaunchGameActivity : AppCompatActivity() {
     // ── Callbacks ──────────────────────────────────────────────────────────
 
     private fun setupCallbacks() {
-        gameView.onStageClear = { catsUsed, stars, tntExplosions ->
+        gameView.onStageClear = { result ->
             lifecycleScope.launch {
-                repository.saveLaunchProgress(currentStageId, stars, selectedDifficulty.coinMultiplier)
-                checkLaunchAchievements(catsUsed, tntExplosions)
+                repository.saveLaunchProgress(currentStageId, result.stars, selectedDifficulty.coinMultiplier, result.score)
+                checkLaunchAchievements(result.catsUsed, result.tntExplosions)
             }
         }
 

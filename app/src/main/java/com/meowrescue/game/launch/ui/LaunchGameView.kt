@@ -41,7 +41,7 @@ class LaunchGameView @JvmOverloads constructor(
     }
 
     // ── Callbacks ────────────────────────────────────────────────────────────
-    var onStageClear: ((catsUsed: Int, stars: Int, tntExplosions: Int) -> Unit)? = null
+    var onStageClear: ((result: com.meowrescue.game.launch.model.StageClearResult) -> Unit)? = null
     var onNextStageClicked: (() -> Unit)? = null
     var onRetryClicked: (() -> Unit)? = null
     var onMenuClicked: (() -> Unit)? = null
@@ -93,7 +93,7 @@ class LaunchGameView @JvmOverloads constructor(
     internal var victoryStars = 0
 
     // ── Pending callback deferral ────────────────────────────────────────────
-    private var pendingStageClear: Triple<Int, Int, Int>? = null
+    private var pendingStageClear: com.meowrescue.game.launch.model.StageClearResult? = null
 
     // ── Celebration particles ────────────────────────────────────────────────
     internal data class CelebrationParticle(
@@ -301,7 +301,7 @@ class LaunchGameView @JvmOverloads constructor(
         val h = holder
         if (!h.surface.isValid) return
         val canvas = h.lockCanvas() ?: return
-        var stageClearData: Triple<Int, Int, Int>? = null
+        var stageClearData: com.meowrescue.game.launch.model.StageClearResult? = null
         try {
             synchronized(lock) {
                 pendingStageClear = null
@@ -312,8 +312,8 @@ class LaunchGameView @JvmOverloads constructor(
         } finally {
             h.unlockCanvasAndPost(canvas)
         }
-        stageClearData?.let { (cats, stars, tntExplosions) ->
-            onStageClear?.invoke(cats, stars, tntExplosions)
+        stageClearData?.let { result ->
+            onStageClear?.invoke(result)
         }
     }
 
@@ -401,7 +401,7 @@ class LaunchGameView @JvmOverloads constructor(
                         spawnCelebrationParticles()
                         ScreenShake.trigger(ScreenShake.Intensity.MEDIUM)
                         HapticManager.vibrateStageClear()
-                        pendingStageClear = Triple(catsUsed, victoryStars, pw.totalTntExplosions)
+                        pendingStageClear = com.meowrescue.game.launch.model.StageClearResult(catsUsed, victoryStars, pw.totalTntExplosions, pw.score)
                     } else if (currentCatIndex < config.catIds.size) {
                         gameState = LaunchGameState.AIMING
                         manualPanActive = false

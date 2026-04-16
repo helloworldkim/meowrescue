@@ -133,11 +133,10 @@ class GameRepository(context: Context) {
 
     // ── Launch Mode Progress ─────────────────────────────────────────
 
-    suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float = 1.0f) = withContext(Dispatchers.IO) {
+    suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float = 1.0f, score: Int = 0) = withContext(Dispatchers.IO) {
         require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
         val existing = db.launchProgressDao().getProgressForStage(stageId)
         val bestStars = maxOf(stars, existing?.stars ?: 0)
-        val score = stars * 50
         val bestScore = maxOf(score, existing?.bestScore ?: 0)
         val isFirstClear = existing == null || !existing.completed
         db.launchProgressDao().saveProgress(
