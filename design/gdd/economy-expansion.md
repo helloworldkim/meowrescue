@@ -15,8 +15,9 @@ date: 2026-04-16
 The Economy Expansion adds 4 coin sink categories to close the economy's open loop
 (currently 9.2x surplus). These sinks serve both core modes and create the first
 aspirational purchases (items costing 150-500 coins vs. the current max of 50).
-The target post-expansion surplus ratio is 2-3x — generous enough for casual mobile
-but scarce enough for spending decisions to matter.
+The target post-expansion surplus ratio is 1.5-2.5x — generous enough for casual mobile
+but scarce enough for spending decisions to matter. The ratio varies by player type:
+completionists who buy all hints approach 1.5x; casual players who skip hints land at ~2.4x.
 
 ### Sink Categories
 
@@ -87,7 +88,7 @@ Skip is treated as a **real 1★ completion** — no special-case logic needed:
 | Mastery achievements (star3_10…) | **No — naturally blocked** | Skip awards 1★; 3★ required for mastery achievements |
 | Gameplay achievements (speed_5s, no_undo…) | **No — naturally blocked** | Skip has no play data (moves=0, time=0); conditions unmet |
 | First-clear bonus (50 coins) | **No — forced blocked** | `isFirstClear` forced false in skip flow |
-| Replaying skipped stage later | Full normal play | Player can earn 2★/3★, first-clear bonus, and proper score on replay |
+| Replaying skipped stage later | Full normal play (no first-clear bonus) | Player can earn 2★/3★ and proper score on replay, but first-clear bonus is permanently forfeited (see Edge Case 10) |
 
 ### Sink 4: Grid Themes (Puzzle Mode)
 
@@ -195,12 +196,12 @@ postExpansionSurplusRatio = totalIncome / totalSinkCapacity
 2. **Paid hint insufficient balance**: Given balance < 20, tapping hint shows "코인이 부족합니다!" toast. No hint shown, no coins deducted.
 3. **Cosmetic purchase persistence**: After `spendCoins(150)` for a color palette, the cosmetic must persist across app restarts. `getCoins()` decreases by 150.
 4. **Cosmetic locked-cat guard**: Given cat ID 7 not yet unlocked, attempting to purchase its cosmetic must be blocked at the UI level (button disabled).
-5. **Skip awards 1★ only**: `saveProgress(stageId, 1, null, 0)` with `isFirstClear` forced false. No first-clear bonus. No score.
+5. **Skip awards 1★ only**: Given the player taps Skip on an uncompleted stage with 100+ coins: (a) the stage tile in Stage Select shows 1★, (b) coin balance decreases by exactly 100, (c) no first-clear bonus (50 coins) is awarded, (d) no score is recorded for the stage.
 6. **Skip limit enforcement**: After using 1 skip in World 3 (stages 61-90), no further skips are available for any stage in World 3.
 7. **Theme unlock persistence**: After purchasing a theme, it appears in the theme selector and persists across restarts.
-8. **Theme override in play**: When a purchased theme is selected, `PuzzleRenderer` uses the custom palette instead of `WorldTheme.forStage()` colors.
-9. **Surplus ratio**: Total first-clear income (puzzle + launch) + achievement income must not exceed 2.5× total sink capacity. Verified by formula, not runtime.
-10. **No gameplay advantage from cosmetics**: Cat cosmetics must not change hitbox size, ability parameters, or any gameplay-affecting property.
+8. **Theme override in play**: Given the Neon theme is purchased and selected, launching any puzzle stage must display the Neon color palette (bright neon on dark background) for grid, cells, and blocks — regardless of which world the stage belongs to. The world's default colors must not appear.
+9. **Surplus ratio**: Total first-clear income (22,180) / total sink capacity (13,300) = 1.67x. Must remain within 1.5-2.5× range. Verified by formula when any income source or sink price changes, not at runtime.
+10. **No gameplay advantage from cosmetics**: Given cat #1 with Color Palette cosmetic active in Cat Launch: (a) trajectory and collision behavior must be identical to cat #1 without cosmetic on the same stage, (b) no ability stats change. Verified by code review of cosmetic rendering path confirming it is render-only.
 11. **Skip triggers cat unlock**: Given stage 75 is uncompleted and cat #6 is locked, skipping stage 75 must call `saveProgress(75, 1, null, 0)` then `getNewlyUnlockedCat(75)` must return cat #6. Congratulations dialog shown.
 12. **Skip triggers progress achievements**: Given `maxCompletedLevel == 89`, skipping stage 90 must trigger `clear_90` ("숲 졸업") achievement and award its 50-coin reward.
 13. **Skip does NOT trigger mastery/gameplay achievements**: Given skip on any stage, `star3_*` achievements must not trigger (skip awards 1★, not 3★). `speed_*`, `no_undo`, `optimal_clear` must not trigger (no play data).
