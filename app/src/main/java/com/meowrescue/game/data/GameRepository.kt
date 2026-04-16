@@ -39,6 +39,9 @@ class GameRepository(context: Context) {
 
         /** Maximum number of unique Launch stages that earn the first-clear bonus. */
         const val LAUNCH_FIRST_CLEAR_CAP = 50
+
+        /** Maximum Endless coins earnable per day. */
+        const val ENDLESS_DAILY_COIN_CAP = 150
     }
 
     // ── Progress ────────────────────────────────────────────────────────
@@ -121,6 +124,32 @@ class GameRepository(context: Context) {
 
     fun setEndlessBest(best: Int) {
         prefs.edit().putInt("endless_best", best).apply()
+    }
+
+    // ── Endless Daily Coin Cap ───────────────────────────────────────────
+
+    /** Returns how many Endless coins have been earned today. Resets at midnight (local). */
+    fun getDailyEndlessCoins(): Int {
+        val savedDate = prefs.getString("endless_coin_date", "") ?: ""
+        val today = java.time.LocalDate.now().toString()
+        return if (savedDate == today) prefs.getInt("endless_coin_today", 0) else 0
+    }
+
+    /** Adds Endless coins up to the daily cap. Returns the actual amount added (may be less than requested). */
+    suspend fun addEndlessCoins(amount: Int): Int {
+        val today = java.time.LocalDate.now().toString()
+        val savedDate = prefs.getString("endless_coin_date", "") ?: ""
+        val current = if (savedDate == today) prefs.getInt("endless_coin_today", 0) else 0
+        val remaining = (ENDLESS_DAILY_COIN_CAP - current).coerceAtLeast(0)
+        val actual = amount.coerceAtMost(remaining)
+        if (actual > 0) {
+            prefs.edit()
+                .putString("endless_coin_date", today)
+                .putInt("endless_coin_today", current + actual)
+                .apply()
+            addCoins(actual)
+        }
+        return actual
     }
 
     // ── Tutorial ─────────────────────────────────────────────────────────

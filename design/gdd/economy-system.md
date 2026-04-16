@@ -53,6 +53,9 @@ Total per first clear: 60-80 coins. Replay: 10-30 coins.
 #### Endless Mode Clear
 
 Same star-based rewards as Puzzle (10/20/30). No first-clear bonus (every clear is "new").
+**Daily coin cap**: Maximum **150 coins per day** from Endless mode. Resets at midnight
+(local time). After the cap, play continues but coins are not awarded. Stars, endlessCount,
+and endlessBest continue to track normally.
 
 #### Achievement Rewards
 
@@ -234,6 +237,7 @@ Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 | Shuffle cost | 50 | `PuzzleActivity.handlePowerUp()` |
 | Achievement rewards | 10-500 | `AchievementDefs.ALL` |
 | Endless star coins | 10 / 20 / 30 | `PuzzleActivity.handleStageClear()` |
+| Endless daily coin cap | 150 | `GameRepository.ENDLESS_DAILY_COIN_CAP` |
 | Launch star coins | 10 / 20 / 30 | `GameRepository.saveLaunchProgress()` |
 | Launch first-clear bonus | 50 | `GameRepository.saveLaunchProgress()` |
 

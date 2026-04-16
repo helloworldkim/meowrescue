@@ -236,9 +236,9 @@ class PuzzleActivity : AppCompatActivity() {
                 if (endlessCount > repository.getEndlessBest()) {
                     repository.setEndlessBest(endlessCount)
                 }
-                // Award coins in endless mode too
+                // Award coins in endless mode (daily cap: 150 coins/day)
                 val starCoins = when (stars) { 3 -> 30; 2 -> 20; else -> 10 }
-                repository.addCoins(starCoins)
+                repository.addEndlessCoins(starCoins)
                 AdManager.onStageClear()
                 // Endless achievements
                 if (endlessCount >= 10) repository.unlockAchievement("endless_10")
