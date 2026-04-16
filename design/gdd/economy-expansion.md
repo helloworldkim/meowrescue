@@ -24,13 +24,14 @@ completionists who buy all hints approach 1.5x; casual players who skip hints la
 | # | Sink | Mode | Price Range | Total Capacity |
 |---|------|------|-------------|---------------|
 | 1 | Additional Hints | Puzzle | 20 coins/hint | ~4,000 coins |
-| 2 | Cat Cosmetics | Both | 150-300 coins/variant | ~5,850 coins |
+| 2 | Cat Cosmetics | Both | 100-1,000 coins/variant (tiered by rarity) | ~9,900 coins |
 | 3 | Stage Skip | Puzzle | 100 coins/skip | ~700 coins |
 | 4 | Grid Themes | Puzzle | 300-500 coins/theme | ~2,400 coins |
-| | **Total sink capacity** | | | **~12,950 coins** |
+| | **Total sink capacity** | | | **~17,000 coins** |
 
 Against ~22,180 total income (puzzle 18,180 + launch 4,000 assuming 50 stages, all 3★),
-this yields a ~1.7x surplus ratio — within the 2-3x target.
+this yields a ~1.3x surplus ratio — within the 1.5-2.5x target for completionists.
+Casual players who skip Legendary cosmetics land at ~1.8-2.0x.
 
 ## B. Player Fantasy
 
@@ -55,18 +56,28 @@ rewards."
 ### Sink 2: Cat Cosmetics (Both Modes)
 
 - Each of the 13 cats gets **2 cosmetic variants** (26 total items).
-- Variant types: **Color Palette** (recolor, 150 coins) and **Accessory** (hat/scarf overlay, 300 coins).
+- Variant types: **Color Palette** (recolor) and **Accessory** (hat/scarf overlay).
+- Prices scale by cat rarity (unlock order = rarity tier).
 - Cosmetics are purely visual — no gameplay effect.
 - Unlocked cosmetics persist forever (one-time purchase).
 - Cosmetics apply in both Puzzle mode (cat block visual) and Cat Launch mode (projectile sprite).
 - A cat must be **unlocked** before its cosmetics can be purchased.
 - Purchased via a new **Shop tab** in the Collection screen.
 
-| Item Type | Count | Price | Subtotal |
-|-----------|-------|-------|----------|
-| Color Palette (13 cats) | 13 | 150 | 1,950 |
-| Accessory (13 cats) | 13 | 300 | 3,900 |
-| **Total** | **26** | | **5,850** |
+| Tier | Cats | Unlock Stages | Palette | Accessory |
+|------|------|--------------|---------|-----------|
+| Common | 나비, 봄이, 여름 (#1-3) | 1, 15, 30 | 100 | 200 |
+| Uncommon | 가을, 겨울, 솜이, 꽃이 (#4-7) | 45, 60, 75, 90 | 200 | 400 |
+| Rare | 하늘, 바다, 무지개, 보석 (#8-11) | 110, 130, 150, 170 | 300 | 600 |
+| Legendary | 왕자, 공주 (#12-13) | 185, 200 | 500 | 1,000 |
+
+| Tier | Count | Palette Subtotal | Accessory Subtotal | Tier Total |
+|------|-------|------------------|--------------------|------------|
+| Common (3) | 6 | 300 | 600 | 900 |
+| Uncommon (4) | 8 | 800 | 1,600 | 2,400 |
+| Rare (4) | 8 | 1,200 | 2,400 | 3,600 |
+| Legendary (2) | 4 | 1,000 | 2,000 | 3,000 |
+| **Total** | **26** | **3,300** | **6,600** | **9,900** |
 
 ### Sink 3: Stage Skip (Puzzle Mode)
 
@@ -114,12 +125,13 @@ Purchased via a new **Themes** section in Settings or Collection screen.
 | Sink | Capacity |
 |------|----------|
 | Hints (est. 200 purchases) | 4,000 |
-| Cat Cosmetics (26 items) | 5,850 |
+| Cat Cosmetics (26 items, tiered) | 9,900 |
 | Stage Skip (7 max, effective cost 150 each) | 1,050 |
 | Grid Themes (6 items) | 2,400 |
-| **Total** | **13,300** |
+| **Total** | **17,350** |
 
-Post-expansion surplus: ~22,180 / 13,300 ≈ **1.67x** (within 2-3x target).
+Post-expansion surplus: ~22,180 / 17,350 ≈ **1.28x** (completionist). Casual players
+who buy only Common/Uncommon cosmetics: ~22,180 / 10,750 ≈ **2.1x**.
 
 > **Note**: Income assumes 50 Cat Launch stages (all 3★). Launch stages are
 > procedurally unlimited — a dedicated Launch player can exceed this. See
@@ -130,7 +142,15 @@ Post-expansion surplus: ~22,180 / 13,300 ≈ **1.67x** (within 2-3x target).
 ```
 hintCost = 20 (flat, per hint after 2 free)
 
-cosmeticCost(type) = { colorPalette: 150, accessory: 300 }
+cosmeticCost(tier, type) = {
+  common:    { palette: 100, accessory: 200 },
+  uncommon:  { palette: 200, accessory: 400 },
+  rare:      { palette: 300, accessory: 600 },
+  legendary: { palette: 500, accessory: 1000 }
+}
+catTier(catId) = {
+  1-3: common, 4-7: uncommon, 8-11: rare, 12-13: legendary
+}
 
 skipCost = 100 (flat)
 skipStarAward = 1 (minimum completion)
@@ -138,12 +158,16 @@ skipFirstClearBonus = 0
 
 themeCost(tier) = { standard: 300, premium: 400, deluxe: 500 }
 
-totalSinkCapacity = (200 * 20) + (13 * 150 + 13 * 300) + (7 * 150) + (2*300 + 2*400 + 2*500)
-                  = 4,000 + 5,850 + 1,050 + 2,400 = 13,300
-                  (skip effective cost = 100 paid + 50 lost first-clear = 150 per skip)
+totalSinkCapacity = hints + cosmetics + skips + themes
+  hints    = 200 * 20 = 4,000
+  cosmetics = 3*(100+200) + 4*(200+400) + 4*(300+600) + 2*(500+1000) = 9,900
+  skips    = 7 * 150 = 1,050  (100 paid + 50 lost first-clear per skip)
+  themes   = 2*300 + 2*400 + 2*500 = 2,400
+  total    = 4,000 + 9,900 + 1,050 + 2,400 = 17,350
 
 postExpansionSurplusRatio = totalIncome / totalSinkCapacity
-                          ≈ 22,180 / 13,300 ≈ 1.67x
+  completionist: 22,180 / 17,350 ≈ 1.28x
+  casual (common+uncommon only): 22,180 / 10,750 ≈ 2.06x
 ```
 
 ---
@@ -180,8 +204,14 @@ postExpansionSurplusRatio = totalIncome / totalSinkCapacity
 | Parameter | Value | Safe Range | Affects |
 |-----------|-------|------------|---------|
 | Hint price | 20 | 10-50 | Spending frequency; <10 = no decision; >50 = avoidance |
-| Color Palette price | 150 | 80-250 | Mid-game aspiration target |
-| Accessory price | 300 | 150-500 | Late-game aspiration target |
+| Common Palette | 100 | 50-150 | First purchase experience; must feel reachable early |
+| Common Accessory | 200 | 100-300 | Early-game casual purchase |
+| Uncommon Palette | 200 | 100-300 | Mid-game standard purchase |
+| Uncommon Accessory | 400 | 200-600 | Mid-game "save up" target |
+| Rare Palette | 300 | 200-500 | Late-mid aspiration |
+| Rare Accessory | 600 | 400-800 | Late-game aspiration |
+| Legendary Palette | 500 | 300-700 | End-game prestige purchase |
+| Legendary Accessory | 1,000 | 600-1,500 | Ultimate aspiration target; "worth saving for" |
 | Skip price | 100 | 50-200 | Frustration relief vs. devaluing puzzle mastery |
 | Skip limit per world | 1 | 0-3 | Total skip capacity; >2 trivializes progression |
 | Standard theme price | 300 | 150-400 | Collection completionism pacing |
@@ -194,13 +224,13 @@ postExpansionSurplusRatio = totalIncome / totalSinkCapacity
 
 1. **Paid hint deduction**: Given 0 free hints remaining and balance ≥ 20, tapping hint must call `spendCoins(20)` then show the next optimal move. Balance decreases by 20.
 2. **Paid hint insufficient balance**: Given balance < 20, tapping hint shows "코인이 부족합니다!" toast. No hint shown, no coins deducted.
-3. **Cosmetic purchase persistence**: After `spendCoins(150)` for a color palette, the cosmetic must persist across app restarts. `getCoins()` decreases by 150.
+3. **Cosmetic purchase persistence**: After purchasing a Common Color Palette (100 coins) for cat #1, the cosmetic must persist across app restarts. `getCoins()` decreases by 100. Same behavior for all tiers (Uncommon 200, Rare 300, Legendary 500).
 4. **Cosmetic locked-cat guard**: Given cat ID 7 not yet unlocked, attempting to purchase its cosmetic must be blocked at the UI level (button disabled).
 5. **Skip awards 1★ only**: Given the player taps Skip on an uncompleted stage with 100+ coins: (a) the stage tile in Stage Select shows 1★, (b) coin balance decreases by exactly 100, (c) no first-clear bonus (50 coins) is awarded, (d) no score is recorded for the stage.
 6. **Skip limit enforcement**: After using 1 skip in World 3 (stages 61-90), no further skips are available for any stage in World 3.
 7. **Theme unlock persistence**: After purchasing a theme, it appears in the theme selector and persists across restarts.
 8. **Theme override in play**: Given the Neon theme is purchased and selected, launching any puzzle stage must display the Neon color palette (bright neon on dark background) for grid, cells, and blocks — regardless of which world the stage belongs to. The world's default colors must not appear.
-9. **Surplus ratio**: Total first-clear income (22,180) / total sink capacity (13,300) = 1.67x. Must remain within 1.5-2.5× range. Verified by formula when any income source or sink price changes, not at runtime.
+9. **Surplus ratio**: Total first-clear income (22,180) / total sink capacity (17,350) = 1.28x (completionist) to 2.06x (casual). Must remain within 1.0-2.5× range for completionists. Verified by formula when any income source or sink price changes, not at runtime.
 10. **No gameplay advantage from cosmetics**: Given cat #1 with Color Palette cosmetic active in Cat Launch: (a) trajectory and collision behavior must be identical to cat #1 without cosmetic on the same stage, (b) no ability stats change. Verified by code review of cosmetic rendering path confirming it is render-only.
 11. **Skip triggers cat unlock**: Given stage 75 is uncompleted and cat #6 is locked, skipping stage 75 must call `saveProgress(75, 1, null, 0)` then `getNewlyUnlockedCat(75)` must return cat #6. Congratulations dialog shown.
 12. **Skip triggers progress achievements**: Given `maxCompletedLevel == 89`, skipping stage 90 must trigger `clear_90` ("숲 졸업") achievement and award its 50-coin reward.
