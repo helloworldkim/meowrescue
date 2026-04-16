@@ -190,9 +190,10 @@ Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 ```
 
 > **Balance Concern — MITIGATED**: Pre-expansion surplus is ~9.7x (power-ups only).
-> Economy Expansion (economy-expansion.md) adds 12,950 coins of sink capacity,
-> bringing the post-expansion ratio to ~23,180/12,950 ≈ **1.8x** (within 2-3x target).
-> Cat Launch first-clear is capped at 50 unique stages to prevent unbounded income.
+> Economy Expansion (economy-expansion.md) adds 17,350 coins of sink capacity
+> (tiered cosmetics 9,900 + hints 4,000 + skips 1,050 + themes 2,400), bringing
+> the post-expansion ratio to completionist **1.28x** / casual **2.06x**.
+> Cat Launch first-clear is capped at 50 unique stages. Endless has a 150 coin/day cap.
 
 ---
 
