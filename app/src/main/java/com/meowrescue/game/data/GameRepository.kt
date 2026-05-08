@@ -104,6 +104,12 @@ class GameRepository(context: Context) : IGameRepository {
         sharedPrefs.setStagesSinceLastAd(count)
     }
 
+    override fun getSelectedThemeId(): String? = sharedPrefs.getSelectedThemeId()
+
+    override fun setSelectedThemeId(value: String?) {
+        sharedPrefs.setSelectedThemeId(value)
+    }
+
     // ── Endless Mode ─────────────────────────────────────────────────
 
     override fun getEndlessCount(): Int = sharedPrefs.getEndlessCount()

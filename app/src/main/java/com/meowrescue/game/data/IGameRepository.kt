@@ -171,6 +171,20 @@ interface IGameRepository {
      */
     fun updateLaunchBestScore(difficulty: Difficulty, score: Int)
 
+    // ── World Theme ───────────────────────────────────────────────────────
+
+    /**
+     * Returns the player's cosmetic theme override ID, or null if none selected.
+     * Sync — reads SharedPreferences directly (ADR-0009).
+     */
+    fun getSelectedThemeId(): String?
+
+    /**
+     * Persists the cosmetic theme override ID. Pass null to clear the override
+     * (player returns to progression-based theming).
+     */
+    fun setSelectedThemeId(value: String?)
+
     // ── Ad Counter ────────────────────────────────────────────────────────
 
     /** Returns the number of stage clears since the last interstitial ad was shown. */

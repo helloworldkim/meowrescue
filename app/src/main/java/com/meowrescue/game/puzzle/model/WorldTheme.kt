@@ -75,6 +75,7 @@ data class WorldTheme(
         )
 
         fun forStage(stage: Int): WorldTheme {
+            require(stage >= 1) { "stage must be >= 1 (got $stage)" }
             val index = when {
                 stage <= 30  -> 0
                 stage <= 60  -> 1
@@ -82,10 +83,15 @@ data class WorldTheme(
                 stage <= 120 -> 3
                 stage <= 150 -> 4
                 stage <= 180 -> 5
-                stage <= 200 -> 6
-                else         -> stage % THEMES.size  // Endless: cycle through all themes
+                else         -> 6
             }
             return THEMES[index]
+        }
+
+        /** Endless mode: cycles all 7 themes via [generatedStageId] % 7. */
+        fun forEndlessStage(generatedStageId: Int): WorldTheme {
+            require(generatedStageId >= 1) { "generatedStageId must be >= 1 (got $generatedStageId)" }
+            return THEMES[generatedStageId % THEMES.size]
         }
 
         fun all(): List<WorldTheme> = THEMES

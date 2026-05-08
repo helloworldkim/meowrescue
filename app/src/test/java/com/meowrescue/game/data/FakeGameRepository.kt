@@ -224,6 +224,14 @@ public class FakeGameRepository(
         prefs[KEY_STAGES_SINCE_AD] = count
     }
 
+    override fun getSelectedThemeId(): String? =
+        prefs[KEY_SELECTED_THEME_ID] as? String
+
+    override fun setSelectedThemeId(value: String?) {
+        if (value == null) prefs.remove(KEY_SELECTED_THEME_ID)
+        else prefs[KEY_SELECTED_THEME_ID] = value
+    }
+
     // ── Private key constants ─────────────────────────────────────────────
 
     private companion object {
@@ -235,5 +243,6 @@ public class FakeGameRepository(
         const val KEY_POWERUP_USE_COUNT = "powerUpUseCount"
         const val KEY_SOUND_ENABLED = "soundEnabled"
         const val KEY_STAGES_SINCE_AD = "stagesSinceLastAd"
+        const val KEY_SELECTED_THEME_ID = "selected_theme_id"
     }
 }
