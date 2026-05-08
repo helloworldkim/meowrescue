@@ -1,0 +1,30 @@
+# .github/workflows/layer-checks.yml
+#
+# Enforces the 9 grep-detectable forbidden patterns from
+# docs/registry/architecture.yaml. See ADR-0006 § Enforcement Mechanism.
+# Script lives at tools/ci/check-layer-boundaries.sh (story 002).
+#
+# The 10th forbidden pattern (non_stateflow_coin_display) is code-review
+# only — see production/qa/checklists/layer-boundary-review.md (story 004).
+#
+# Branch protection: enable "Layer Boundaries / check" as a required status
+# check on main in GitHub repo settings (repo-admin UI action).
+
+name: Layer Boundaries
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run layer-boundary checks
+        run: bash tools/ci/check-layer-boundaries.sh
