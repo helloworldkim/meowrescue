@@ -269,7 +269,8 @@ class LaunchGameActivity : AppCompatActivity() {
         for (catId in catIds.distinct()) {
             val def = GameRepository.CAT_DEFINITIONS.firstOrNull { it.id == catId }
             val resId = def?.drawableRes ?: R.drawable.cat_1
-            val bmp = BitmapFactory.decodeResource(resources, resId)
+            val opts = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
+            val bmp = BitmapFactory.decodeResource(resources, resId, opts)
             if (bmp != null) map[catId] = bmp
         }
         return map

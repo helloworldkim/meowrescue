@@ -146,6 +146,7 @@ class LaunchGameView @JvmOverloads constructor(
 
     init {
         holder.addCallback(this)
+        holder.setFormat(android.graphics.PixelFormat.RGB_565)
         setZOrderOnTop(false)
     }
 

@@ -38,7 +38,7 @@ class LaunchPhysicsWorld {
 
         const val SETTLED_VELOCITY_THRESHOLD = 0.2f
         private const val DAMAGE_MULTIPLIER = 10f
-        private const val DEBRIS_PER_OBSTACLE = 6
+        private const val DEBRIS_PER_OBSTACLE = 4
         private const val DEFAULT_PROJECTILE_RADIUS = 0.25f
 
         private const val TNT_BLAST_RADIUS = 2.0f
