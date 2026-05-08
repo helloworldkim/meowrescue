@@ -694,8 +694,9 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
 
             if (isSnapping) {
                 val snapElapsed = (System.currentTimeMillis() - view.snapStartTime).toFloat() / PuzzleView.SNAP_DURATION_MS
-                val t = snapElapsed.coerceIn(0f, 1f)
-                val easeT = 1f - (1f - t) * (1f - t)
+                // A-3: cubic ease-out — faster initial travel, longer deceleration tail
+                val rawT = snapElapsed.coerceIn(0f, 1f)
+                val easeT = 1f - (1f - rawT) * (1f - rawT) * (1f - rawT)
                 val curCol = view.snapFromCol + (block.col - view.snapFromCol) * easeT
                 val curRow = view.snapFromRow + (block.row - view.snapFromRow) * easeT
                 left = view.boardLeft + curCol * view.cellSize + padding
@@ -703,6 +704,11 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
             } else if (isDragging && view.dragAxis != 0) {
                 left += view.dragSmoothX
                 top  += view.dragSmoothY
+            }
+
+            // A-2: apply post-snap micro-shake to the block that just landed
+            if (block.id == view.lastSnapBlockId && view.snapShakeOffset != 0f) {
+                left += view.snapShakeOffset
             }
 
             val widthCells  = if (block.isHorizontal || block.length == 1) block.length else 1
@@ -832,7 +838,7 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
         )
 
         paints.tutTitlePaint.textSize = 22 * density
-        paints.tutBodyPaint.textSize = 15 * density
+        paints.tutBodyPaint.textSize = 16 * density
         val cx = w / 2f
 
         when (view.tutorialStep) {
@@ -865,7 +871,7 @@ class PuzzleRenderer(private val view: PuzzleView, private val paints: PuzzlePai
 
         if (view.tutorialAutoDismissAt == 0L) {
             val pulsed = (sin(view.tutorialPulse * 2.0) * 0.3 + 0.7).toFloat()
-            paints.tutHintPaint.textSize = 13 * density
+            paints.tutHintPaint.textSize = 14 * density
             paints.tutHintPaint.alpha = (pulsed * 255).toInt()
             canvas.drawText("Tap to continue", cx, panelT + panelH - 18 * density, paints.tutHintPaint)
         }

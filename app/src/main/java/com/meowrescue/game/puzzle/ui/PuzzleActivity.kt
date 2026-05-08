@@ -17,6 +17,7 @@ import com.google.android.gms.ads.AdView
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.AchievementDefs
 import com.meowrescue.game.data.GameRepository
+import com.meowrescue.game.ui.CatAssetResolver
 import com.meowrescue.game.puzzle.engine.PuzzleGenerator
 import com.meowrescue.game.puzzle.engine.PuzzleSolver
 import com.meowrescue.game.puzzle.model.GenerateResult
@@ -94,7 +95,7 @@ class PuzzleActivity : AppCompatActivity() {
             FrameLayout.LayoutParams.MATCH_PARENT
         ))
 
-        loadingOverlay = PuzzleOverlays.buildLoadingOverlay(this, repository.getSelectedCatDrawable(), dp)
+        loadingOverlay = PuzzleOverlays.buildLoadingOverlay(this, CatAssetResolver.getDrawable(repository.getSelectedCatId()), dp)
         frameRoot.addView(loadingOverlay, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -127,7 +128,7 @@ class PuzzleActivity : AppCompatActivity() {
         enableImmersiveMode()
 
         // Load selected cat bitmap
-        val catRes = repository.getSelectedCatDrawable()
+        val catRes = CatAssetResolver.getDrawable(repository.getSelectedCatId())
         puzzleView.setCatBitmap(catRes)
 
         setupCallbacks()
@@ -172,28 +173,12 @@ class PuzzleActivity : AppCompatActivity() {
             loadingOverlay.visibility = View.GONE
             puzzleView.visibility = View.VISIBLE
 
-            // Show tutorial for stages 1-3 (only first time ever)
-            if (!isEndless && !repository.isTutorialCompleted()) {
-                when (stage) {
-                    1 -> {
-                        puzzleView.tutorialStep = 0
-                        puzzleView.tutorialAutoDismissAt = 0L
-                        puzzleView.onTutorialDismissed = {
-                            repository.setTutorialCompleted()
-                        }
-                    }
-                    2 -> {
-                        puzzleView.tutorialStep = 10
-                        puzzleView.tutorialAutoDismissAt = System.currentTimeMillis() + 2500L
-                        puzzleView.onTutorialDismissed = null
-                    }
-                    3 -> {
-                        puzzleView.tutorialStep = 20
-                        puzzleView.tutorialAutoDismissAt = System.currentTimeMillis() + 2500L
-                        puzzleView.onTutorialDismissed = {
-                            repository.setTutorialCompleted()
-                        }
-                    }
+            // Show tutorial on stage 1 only (first time ever)
+            if (!isEndless && stage == 1 && !repository.isTutorialCompleted()) {
+                puzzleView.tutorialStep = 0
+                puzzleView.tutorialAutoDismissAt = 0L
+                puzzleView.onTutorialDismissed = {
+                    repository.setTutorialCompleted()
                 }
             }
 
@@ -244,12 +229,11 @@ class PuzzleActivity : AppCompatActivity() {
                 if (endlessCount >= 10) repository.unlockAchievement("endless_10")
                 if (endlessCount >= 50) repository.unlockAchievement("endless_50")
             } else {
-                val prevMax = repository.getMaxCompletedLevel()
-                repository.saveProgress(currentStage, stars, null, score)
+                val isFirstClear = repository.saveProgress(currentStage, stars, score)
                 AdManager.onStageClear()
 
                 // Check for new cat unlock (only on first-time clear)
-                if (currentStage > prevMax) {
+                if (isFirstClear) {
                     val newCat = repository.getNewlyUnlockedCat(currentStage)
                     if (newCat != null) {
                         showCongratsDialog(newCat)

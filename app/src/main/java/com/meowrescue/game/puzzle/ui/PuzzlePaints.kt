@@ -41,7 +41,7 @@ class PuzzlePaints(density: Float) {
         color = 0xFF4E342E.toInt(); textAlign = Paint.Align.CENTER
     }
     val tutHintPaint  = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF9E9E9E.toInt(); textAlign = Paint.Align.CENTER
+        color = 0xFF616161.toInt(); textAlign = Paint.Align.CENTER
     }
 
     val starInfoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

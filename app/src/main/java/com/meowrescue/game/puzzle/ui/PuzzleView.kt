@@ -82,6 +82,7 @@ class PuzzleView @JvmOverloads constructor(
         private const val TOOLBAR_HEIGHT_DP = 80f
         internal const val ARROW_AREA_DP    = 48f
         private const val AUTO_SOLVE_DELAY_MS = 350L
+        private const val SNAP_SHAKE_FRAMES = 4
     }
 
     // ── Callbacks ──────────────────────────────────────────────────────────
@@ -176,6 +177,12 @@ class PuzzleView @JvmOverloads constructor(
     internal var snapFromRow   = 0f
     internal var snapStartTime = 0L
     internal var snapPendingSolveCheck = false
+
+    // ── Post-snap block shake (A-2) ───────────────────────────────────────
+    internal var lastSnapBlockId    = -1
+    internal var snapShakeOffset    = 0f
+    internal var snapShakeStartTime = 0L
+    private val snapShakeAmpPx get() = 4f * resources.displayMetrics.density
 
     // ── Cat escape animation ──────────────────────────────────────────────
     internal var escapePhase = 0
@@ -341,7 +348,8 @@ class PuzzleView @JvmOverloads constructor(
             grid = init.clone()
             resetAnimationState()
         }
-        SoundManager.playButtonTap()
+        // Treat manual reset as a give-up moment — play level fail SFX (A-1)
+        SoundManager.playLevelFail()
     }
 
     /** Ice power-up: remove one random non-cat, non-key, non-wall block. Returns true if removed. */
@@ -416,6 +424,7 @@ class PuzzleView @JvmOverloads constructor(
         autoSolveSteps = emptyList(); autoSolveIndex = 0
         autoSolveNextTime = 0L; screenFlashAlpha = 0f
         // New state
+        lastSnapBlockId = -1; snapShakeOffset = 0f; snapShakeStartTime = 0L
         comboCount = 0; lastMoveTime = 0L; comboDisplayAlpha = 0f
         comboDisplayScale = 1f; comboDisplayY = 0f; maxCombo = 0; score = 0
         timeScale = 1f; coinAnimActive = false
@@ -596,10 +605,29 @@ class PuzzleView @JvmOverloads constructor(
             if (elapsed >= SNAP_DURATION_MS) {
                 snapAnimating = false
 
-                // Sound + haptic + shake on block snap
-                SoundManager.playBlockMatch()
+                // Combo tracking: increment if within 2 s of previous snap, else reset (A-1)
+                val now2 = System.currentTimeMillis()
+                if (lastMoveTime > 0L && now2 - lastMoveTime < 2000L) {
+                    comboCount++
+                } else {
+                    comboCount = 1
+                }
+                lastMoveTime = now2
+
+                // Combo-aware block match SFX (A-1)
+                // NOTE: playCageDestroy() is loaded but unwired — PuzzleBlock has no cage type;
+                //       wire this when a cage mechanic is added to the block model.
+                if (comboCount >= 2) {
+                    SoundManager.playCascade()
+                } else {
+                    SoundManager.playBlockMatchCombo(comboCount)
+                }
                 HapticManager.vibrateBlockMove()
                 ScreenShake.trigger(ScreenShake.Intensity.LIGHT)
+
+                // Record which block just snapped for post-snap shake (A-2)
+                lastSnapBlockId    = snapBlockId
+                snapShakeStartTime = now2
 
                 if (snapPendingSolveCheck) {
                     snapPendingSolveCheck = false
@@ -725,10 +753,27 @@ class PuzzleView @JvmOverloads constructor(
         }
     }
 
+    // A-2: 4-frame horizontal micro-shake on the block that just snapped to rest.
+    // Only runs after snapAnimating has cleared (i.e. !snapAnimating is already true).
+    private fun updateSnapBlockShake() {
+        if (snapShakeStartTime > 0L && !snapAnimating) {
+            val elapsed = System.currentTimeMillis() - snapShakeStartTime
+            val frameDuration = FRAME_MS * SNAP_SHAKE_FRAMES
+            if (elapsed < frameDuration) {
+                val t = elapsed.toFloat() / frameDuration
+                snapShakeOffset = sin(t * Math.PI.toFloat() * 3f) * snapShakeAmpPx * (1f - t)
+            } else {
+                snapShakeOffset    = 0f
+                snapShakeStartTime = 0L
+            }
+        }
+    }
+
     private fun update() {
         ScreenShake.update()
         updateDragInterpolation()
         updateSnapAnimation()
+        updateSnapBlockShake()
         updateEscapeSequence()
         updateVictoryFade()
         updateTutorial()
