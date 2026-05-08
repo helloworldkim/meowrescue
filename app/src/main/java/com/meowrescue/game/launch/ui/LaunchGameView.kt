@@ -86,7 +86,8 @@ class LaunchGameView @JvmOverloads constructor(
     internal var maxPullDistancePx = 0f
 
     // ── Cat bitmaps ──────────────────────────────────────────────────────────
-    internal var catBitmaps: Map<Int, Bitmap> = emptyMap()
+    // @Volatile ensures main-thread writes are visible to the render thread immediately.
+    @Volatile internal var catBitmaps: Map<Int, Bitmap> = emptyMap()
 
     // ── Victory / Fail overlay ───────────────────────────────────────────────
     internal var victoryAlpha = 0f
