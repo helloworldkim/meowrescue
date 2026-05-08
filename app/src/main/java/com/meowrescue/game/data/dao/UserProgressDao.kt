@@ -6,7 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
-interface UserProgressDao {
+internal interface UserProgressDao {
 
     @Query("SELECT * FROM user_progress WHERE levelId = :levelId")
     fun getProgressForLevel(levelId: Int): UserProgress?
@@ -22,4 +22,7 @@ interface UserProgressDao {
 
     @Query("SELECT MAX(levelId) FROM user_progress WHERE completed = 1")
     fun getMaxCompletedLevel(): Int?
+
+    @Query("SELECT COUNT(*) FROM user_progress WHERE stars >= 3")
+    fun getThreeStarCount(): Int
 }

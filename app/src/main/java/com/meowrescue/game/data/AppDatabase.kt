@@ -8,19 +8,30 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [UserProgress::class, LaunchProgress::class, PlayerStats::class, Achievement::class],
-    version = 3,
-    exportSchema = false
+    entities = [
+        UserProgress::class,
+        LaunchProgress::class,
+        PlayerStats::class,
+        Achievement::class,
+        CosmeticPurchase::class,
+        SelectedCosmetic::class,
+        ThemeUnlock::class,
+    ],
+    version = 5,
+    exportSchema = true
 )
-abstract class AppDatabase : RoomDatabase() {
+internal abstract class AppDatabase : RoomDatabase() {
 
     abstract fun userProgressDao(): UserProgressDao
     abstract fun launchProgressDao(): LaunchProgressDao
     abstract fun playerStatsDao(): PlayerStatsDao
     abstract fun achievementDao(): AchievementDao
+    abstract fun cosmeticDao(): CosmeticDao
+    abstract fun selectedCosmeticDao(): SelectedCosmeticDao
+    abstract fun themeDao(): ThemeDao
 
     companion object {
-        private val MIGRATION_1_2 = object : Migration(1, 2) {
+        internal val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS launch_progress (
@@ -33,7 +44,7 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        private val MIGRATION_2_3 = object : Migration(2, 3) {
+        internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Add bestScore column to user_progress
                 db.execSQL("ALTER TABLE user_progress ADD COLUMN bestScore INTEGER NOT NULL DEFAULT 0")
@@ -70,9 +81,14 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "meow_rescue_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .build().also { INSTANCE = it }
             }
+        }
+
+        internal fun closeForTesting() {
+            INSTANCE?.close()
+            INSTANCE = null
         }
     }
 }

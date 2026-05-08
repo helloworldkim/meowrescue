@@ -2,7 +2,6 @@ package com.meowrescue.game.ads
 
 import android.app.Activity
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
@@ -15,6 +14,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.meowrescue.game.data.IGameRepository
 
 object AdManager {
 
@@ -31,17 +31,14 @@ object AdManager {
     private var interstitialAd: InterstitialAd? = null
     private var rewardedAd: RewardedAd? = null
 
-    private const val PREFS_NAME = "ad_prefs"
-    private const val KEY_STAGES_SINCE_AD = "stages_since_last_ad"
-
-    private var prefs: SharedPreferences? = null
+    private lateinit var repo: IGameRepository
     private var stagesSinceLastAd: Int = 0
     private var isInitialized = false
 
-    fun initialize(context: Context) {
+    fun initialize(context: Context, repository: IGameRepository) {
         if (isInitialized) return
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        stagesSinceLastAd = prefs?.getInt(KEY_STAGES_SINCE_AD, 0) ?: 0
+        repo = repository
+        stagesSinceLastAd = repo.getStagesSinceLastAd()
         MobileAds.initialize(context) {
             Log.d(TAG, "MobileAds SDK initialized")
             isInitialized = true
@@ -73,7 +70,7 @@ object AdManager {
     }
 
     private fun saveStageCounter() {
-        prefs?.edit()?.putInt(KEY_STAGES_SINCE_AD, stagesSinceLastAd)?.apply()
+        repo.setStagesSinceLastAd(stagesSinceLastAd)
     }
 
     fun shouldShowAd(currentStage: Int): Boolean {

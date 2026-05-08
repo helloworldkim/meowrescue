@@ -89,7 +89,7 @@ class MenuActivity : AppCompatActivity() {
 
         // Cat mascot image (compact)
         catImage = ImageView(this).apply {
-            setImageResource(repository.getSelectedCatDrawable())
+            setImageResource(CatAssetResolver.getDrawable(repository.getSelectedCatId()))
             scaleType = ImageView.ScaleType.FIT_CENTER
             val w = (120 * dp).toInt()
             val h = (160 * dp).toInt()
@@ -240,7 +240,7 @@ class MenuActivity : AppCompatActivity() {
         // Refresh sound button label in case state changed
         if (::soundButton.isInitialized) soundButton.text = soundIcon()
         // Refresh cat mascot in case selection changed
-        if (::catImage.isInitialized) catImage.setImageResource(repository.getSelectedCatDrawable())
+        if (::catImage.isInitialized) catImage.setImageResource(CatAssetResolver.getDrawable(repository.getSelectedCatId()))
         // Show endless button only if 200 stages cleared
         if (::endlessBtn.isInitialized) {
             lifecycleScope.launch {

@@ -3,7 +3,7 @@ package com.meowrescue.game.data
 /**
  * Static achievement definitions. Each has an ID, display info, and coin reward.
  */
-object AchievementDefs {
+internal object AchievementDefs {
 
     data class AchievementDef(
         val id: String,
@@ -58,6 +58,9 @@ object AchievementDefs {
         AchievementDef("endless_10", "끝없는 도전",      "엔들리스 10스테이지 클리어",    "\u267E", 30),
         AchievementDef("endless_50", "무한 구조대원",     "엔들리스 50스테이지 클리어",    "\u267E", 100),
     )
+
+    val TOTAL_REWARD: Int = ALL.sumOf { it.coinReward }
+    init { require(TOTAL_REWARD == 2180) { "Achievement total $TOTAL_REWARD != 2180" } }
 
     private val MAP = ALL.associateBy { it.id }
 

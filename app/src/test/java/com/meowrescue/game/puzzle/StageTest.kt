@@ -211,14 +211,23 @@ class StageTest {
             assertFalse("Stage $s should have no key", f.hasKey)
             assertFalse("Stage $s should have no checkpoint", f.hasCheckpoint)
         }
-        // Stages 16-30: some have key, none have checkpoint
+        // Stages 16-21: keys introduced, no checkpoint yet
         var hasAnyKey = false
-        for (s in 16..30) {
+        for (s in 16..21) {
             val f = gen.featuresForStage(s)
             if (f.hasKey) hasAnyKey = true
             assertFalse("Stage $s should have no checkpoint", f.hasCheckpoint)
         }
-        assertTrue("Some stages 16-30 should have key", hasAnyKey)
+        assertTrue("Some stages 16-21 should have key", hasAnyKey)
+
+        // Stages 22-30: checkpoints introduced, no key
+        var hasAnyCheckpoint = false
+        for (s in 22..30) {
+            val f = gen.featuresForStage(s)
+            assertFalse("Stage $s should have no key", f.hasKey)
+            if (f.hasCheckpoint) hasAnyCheckpoint = true
+        }
+        assertTrue("Some stages 22-30 should have checkpoint", hasAnyCheckpoint)
 
         // Stages 31-50: key XOR checkpoint
         for (s in 31..50) {

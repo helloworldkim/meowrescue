@@ -6,7 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
-interface LaunchProgressDao {
+internal interface LaunchProgressDao {
 
     @Query("SELECT * FROM launch_progress WHERE stageId = :stageId")
     fun getProgressForStage(stageId: Int): LaunchProgress?

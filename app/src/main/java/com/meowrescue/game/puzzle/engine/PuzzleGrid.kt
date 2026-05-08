@@ -1,5 +1,6 @@
 package com.meowrescue.game.puzzle.engine
 
+import com.meowrescue.game.core.util.RngSource
 import com.meowrescue.game.puzzle.model.ExitDirection
 import com.meowrescue.game.puzzle.model.PuzzleBlock
 
@@ -353,5 +354,99 @@ class PuzzleGrid(
         }
         clone.checkpointReached = checkpointReached
         return clone
+    }
+
+    // ── Power-Up snapshot / restore ───────────────────────────────────────────
+
+    /**
+     * Lightweight grid state snapshot used by [PowerUpService] for rollback.
+     *
+     * Captures a deep copy of the block list and checkpoint flag. Move history
+     * and move count are intentionally excluded — after a power-up restore the
+     * undo stack is cleared to keep state consistent.
+     */
+    data class GridSnapshot(
+        val blocks: List<PuzzleBlock>,
+        val checkpointReached: Boolean
+    )
+
+    /**
+     * Returns a snapshot of the current grid state.
+     * Call this before executing a [PowerUpEffect]; pass to [restoreFrom] on rollback.
+     */
+    fun snapshot(): GridSnapshot {
+        return GridSnapshot(
+            blocks = _blocks.map { it.copy() },
+            checkpointReached = checkpointReached
+        )
+    }
+
+    /**
+     * Restores the grid to the state captured in [snapshot].
+     *
+     * Clears the internal cell-occupancy array and block list, then re-places
+     * every block from the snapshot. Move history and move count are reset so
+     * the undo stack cannot reference pre-restore moves.
+     */
+    fun restoreFrom(snapshot: GridSnapshot) {
+        // Clear occupancy array in-place
+        for (r in 0 until rows) grid[r].fill(-1)
+        _blocks.clear()
+        moveHistory.clear()
+        moveCount = 0
+        checkpointReached = snapshot.checkpointReached
+        for (block in snapshot.blocks) {
+            _blocks.add(block)
+            markGrid(block, block.id)
+        }
+    }
+
+    // ── Power-Up shuffle ─────────────────────────────────────────────────────
+
+    /**
+     * Randomly permutes the positions of all non-cat, non-wall blocks in-place.
+     *
+     * Algorithm:
+     * 1. Collect the current (row, col) positions of every movable block.
+     * 2. Fisher-Yates shuffle those positions using [rng].
+     * 3. Remove every movable block from the grid, then re-place each one at
+     *    its shuffled position.
+     *
+     * Blocks that cannot be re-placed (collision with a block that was not
+     * removed, e.g. a wall at the target cell) are skipped — [ShuffleEffect]
+     * retries up to [ShuffleEffect.MAX_ATTEMPTS] times if the result is not
+     * solvable, so an occasional mis-place is handled gracefully by the retry
+     * loop rather than requiring perfect placement here.
+     *
+     * Called exclusively by [ShuffleEffect]. [PowerUpService] holds a pre-execute
+     * [GridSnapshot] and will call [restoreFrom] if all attempts are exhausted.
+     */
+    fun shuffleNonCatBlocks(rng: RngSource) {
+        val movable = _blocks.filter { !it.isCat && !it.isWall }
+        if (movable.size < 2) return
+
+        // Collect positions and shuffle them
+        val positions = movable.map { Pair(it.row, it.col) }.toMutableList()
+        for (i in positions.indices.reversed()) {
+            val j = rng.nextInt(i + 1)
+            val tmp = positions[i]; positions[i] = positions[j]; positions[j] = tmp
+        }
+
+        // Remove all movable blocks from grid
+        for (block in movable) {
+            clearGrid(block)
+            _blocks.removeAll { it.id == block.id }
+        }
+
+        // Re-place each block at its shuffled position
+        for ((block, pos) in movable.zip(positions)) {
+            val repositioned = block.copy(row = pos.first, col = pos.second)
+            // Only place if the cells are free (walls may occupy shuffled targets)
+            if (isValidPlacement(repositioned)) {
+                _blocks.add(repositioned)
+                markGrid(repositioned, repositioned.id)
+            }
+            // Skipped blocks are simply absent; the retry loop in ShuffleEffect handles it
+        }
     }
 }

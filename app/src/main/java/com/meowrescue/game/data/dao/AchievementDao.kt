@@ -6,7 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
-interface AchievementDao {
+internal interface AchievementDao {
 
     @Query("SELECT * FROM achievements WHERE unlocked = 1")
     fun getUnlocked(): List<Achievement>

@@ -1,15 +1,14 @@
 package com.meowrescue.game.data
 
 import android.content.Context
-import android.content.Context.MODE_PRIVATE
 import com.meowrescue.game.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class GameRepository(context: Context) {
+class GameRepository(context: Context) : IGameRepository {
 
     private val db = AppDatabase.getInstance(context)
-    private val prefs = context.getSharedPreferences("meow_rescue", MODE_PRIVATE)
+    private val sharedPrefs = SharedPrefsWrapper(context)
 
     // ── Cat Collection Definitions ──────────────────────────────────────
 
@@ -46,55 +45,42 @@ class GameRepository(context: Context) {
 
     // ── Progress ────────────────────────────────────────────────────────
 
-    suspend fun saveProgress(levelId: Int, stars: Int, catId: String?, score: Int = 0) = withContext(Dispatchers.IO) {
+    override suspend fun saveProgress(stageId: Int, stars: Int, score: Int): Boolean = withContext(Dispatchers.IO) {
         require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
-        val existing = db.userProgressDao().getProgressForLevel(levelId)
+        val existing = db.userProgressDao().getProgressForLevel(stageId)
         val bestStars = maxOf(stars, existing?.stars ?: 0)
-        val bestCat = catId ?: existing?.catUnlocked
         val bestScore = maxOf(score, existing?.bestScore ?: 0)
         val isFirstClear = existing == null || !existing.completed
-        val progress = UserProgress(
-            levelId = levelId,
-            stars = bestStars,
-            completed = bestStars > 0,
-            catUnlocked = bestCat,
-            bestScore = bestScore
+        db.userProgressDao().saveProgress(
+            UserProgress(stageId = stageId, stars = bestStars, completed = bestStars > 0,
+                catUnlocked = existing?.catUnlocked, bestScore = bestScore)
         )
-        db.userProgressDao().saveProgress(progress)
-
-        // Award coins
         val starCoins = when (stars) { 3 -> 30; 2 -> 20; 1 -> 10; else -> 0 }
-        val firstClearBonus = if (isFirstClear) 50 else 0
-        val totalCoins = starCoins + firstClearBonus
-        addCoins(totalCoins)
+        addCoins(starCoins + if (isFirstClear) 50 else 0)
+        isFirstClear
     }
 
-    suspend fun getProgress(levelId: Int): UserProgress? = withContext(Dispatchers.IO) {
+    override suspend fun getProgress(levelId: Int): UserProgress? = withContext(Dispatchers.IO) {
         db.userProgressDao().getProgressForLevel(levelId)
     }
 
-    suspend fun getMaxCompletedLevel(): Int = withContext(Dispatchers.IO) {
+    override suspend fun getMaxCompletedLevel(): Int = withContext(Dispatchers.IO) {
         db.userProgressDao().getMaxCompletedLevel() ?: 0
     }
 
-    suspend fun getUnlockedCats(): List<String> = withContext(Dispatchers.IO) {
-        db.userProgressDao().getUnlockedCats()
+    suspend fun getUnlockedCats(): List<CatDefinition> = withContext(Dispatchers.IO) {
+        val maxStage = db.userProgressDao().getMaxCompletedLevel() ?: 0
+        CAT_DEFINITIONS.filter { it.requiredStage <= maxStage }
     }
 
     // ── Cat Collection ─────────────────────────────────────────────────
 
-    fun getSelectedCatId(): Int {
-        return prefs.getInt("selected_cat", 1)
+    override fun getSelectedCatId(): Int {
+        return sharedPrefs.getSelectedCatId()
     }
 
-    fun setSelectedCatId(catId: Int) {
-        prefs.edit().putInt("selected_cat", catId).apply()
-    }
-
-    /** Returns the drawable resource for the selected cat */
-    fun getSelectedCatDrawable(): Int {
-        val selectedId = getSelectedCatId()
-        return CAT_DEFINITIONS.firstOrNull { it.id == selectedId }?.drawableRes ?: R.drawable.cat_1
+    override fun setSelectedCatId(catId: Int) {
+        sharedPrefs.setSelectedCatId(catId)
     }
 
     /** Returns newly unlocked cat for given stage, or null */
@@ -104,49 +90,52 @@ class GameRepository(context: Context) {
 
     // ── Settings ────────────────────────────────────────────────────────
 
-    fun isSoundEnabled(): Boolean {
-        return prefs.getBoolean("sound_enabled", true)
+    override fun isSoundEnabled(): Boolean {
+        return sharedPrefs.isSoundEnabled()
     }
 
-    fun setSoundEnabled(enabled: Boolean) {
-        prefs.edit().putBoolean("sound_enabled", enabled).apply()
+    override fun setSoundEnabled(enabled: Boolean) {
+        sharedPrefs.setSoundEnabled(enabled)
+    }
+
+    override fun getStagesSinceLastAd(): Int = sharedPrefs.getStagesSinceLastAd()
+
+    override fun setStagesSinceLastAd(count: Int) {
+        sharedPrefs.setStagesSinceLastAd(count)
     }
 
     // ── Endless Mode ─────────────────────────────────────────────────
 
-    fun getEndlessCount(): Int = prefs.getInt("endless_count", 0)
+    override fun getEndlessCount(): Int = sharedPrefs.getEndlessCount()
 
-    fun setEndlessCount(count: Int) {
-        prefs.edit().putInt("endless_count", count).apply()
+    override fun setEndlessCount(count: Int) {
+        sharedPrefs.setEndlessCount(count)
     }
 
-    fun getEndlessBest(): Int = prefs.getInt("endless_best", 0)
+    override fun getEndlessBest(): Int = sharedPrefs.getEndlessBest()
 
-    fun setEndlessBest(best: Int) {
-        prefs.edit().putInt("endless_best", best).apply()
+    override fun setEndlessBest(best: Int) {
+        sharedPrefs.setEndlessBest(best)
     }
 
     // ── Endless Daily Coin Cap ───────────────────────────────────────────
 
     /** Returns how many Endless coins have been earned today. Resets at midnight (local). */
-    fun getDailyEndlessCoins(): Int {
-        val savedDate = prefs.getString("endless_coin_date", "") ?: ""
+    override fun getDailyEndlessCoins(): Int {
+        val savedDate = sharedPrefs.getEndlessCoinDate()
         val today = java.time.LocalDate.now().toString()
-        return if (savedDate == today) prefs.getInt("endless_coin_today", 0) else 0
+        return if (savedDate == today) sharedPrefs.getEndlessCoinToday() else 0
     }
 
     /** Adds Endless coins up to the daily cap. Returns the actual amount added (may be less than requested). */
-    suspend fun addEndlessCoins(amount: Int): Int {
+    override suspend fun addEndlessCoins(amount: Int): Int {
         val today = java.time.LocalDate.now().toString()
-        val savedDate = prefs.getString("endless_coin_date", "") ?: ""
-        val current = if (savedDate == today) prefs.getInt("endless_coin_today", 0) else 0
+        val savedDate = sharedPrefs.getEndlessCoinDate()
+        val current = if (savedDate == today) sharedPrefs.getEndlessCoinToday() else 0
         val remaining = (ENDLESS_DAILY_COIN_CAP - current).coerceAtLeast(0)
         val actual = amount.coerceAtMost(remaining)
         if (actual > 0) {
-            prefs.edit()
-                .putString("endless_coin_date", today)
-                .putInt("endless_coin_today", current + actual)
-                .apply()
+            sharedPrefs.setEndlessCoinDateAndToday(today, current + actual)
             addCoins(actual)
         }
         return actual
@@ -154,15 +143,15 @@ class GameRepository(context: Context) {
 
     // ── Tutorial ─────────────────────────────────────────────────────────
 
-    fun isTutorialCompleted(): Boolean = prefs.getBoolean("tutorial_completed", false)
+    override fun isTutorialCompleted(): Boolean = sharedPrefs.isTutorialCompleted()
 
-    fun setTutorialCompleted() {
-        prefs.edit().putBoolean("tutorial_completed", true).apply()
+    override fun setTutorialCompleted(value: Boolean) {
+        sharedPrefs.setTutorialCompleted(value)
     }
 
     // ── Launch Mode Progress ─────────────────────────────────────────
 
-    suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float = 1.0f, score: Int = 0) = withContext(Dispatchers.IO) {
+    override suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float, score: Int) = withContext(Dispatchers.IO) {
         require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
         val existing = db.launchProgressDao().getProgressForStage(stageId)
         val bestStars = maxOf(stars, existing?.stars ?: 0)
@@ -180,11 +169,11 @@ class GameRepository(context: Context) {
         addCoins(scaledStarCoins + firstClearBonus)
     }
 
-    suspend fun getLaunchProgress(stageId: Int): LaunchProgress? = withContext(Dispatchers.IO) {
+    override suspend fun getLaunchProgress(stageId: Int): LaunchProgress? = withContext(Dispatchers.IO) {
         db.launchProgressDao().getProgressForStage(stageId)
     }
 
-    suspend fun getMaxCompletedLaunchStage(): Int = withContext(Dispatchers.IO) {
+    override suspend fun getMaxCompletedLaunchStage(): Int = withContext(Dispatchers.IO) {
         db.launchProgressDao().getMaxCompletedStage() ?: 0
     }
 
@@ -192,7 +181,7 @@ class GameRepository(context: Context) {
         db.launchProgressDao().getAllProgress()
     }
 
-    suspend fun getCompletedLaunchCount(): Int = withContext(Dispatchers.IO) {
+    override suspend fun getCompletedLaunchCount(): Int = withContext(Dispatchers.IO) {
         db.launchProgressDao().getCompletedCount()
     }
 
@@ -204,38 +193,44 @@ class GameRepository(context: Context) {
         }
     }
 
-    suspend fun getCoins(): Int = withContext(Dispatchers.IO) {
+    override suspend fun getCoins(): Int = withContext(Dispatchers.IO) {
         ensurePlayerStats()
         db.playerStatsDao().getCoins() ?: 0
     }
 
-    suspend fun addCoins(amount: Int) = withContext(Dispatchers.IO) {
+    override suspend fun addCoins(amount: Int) = withContext(Dispatchers.IO) {
         require(amount > 0) { "addCoins amount must be positive (got $amount)" }
         ensurePlayerStats()
         db.playerStatsDao().addCoins(amount)
     }
 
-    suspend fun spendCoins(amount: Int): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun spendCoins(amount: Int): Boolean = withContext(Dispatchers.IO) {
         require(amount > 0) { "spendCoins amount must be positive (got $amount)" }
         ensurePlayerStats()
         db.playerStatsDao().spendCoins(amount) > 0
     }
 
     /** Refund coins without inflating totalCoinsEarned. */
-    suspend fun refundCoins(amount: Int) = withContext(Dispatchers.IO) {
+    override suspend fun refundCoins(amount: Int) = withContext(Dispatchers.IO) {
         require(amount > 0) { "refundCoins amount must be positive (got $amount)" }
         ensurePlayerStats()
         db.playerStatsDao().refundCoins(amount)
     }
 
-    suspend fun getTotalCoinsEarned(): Int = withContext(Dispatchers.IO) {
+    override suspend fun getTotalCoinsEarned(): Int = withContext(Dispatchers.IO) {
         ensurePlayerStats()
         db.playerStatsDao().getStats()?.totalCoinsEarned ?: 0
     }
 
     // ── Achievements ──────────────────────────────────────────────
 
-    suspend fun unlockAchievement(id: String): Boolean = withContext(Dispatchers.IO) {
+    suspend fun seedAchievements() = withContext(Dispatchers.IO) {
+        AchievementDefs.ALL.forEach { def ->
+            db.achievementDao().insert(Achievement(achievementId = def.id))
+        }
+    }
+
+    override suspend fun unlockAchievement(id: String): Boolean = withContext(Dispatchers.IO) {
         val time = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
             .format(java.util.Date())
         db.achievementDao().insert(Achievement(achievementId = id))
@@ -247,7 +242,7 @@ class GameRepository(context: Context) {
         unlocked
     }
 
-    suspend fun isAchievementUnlocked(id: String): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun isAchievementUnlocked(id: String): Boolean = withContext(Dispatchers.IO) {
         db.achievementDao().get(id)?.unlocked == true
     }
 
@@ -255,27 +250,126 @@ class GameRepository(context: Context) {
         db.achievementDao().getUnlocked()
     }
 
-    suspend fun getUnlockedAchievementCount(): Int = withContext(Dispatchers.IO) {
+    override suspend fun getUnlockedAchievementCount(): Int = withContext(Dispatchers.IO) {
         db.achievementDao().getUnlockedCount()
     }
 
     // ── Best Score ────────────────────────────────────────────────
 
-    suspend fun getBestScore(levelId: Int): Int = withContext(Dispatchers.IO) {
+    // ── Star Ratings Batch ────────────────────────────────────────────────
+
+    override suspend fun getAllStarRatings(): IntArray = withContext(Dispatchers.IO) {
+        val ratings = IntArray(211)
+        db.userProgressDao().getAllProgress().forEach { p ->
+            if (p.stageId in 1..210) ratings[p.stageId] = p.stars
+        }
+        ratings
+    }
+
+    // ── Cat Launch Best Scores per Difficulty ─────────────────────────────
+
+    override fun getLaunchBestScore(difficulty: Difficulty): Int =
+        sharedPrefs.getLaunchBestScore(difficulty)
+
+    override fun updateLaunchBestScore(difficulty: Difficulty, score: Int) {
+        if (score > sharedPrefs.getLaunchBestScore(difficulty))
+            sharedPrefs.setLaunchBestScore(difficulty, score)
+    }
+
+    override suspend fun getBestScore(levelId: Int): Int = withContext(Dispatchers.IO) {
         db.userProgressDao().getProgressForLevel(levelId)?.bestScore ?: 0
     }
 
     // ── Power-Up Tracking ─────────────────────────────────────────
 
-    fun getPowerUpUseCount(): Int = prefs.getInt("powerup_use_count", 0)
+    override fun getPowerUpUseCount(): Int = sharedPrefs.getPowerUpUseCount()
 
-    fun incrementPowerUpUseCount() {
-        prefs.edit().putInt("powerup_use_count", getPowerUpUseCount() + 1).apply()
+    override fun incrementPowerUpUseCount() {
+        sharedPrefs.incrementPowerUpUseCount()
     }
 
     // ── Star Count ────────────────────────────────────────────────
 
-    suspend fun getThreeStarCount(): Int = withContext(Dispatchers.IO) {
-        db.userProgressDao().getAllProgress().count { it.stars >= 3 }
+    override suspend fun getThreeStarCount(): Int = withContext(Dispatchers.IO) {
+        db.userProgressDao().getThreeStarCount()
+    }
+
+    // ── Cosmetic Purchases (TR-expand-002) ────────────────────────
+
+    /**
+     * Records a cosmetic purchase for [catId] and [type] (`"PALETTE"` or `"ACCESSORY"`).
+     * Idempotent — if the purchase already exists the insert is silently ignored.
+     * @param purchasedAt UTC epoch millis; defaults to [System.currentTimeMillis].
+     * @return true if the row was newly inserted, false if it already existed.
+     */
+    suspend fun insertCosmeticPurchase(
+        catId: Int,
+        type: String,
+        purchasedAt: Long = System.currentTimeMillis()
+    ): Boolean = withContext(Dispatchers.IO) {
+        db.cosmeticDao().insertPurchase(CosmeticPurchase(catId, type, purchasedAt)) != -1L
+    }
+
+    /**
+     * Returns all cosmetic purchases for [catId].
+     * Returns an empty list if the cat has no purchases.
+     */
+    suspend fun getCosmeticPurchasesForCat(catId: Int): List<CosmeticPurchase> =
+        withContext(Dispatchers.IO) {
+            db.cosmeticDao().getPurchasesForCat(catId)
+        }
+
+    // ── Equipped Cosmetics (TR-expand-002) ───────────────────────
+
+    /**
+     * Equips cosmetic [cosmeticId] on [catId], replacing any previous selection.
+     */
+    suspend fun setEquippedCosmetic(catId: Int, cosmeticId: Int) = withContext(Dispatchers.IO) {
+        db.selectedCosmeticDao().upsertSelection(SelectedCosmetic(catId, cosmeticId))
+    }
+
+    /**
+     * Returns the ID of the cosmetic currently equipped on [catId], or null if none.
+     */
+    suspend fun getEquippedCosmetic(catId: Int): Int? = withContext(Dispatchers.IO) {
+        db.selectedCosmeticDao().getSelectionForCat(catId)?.cosmeticId
+    }
+
+    /**
+     * Removes the equipped cosmetic record for [catId]. After this call
+     * [getEquippedCosmetic] returns null for that cat.
+     */
+    suspend fun clearEquippedCosmetic(catId: Int) = withContext(Dispatchers.IO) {
+        db.selectedCosmeticDao().clearSelection(catId)
+    }
+
+    // ── Theme Unlocks (TR-expand-004) ─────────────────────────────
+
+    /**
+     * Records a theme unlock for [themeId].
+     * Idempotent — if the theme is already unlocked the insert is silently ignored.
+     * @param purchasedAt UTC epoch millis; defaults to [System.currentTimeMillis].
+     * @return true if the row was newly inserted, false if already unlocked.
+     */
+    suspend fun insertThemeUnlock(
+        themeId: String,
+        purchasedAt: Long = System.currentTimeMillis()
+    ): Boolean = withContext(Dispatchers.IO) {
+        db.themeDao().insertUnlock(ThemeUnlock(themeId, purchasedAt)) != -1L
+    }
+
+    /**
+     * Returns true if the theme identified by [themeId] has been purchased.
+     */
+    suspend fun isThemeUnlocked(themeId: String): Boolean = withContext(Dispatchers.IO) {
+        db.themeDao().isUnlocked(themeId)
+    }
+
+    /**
+     * Returns all purchased theme unlocks.
+     * Returns an empty list if no themes have been purchased.
+     */
+    suspend fun getAllThemeUnlocks(): List<ThemeUnlock> = withContext(Dispatchers.IO) {
+        db.themeDao().getAllUnlocked()
     }
 }

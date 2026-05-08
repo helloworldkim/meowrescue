@@ -6,7 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
-interface PlayerStatsDao {
+internal interface PlayerStatsDao {
 
     @Query("SELECT * FROM player_stats WHERE id = 1")
     fun getStats(): PlayerStats?
