@@ -28,12 +28,31 @@ import kotlin.coroutines.coroutineContext
  *                           to Main via `Activity.runOnUiThread { }`.
  *                           **Never**: Room access, suspend functions.
  *
+ * ## Sanctioned coroutine scopes
+ *
+ * - `lifecycleScope` (Activity / Fragment) — cancelled automatically when the
+ *   Activity reaches `DESTROYED`. Use for all UI-driven coroutines launched from
+ *   an Activity or Fragment. Canonical pattern:
+ *
+ * ```kotlin
+ * lifecycleScope.launch {
+ *     repeatOnLifecycle(Lifecycle.State.STARTED) {
+ *         viewModel.flow.collect { hudView.update(it) }
+ *     }
+ * }
+ * ```
+ *
+ * - `viewModelScope` (ViewModel) — cancelled when the ViewModel is cleared.
+ *   Use for all ViewModel-launched coroutines.
+ *
  * ## Forbidden patterns (any layer)
  *
  * - `runBlocking` on the Main thread — causes ANR.
  * - `Dispatchers.IO` for CPU-bound work — wastes IO pool threads.
  * - `Dispatchers.Main` for DB calls — causes ANR.
- * - `GlobalScope` — leaks coroutines across Activity lifecycle (see story 002).
+ * - `GlobalScope` — forbidden project-wide; leaks coroutines beyond Activity
+ *   lifecycle and makes state uncontrollable. Use `lifecycleScope` or
+ *   `viewModelScope` instead. Detected automatically by `GlobalScopeBanTest`.
  *
  * Use [assertDispatcher] in debug builds to verify callers respect these rules.
  */
