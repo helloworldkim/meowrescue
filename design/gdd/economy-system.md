@@ -57,9 +57,17 @@ Same star-based rewards as Puzzle (10/20/30). No first-clear bonus (every clear 
 (local time). After the cap, play continues but coins are not awarded. Stars, endlessCount,
 and endlessBest continue to track normally.
 
+> **Design rationale**: Endless mode generates unlimited stages procedurally. Without a
+> cap, a dedicated player could earn thousands of coins per day, inflating income far
+> above the expansion sinks (17,350 total) and breaking the target 1.0–2.5× surplus
+> ratio. The 150 coin/day cap (~5-7 clears) allows a meaningful daily reward session
+> while bounding long-term inflation. At 150/day over 30 days = 4,500 coins — a
+> significant but contained supplement to the ~22,290 progression-based income.
+> Achievement coins earned during Endless play bypass the cap (see Edge Case 14).
+
 #### Achievement Rewards
 
-30 achievements with rewards ranging from 10 to 500 coins.
+32 achievements with rewards ranging from 10 to 500 coins.
 
 | Tier | Typical Reward | Examples |
 |------|---------------|----------|
@@ -68,22 +76,25 @@ and endlessBest continue to track normally.
 | Hard | 80-150 coins | clear_150, star3_100, speed_5s |
 | Epic | 200-500 coins | clear_200, cat_all, star3_200 |
 
-Total achievable achievement coins: **2,180** (sum of all 30 achievement rewards).
+Total achievable achievement coins: **2,290** (sum of all 32 achievement rewards).
 
 #### Cat Launch Stage Clear
 
-Cat Launch clears award coins at the same star-based rates as Puzzle mode:
+Cat Launch clears award **base** star coins scaled by a difficulty multiplier:
 
-| Star Rating | Coins Earned |
-|-------------|-------------|
-| 3★ | 30 |
-| 2★ | 20 |
-| 1★ | 10 |
+| Star Rating | Base Coins | Easy (×1.0) | Normal (×1.5) | Hard (×2.0) |
+|-------------|-----------|-------------|---------------|-------------|
+| 3★ | 30 | 30 | 45 | 60 |
+| 2★ | 20 | 20 | 30 | 40 |
+| 1★ | 10 | 10 | 15 | 20 |
 
-**First-clear bonus**: +50 coins on first completion of any Launch stage (parity with Puzzle).
+**First-clear bonus**: +50 coins (flat, regardless of difficulty) on first completion
+of any Launch stage. Capped at **50 unique stages** — after 50 first clears, subsequent
+new stages earn star coins only (no bonus).
 
 > **Implemented** (2026-04-15): `GameRepository.saveLaunchProgress()` calls
-> `addCoins(starCoins + firstClearBonus)` with `require(stars in 1..3)` guard.
+> `addCoins(scaledStarCoins + firstClearBonus)` with `require(stars in 1..3)` guard.
+> Difficulty multiplier applied via `LaunchDifficulty.coinMultiplier`.
 
 ### Coin Sinks
 
@@ -133,67 +144,130 @@ The user has confirmed additional coin sinks are planned. Potential categories:
 
 ## D. Formulas
 
+### Variable Definitions
+
+| Symbol | Type | Range | Description |
+|--------|------|-------|-------------|
+| `stars` | INT | [1, 3] | Star rating earned on clear |
+| `starCoins(s)` | INT | {10, 20, 30} | Base coin reward for star rating `s` |
+| `coinMult` | FLOAT | {1.0, 1.5, 2.0} | Cat Launch difficulty multiplier (Easy/Normal/Hard) |
+| `firstClearBonus` | INT | 50 | Flat bonus on first completion of a stage |
+| `isFirstClear` | BOOL | — | True if stage has no prior completed record |
+| `dailyEarned` | INT | [0, 150] | Endless coins earned today (resets at midnight) |
+| `DAILY_CAP` | INT | 150 | Maximum Endless coins per calendar day |
+
 ### Puzzle Earnings Per Stage
 
 ```
-firstClearCoins(stars) = starCoins(stars) + 50
-replayCoins(stars) = starCoins(stars)
+puzzleClearCoins(stars, isFirstClear) =
+  starCoins(stars) + (isFirstClear ? 50 : 0)
 
-where starCoins = { 3: 30, 2: 20, 1: 10 }
+where starCoins = { 1: 10, 2: 20, 3: 30 }
 ```
+
+**Output range**: [10, 80]
+- Minimum: replay, 1★ → 10
+- Maximum: first clear, 3★ → 30 + 50 = 80
+
+**Worked examples**:
+- Stage 42, first clear, 2★ → 20 + 50 = **70 coins**
+- Stage 42, replay, 3★ → 30 + 0 = **30 coins**
+- Stage 1, first clear, 1★ → 10 + 50 = **60 coins**
 
 ### Cat Launch Earnings Per Stage
 
 ```
-launchFirstClearCoins(stars) = starCoins(stars) + 50
-launchReplayCoins(stars) = starCoins(stars)
+launchClearCoins(stars, coinMult, isFirstClear) =
+  round(starCoins(stars) * coinMult) + (isFirstClear ? 50 : 0)
 
-where starCoins = { 3: 30, 2: 20, 1: 10 }
+where starCoins = { 1: 10, 2: 20, 3: 30 }
+      coinMult  = { Easy: 1.0, Normal: 1.5, Hard: 2.0 }
+      firstClearBonus = 50 (flat — NOT multiplied by coinMult)
 ```
 
-### Maximum Possible Coins (Full Completion — Best Case, All 3★)
+**Output range**: [10, 110]
+- Minimum: replay, Easy, 1★ → round(10 × 1.0) = 10
+- Maximum: first clear, Hard, 3★ → round(30 × 2.0) + 50 = 110
+
+**First-clear cap**: After 50 unique Launch stage IDs cleared, `isFirstClear` is
+forced false regardless of stage history. Total capped first-clear income:
+50 × 50 = 2,500 coins (bonus only).
+
+**Worked examples**:
+- Easy, 3★, first clear → round(30 × 1.0) + 50 = **80 coins**
+- Normal, 2★, replay → round(20 × 1.5) + 0 = **30 coins**
+- Hard, 3★, first clear → round(30 × 2.0) + 50 = **110 coins**
+- Hard, 1★, replay → round(10 × 2.0) + 0 = **20 coins**
+
+Note: All products of {10, 20, 30} × {1.0, 1.5, 2.0} produce integers; rounding
+has no practical effect at current values but guards against future multiplier changes.
+
+### Endless Earnings Per Clear
 
 ```
-puzzleFirstClears = 200 * 30 (star coins) + 200 * 50 (first-clear) = 16,000
-launchIncome = varies (procedural, uncapped)
-achievementRewards = 2,180
-totalMaxCoins ≈ 18,180 (puzzle + achievements, excluding replays, endless, and Launch)
+endlessClearCoins(stars, dailyEarned) =
+  min(starCoins(stars), DAILY_CAP - dailyEarned)
+
+where DAILY_CAP = 150
+      starCoins = { 1: 10, 2: 20, 3: 30 }
 ```
 
-Note: `avg(30)` in the original was misleading — 30 is the 3★ maximum, not the average.
-A realistic average across mixed star ratings is ~20, yielding ~14,180 for puzzle alone.
+**Output range**: [0, 30]
+- Awards 0 when `dailyEarned ≥ 150` (cap reached)
+- Partial award when `dailyEarned + starCoins(stars) > 150`
 
-### Economy Balance Snapshot
+**Worked examples**:
+- dailyEarned = 0, 3★ → min(30, 150) = **30 coins**
+- dailyEarned = 140, 3★ → min(30, 10) = **10 coins** (partial)
+- dailyEarned = 150, 3★ → min(30, 0) = **0 coins** (capped)
+
+### Lifetime Income Estimates
 
 ```
-Income (first 200 puzzle stages, best case):
-  - 200 * 30 star coins (all 3★) = 6,000
-  - 200 * 50 first-clear bonus = 10,000
-  - Achievement rewards = 2,180
-  Puzzle subtotal: ~18,180 coins
+Puzzle first-clears (200 stages, all 3★):
+  200 × (30 + 50) = 16,000
+Puzzle first-clears (200 stages, avg 2★):
+  200 × (20 + 50) = 14,000
 
-Cat Launch income (capped at 50 unique first-clears):
-  - 50 * 30 star coins (Easy, all 3★) = 1,500
-  - 50 * 50 first-clear bonus = 2,500
-  Launch first-clear subtotal: 4,000 coins
-  Additional replays (uncapped, no bonus): ~1,000 est.
-  Launch subtotal: ~5,000 coins
-  Note: Difficulty multiplier (Easy ×1.0, Normal ×1.5, Hard ×2.0) can increase
-  star coins but first-clear bonus is flat 50 regardless of difficulty.
+Achievement rewards: 2,290 (sum of 32 achievements)
 
-Current sinks:
-  - Power-up usage: 30-50 per use
-  - Estimated: 3 uses per stuck stage, ~20 stuck stages: ~2,400 coins
+Puzzle + achievements subtotal: 18,290 (best case) / 16,290 (avg)
 
-Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
-= 9.7x income-to-sink ratio (pre-expansion)
+Cat Launch first-clears (50 stages, Easy, all 3★):
+  50 × (30 + 50) = 4,000
+Cat Launch first-clears (50 stages, Hard, all 3★):
+  50 × (60 + 50) = 5,500
+
+Income variance by difficulty: Easy 4,000 → Hard 5,500 (+37.5%)
 ```
 
-> **Balance Concern — MITIGATED**: Pre-expansion surplus is ~9.7x (power-ups only).
-> Economy Expansion (economy-expansion.md) adds 17,350 coins of sink capacity
-> (tiered cosmetics 9,900 + hints 4,000 + skips 1,050 + themes 2,400), bringing
-> the post-expansion ratio to completionist **1.28x** / casual **2.06x**.
-> Cat Launch first-clear is capped at 50 unique stages. Endless has a 150 coin/day cap.
+**Canonical income base**: **22,290 coins** (puzzle 18,290 + launch 4,000, Easy 3★
+first-clears only). Used for all surplus ratio calculations. Excludes replays, Endless,
+and difficulty multiplier variance — these add income above the baseline.
+
+### Economy Balance — Milestone Pacing
+
+Income/sink balance at key progression checkpoints. Assumptions: average 2★ per stage,
+Easy Cat Launch, consumable spending (power-ups + hints) estimated at ~10 coins/stage.
+
+| Milestone | Cumul. Income | Unlocked One-Time Sinks | Ratio | Assessment |
+|-----------|--------------|------------------------|-------|------------|
+| Stage 30 | ~2,600 | 3,300 (Common cosmetics 900 + themes 2,400) | 0.79x | Constrained — cannot buy everything |
+| Stage 60 | ~5,400 | 4,500 (+Uncommon cosmetics for cats 4-5) | 1.20x | Near break-even — real spending decisions |
+| Stage 100 | ~9,200 | 5,700 (+Uncommon cosmetics for cats 6-7) | 1.61x | Surplus building — themes compete with cosmetics |
+| Stage 150 | ~14,200 | 8,400 (+Rare cosmetics for cats 8-10) | 1.69x | Stable — Rare items absorb surplus |
+| Stage 200 | ~22,290 | 17,350 (all expansion sinks) | 1.28x | Tight — Legendary sinks close the loop |
+
+**Target range**: 1.0–2.5× at each checkpoint. All milestones fall within target.
+Early game (stages 1-60) is genuinely constrained; mid-game (stages 60-150) has
+moderate surplus with real spending decisions between cosmetics and themes;
+endgame (stages 150-200) tightens as Legendary sinks become available.
+
+> **Balance Note**: Pre-expansion surplus is ~9.7x (power-ups only). The expansion
+> sinks are **required** for the economy to function as intended — without them the
+> Player Fantasy of "scarce enough for thought" cannot be delivered. Endless mode
+> income (capped at 150 coins/day) is excluded as time-based rather than
+> progression-based; it adds income above the baseline over extended play.
 
 ---
 
@@ -209,6 +283,10 @@ Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 8. **Negative amount guard**: `addCoins()`, `spendCoins()`, and `refundCoins()` all enforce `require(amount > 0)`. Verified 2026-04-15.
 9. **`totalCoinsEarned` semantics**: This column measures "coins added via `addCoins()` only." It is NOT a spend-volume metric. Refunded coins can be re-spent without incrementing `totalCoinsEarned`.
 10. **Endless count default**: `getEndlessCount()` defaults to 0 in SharedPreferences. Verified 2026-04-15.
+11. **Endless daily cap partial award**: If `dailyEarned = 140` and the player earns 3★ (30 coins), only `min(30, 150-140) = 10` coins are awarded. `totalCoinsEarned` increases by 10, not 30.
+12. **Endless daily cap reset**: The daily cap resets at midnight local time. The reset date is stored in SharedPreferences as `endless_coin_date` (ISO date string). If the current date differs from the stored date, `dailyEarned` resets to 0 and the new date is stored.
+13. **Endless cap UI feedback**: When the daily cap is reached, Endless clears continue to track stars, `endlessCount`, and `endlessBest` normally. The player is informed that coin rewards are exhausted for today.
+14. **Endless cap vs. achievement coins**: Achievement coins earned during Endless play (via `unlockAchievement()`) are awarded through `addCoins()` independently — they are NOT counted against the Endless daily cap. The cap applies only to clear rewards.
 
 ---
 
@@ -220,6 +298,7 @@ Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 | **Progression System** | Achievement unlocks trigger coin rewards |
 | **Cat Launch System** | Shares coin pool; awards coins on stage clears (10/20/30 + 50 first-clear) |
 | **Ad System** | No direct monetization tie — ads gate hints/solve, not coins |
+| **Economy Expansion** | Extends coin sinks: paid hints, cat cosmetics, stage skip, grid themes |
 | **UI System** | Displays coin balance in HUD; power-up buttons show costs |
 
 ---
@@ -229,18 +308,18 @@ Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 > **Ownership**: Economy GDD is the single source of truth for all coin/reward values.
 > Other GDDs (Puzzle, Cat Launch, Progression) reference these values but do not redefine them.
 
-| Parameter | Current Value | Location |
-|-----------|--------------|----------|
-| Star coin rewards | 10 / 20 / 30 | `GameRepository.saveProgress()` |
-| First-clear bonus | 50 | `GameRepository.saveProgress()` |
-| Magnet cost | 30 | `PuzzleActivity.handlePowerUp()` |
-| Ice cost | 40 | `PuzzleActivity.handlePowerUp()` |
-| Shuffle cost | 50 | `PuzzleActivity.handlePowerUp()` |
-| Achievement rewards | 10-500 | `AchievementDefs.ALL` |
-| Endless star coins | 10 / 20 / 30 | `PuzzleActivity.handleStageClear()` |
-| Endless daily coin cap | 150 | `GameRepository.ENDLESS_DAILY_COIN_CAP` |
-| Launch star coins | 10 / 20 / 30 | `GameRepository.saveLaunchProgress()` |
-| Launch first-clear bonus | 50 | `GameRepository.saveLaunchProgress()` |
+| Parameter | Current Value | Safe Range | Affects | Location |
+|-----------|--------------|------------|---------|----------|
+| Star coin rewards (1★/2★/3★) | 10 / 20 / 30 | 5-50 per tier | Session income rate; surplus ratio | `GameRepository.saveProgress()` |
+| First-clear bonus | 50 | 20-100 | Income front-loading; pacing curve shape | `GameRepository.saveProgress()` |
+| Magnet cost | 30 | 15-60 | Lowest spending threshold; power-up frequency | `PuzzleActivity.handlePowerUp()` |
+| Ice cost | 40 | 20-80 | Mid-tier power-up accessibility | `PuzzleActivity.handlePowerUp()` |
+| Shuffle cost | 50 | 25-100 | Premium power-up gate; highest base spend | `PuzzleActivity.handlePowerUp()` |
+| Achievement rewards | 10-500 | 5-1,000 | One-time income spikes; pacing bumps at milestones | `AchievementDefs.ALL` |
+| Endless star coins | 10 / 20 / 30 | 5-50 | Endgame income rate (within daily cap) | `PuzzleActivity.handleStageClear()` |
+| Endless daily coin cap | 150 | 50-300 | Long-term inflation rate; endgame income ceiling | `GameRepository.ENDLESS_DAILY_COIN_CAP` |
+| Launch base star coins | 10 / 20 / 30 | 5-50 | Cat Launch income (before difficulty multiplier) | `GameRepository.saveLaunchProgress()` |
+| Launch first-clear bonus | 50 | 20-100 | Launch mode incentive; matches Puzzle parity | `GameRepository.saveLaunchProgress()` |
 
 ---
 
@@ -250,22 +329,27 @@ Surplus: ~23,180 coins (puzzle+launch+achievements) vs ~2,400 spending
 
 1. **Star coin mapping**: `starCoins` must return exactly `{3: 30, 2: 20, 1: 10}`. No other star values are valid — `require(stars in 1..3)` enforced at call site.
 2. **Puzzle first-clear bonus**: Given a stage with no prior `UserProgress` record (or `completed = false`), `saveProgress(stageId, stars, ...)` must award `starCoins(stars) + 50` coins. Replays of the same stage must award `starCoins(stars)` only, with 0 bonus.
-3. **Endless coin awards**: Endless mode clears must award `starCoins(stars)` via `addCoins()` with no first-clear bonus. `totalCoinsEarned` must increase by the awarded amount.
+3. **Endless coin awards (under cap)**: Given `dailyEarned < 150`, an Endless clear with stars `S` awards exactly `starCoins(S)` coins. `totalCoinsEarned` increases by `starCoins(S)`. No first-clear bonus is awarded.
+3a. **Endless daily cap enforcement**: Given `dailyEarned >= 150`, an Endless clear awards **0 coins**. `totalCoinsEarned` is unchanged. Stars, `endlessCount`, and `endlessBest` continue to update normally.
+3b. **Endless partial cap award**: Given `dailyEarned = N` where `N + starCoins(S) > 150`, the clear awards exactly `150 - N` coins (not the full `starCoins(S)`). `totalCoinsEarned` increases by `150 - N`.
+3c. **Endless cap reset**: Given the cap was reached on calendar date D, an Endless clear on date D+1 awards the full `starCoins(S)` coins (assuming new `dailyEarned` = 0).
 
 ### Cat Launch Coin Sources (2)
 
-4. **Launch star coins**: `saveLaunchProgress(stageId, stars)` must award `starCoins(stars)` on every clear. Star-to-coin mapping is identical to Puzzle: `{3: 30, 2: 20, 1: 10}`.
-5. **Launch first-clear bonus**: First completion of a Launch stage awards +50 bonus coins (parity with Puzzle). Subsequent clears of the same stage award 0 bonus. `totalCoinsEarned` must increase by `starCoins + bonus`.
+4. **Launch star coins with difficulty multiplier**: `saveLaunchProgress(stageId, stars, coinMultiplier)` must award `round(starCoins(stars) * coinMultiplier)` on every clear. Easy (×1.0): 10/20/30. Normal (×1.5): 15/30/45. Hard (×2.0): 20/40/60. `totalCoinsEarned` increases by the scaled amount.
+5. **Launch first-clear bonus**: First completion of a Launch stage awards +50 bonus coins (flat, not multiplied by difficulty). Subsequent clears of the same stage award 0 bonus. `totalCoinsEarned` must increase by `round(starCoins * coinMultiplier) + bonus`.
+5a. **Launch first-clear cap**: After 50 unique Launch stage IDs have been first-cleared, subsequent new stages award scaled star coins only — no first-clear bonus. The 51st unique first clear must award 0 bonus. Checked via `getCompletedLaunchCount() >= LAUNCH_FIRST_CLEAR_CAP`.
 
 ### Achievement Coin Sources (2)
 
 6. **Achievement idempotency**: `unlockAchievement(id)` must award `AchievementDefs.get(id).coinReward` via `addCoins()` on the first call. All subsequent calls for the same `id` must award 0 coins and return `false`.
-7. **Achievement reward total**: The 30 achievements in `AchievementDefs.ALL` must sum to exactly **2,180** coins. Any change to individual rewards must update this total and `economy-system.md` Section D.
+7. **Achievement reward total**: The 32 achievements in `AchievementDefs.ALL` must sum to exactly **2,290** coins. Any change to individual rewards must update this total and `economy-system.md` Section D.
 
 ### Coin Sinks — Power-Ups (3)
 
 8. **Deduction-before-effect**: `handlePowerUp(index)` must call `spendCoins(cost)` and confirm success before applying the power-up effect. If `spendCoins()` returns `false`, no effect is applied.
 9. **Ice refund on failure**: Given a grid with only non-removable blocks (cat/wall/key), `handlePowerUp(1)` [Ice, 40 coins] must deduct 40, call `applyIcePowerUp()` → returns `false`, then call `refundCoins(40)`. Net balance: unchanged. `totalCoinsEarned`: unchanged.
+9a. **Shuffle refund on failure**: Given 5 consecutive shuffle attempts all produce unsolvable states, `handlePowerUp(2)` [Shuffle, 50 coins] must deduct 50, attempt shuffles, restore original grid on failure, then call `refundCoins(50)`. Net balance: unchanged. `totalCoinsEarned`: unchanged. Mirrors Ice refund policy.
 10. **Insufficient balance rejection**: Given balance `B` and `spendCoins(amount)` where `amount > B`: (a) returns `false`, (b) `getCoins()` still returns `B`, (c) `totalCoinsEarned` unchanged, (d) no power-up effect applied.
 
 ### Balance Integrity (3)

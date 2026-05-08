@@ -30,8 +30,11 @@ additional Endless mode for infinite replayability.
 The player is a **cat rescuer** guiding trapped cats to freedom. Each puzzle is a
 spatial logic challenge where the satisfaction comes from finding the optimal path
 through a congested grid. The progression from simple 5x5 grids to complex 7x7
-puzzles with portals and linked blocks delivers a smooth difficulty curve that
-rewards returning players with new mechanics and collectible cats.
+puzzles with portals and linked blocks delivers a layered difficulty curve:
+the `minMoves` formula provides a rising baseline through stage ~88 (capped at 16),
+while block count, grid size expansion, and progressive mechanic introduction
+(walls, linked blocks, portals, multi-cat) sustain challenge through stage 200.
+Returning players are rewarded with new mechanics and collectible cats.
 
 ---
 
@@ -96,7 +99,7 @@ have Keys only; stages 22-30 have Checkpoints only; stages 31+ combine them.
 
 ### Hints & Auto-Solve
 
-- **Hints**: 2 free per stage. Shows the next optimal move (from BFS solver). Additional hints via rewarded ad.
+- **Hints**: 2 free per stage. Shows the next optimal move (from BFS solver). Additional hints via rewarded ad or **20 coins each** (see `economy-expansion.md` Sink 1).
 - **Auto-Solve**: Plays the full optimal solution automatically. Requires rewarded ad.
 
 ### Power-Ups
@@ -110,7 +113,9 @@ have Keys only; stages 22-30 have Checkpoints only; stages 31+ combine them.
 - If Ice finds no removable block, the cost is refunded.
 - Shuffle is BFS-verified after each attempt: if the shuffled state is unsolvable,
   the system re-shuffles (up to 5 attempts). If all attempts fail, the original
-  grid is restored (coins already deducted — no refund for Shuffle).
+  grid is restored and the cost is **refunded** via `refundCoins(50)`.
+  This matches Ice's refund-on-failure policy — power-ups that produce no effect
+  do not consume coins.
 
 ### Tutorial
 
@@ -138,6 +143,12 @@ minMoves(stage) =
 
 acceptThreshold = max(2, floor(minMoves * 0.50))
 ```
+
+The generator accepts a puzzle if `optimalMoves >= acceptThreshold`. This is a
+lower bound — puzzles below this floor are discarded and the generator retries.
+For stages 1-5 (minMoves 2-6), acceptThreshold = 2, matching the quality filter's
+`optimalMoves >= 2` criterion. From stage 12+ (minMoves 7+), acceptThreshold rises
+above 2, providing a tighter difficulty floor.
 
 The `max(6, ...)` floor ensures monotonicity at the stage 5→6 boundary (the linear
 branch yields 6 at stage 5; the sqrt branch would drop to 5 at stage 6 without it).
@@ -204,10 +215,19 @@ blockerBlock: 33% chance length 3, 67% length 2
 
 ### Score
 
+Score serves as a **per-stage personal best** metric supporting P4 (Visible Progress).
+It is displayed at the stage-end screen and stored as `bestScore` (best-ever, via
+`max(new, existing)`). Higher scores reward efficiency — solving closer to optimal
+moves earns more points.
+
 ```
 star2Limit = floor(optimalMoves * 1.5)
 score = max(0, star2Limit - moves + 1) * 100 + stars * 200
 ```
+
+**Output range**: [200, varies by optimalMoves]
+- Minimum (1★, moves >> optimal): 0 × 100 + 1 × 200 = **200** (floor, never lower)
+- Optimal clear (3★, moves = optimal): (star2Limit - optimal + 1) × 100 + 600
 
 ### Coin Rewards (per clear)
 
@@ -227,7 +247,7 @@ score = max(0, star2Limit - moves + 1) * 100 + stars * 200
 7. **Depth cap rejection**: Puzzles with BFS solution depth > 45 are rejected during generation. This prevents puzzles that the solver/hints/auto-solve cannot handle.
 8. **Ice power-up on empty grid**: If no non-cat blocks exist, the cost is refunded.
 9. **Shuffle solvability**: After shuffling, the grid is BFS-verified. If unsolvable, the system re-shuffles (up to 5 attempts). If all fail, the original grid is restored.
-10. **Combo system**: Variables are scaffolded (`comboCount`, `maxCombo`) but increment logic is **not implemented**. Decision pending: cut or design.
+10. **Combo system — CUT**: Scaffolded variables (`comboCount`, `maxCombo`) exist in code but have no increment logic and no design. The combo feature is deferred indefinitely. The scaffolded variables should be removed during the next cleanup pass to avoid confusion.
 11. **Concurrent generation**: `seedOffsetCache` uses `ConcurrentHashMap` for thread-safe access during preload + on-demand generation.
 
 ---
@@ -239,10 +259,11 @@ score = max(0, star2Limit - moves + 1) * 100 + stars * 200
 | **Economy System** | Consumes coins for power-ups; earns coins from clears |
 | **Progression System** | Reads/writes stage completion, stars, best scores |
 | **Cat Collection** | Selected cat determines visual; unlocked cats are earned via progression |
-| **Achievement System** | Triggers achievement checks on clear (speed, efficiency, stars, etc.) |
+| **Progression System (achievements)** | Triggers achievement checks on clear (speed, efficiency, stars, etc.) |
 | **Ad System** | Rewarded ads gate hints, auto-solve, and next-stage transitions |
 | **Sound System** | World-themed BGM, haptic feedback on moves |
 | **Cat Launch System** | Independent sibling mode; shares cat collection and coin economy |
+| **Economy Expansion** | Paid hints (20 coins after 2 free), stage skip (100 coins), grid themes |
 
 ---
 
@@ -291,7 +312,7 @@ score = max(0, star2Limit - moves + 1) * 100 + stars * 200
 ### Star & Score
 
 8. **Star formula determinism**: Given identical `moves` and `optimalMoves`, stars are always: `3` if `moves ≤ optimalMoves`; `2` if `moves ≤ floor(optimalMoves * 1.5)`; `1` otherwise. Implemented in exactly one location.
-9. **Score formula**: `score = max(0, floor(optimalMoves * 1.5) - moves + 1) * 100 + stars * 200`. Score must never be negative. Unit tests must verify boundary values: optimal clear, exact 2★ boundary, and 1★ case.
+9. **Score formula**: `score = max(0, floor(optimalMoves * 1.5) - moves + 1) * 100 + stars * 200`. Score minimum is **200** (1★ clear, moves >> optimal). Score is displayed at stage end and stored as `bestScore` (best-ever). Unit tests must verify: optimal clear, exact 2★ boundary, and 1★ case (floor = 200).
 
 ### Undo
 
@@ -300,7 +321,7 @@ score = max(0, star2Limit - moves + 1) * 100 + stars * 200
 
 ### Power-Ups
 
-12. **Shuffle solvability**: After `applyShufflePowerUp()`, `solveFast(grid) >= 1` must hold. If a shuffle produces an unsolvable state, the system re-shuffles (up to `MAX_SHUFFLE_ATTEMPTS = 5`). If all fail, the original grid is restored.
+12. **Shuffle solvability**: After `applyShufflePowerUp()`, `solveFast(grid) >= 1` must hold (intentionally lower than the `>= 2` generation standard — shuffle only needs to guarantee a path exists). If a shuffle produces an unsolvable state, the system re-shuffles (up to `MAX_SHUFFLE_ATTEMPTS = 5`). If all fail, the original grid is restored and `refundCoins(50)` is called. Net balance: unchanged.
 13. **Ice refund**: Given a grid with only cat/wall/key blocks (no removable blocks), `handlePowerUp(1)` [Ice, 40 coins] must deduct 40, call `applyIcePowerUp()` → returns `false`, then `refundCoins(40)`, net balance unchanged.
 14. **Coin deduction ordering**: Coins are deducted via `spendCoins(cost)` before any power-up effect. If balance is insufficient, no effect is applied.
 

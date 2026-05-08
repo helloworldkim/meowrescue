@@ -25,12 +25,12 @@ completionists who buy all hints approach 1.5x; casual players who skip hints la
 |---|------|------|-------------|---------------|
 | 1 | Additional Hints | Puzzle | 20 coins/hint | ~4,000 coins |
 | 2 | Cat Cosmetics | Both | 100-1,000 coins/variant (tiered by rarity) | ~9,900 coins |
-| 3 | Stage Skip | Puzzle | 100 coins/skip | ~700 coins |
+| 3 | Stage Skip | Puzzle | 100 coins/skip | ~1,050 coins |
 | 4 | Grid Themes | Puzzle | 300-500 coins/theme | ~2,400 coins |
-| | **Total sink capacity** | | | **~17,000 coins** |
+| | **Total sink capacity** | | | **~17,350 coins** |
 
-Against ~22,180 total income (puzzle 18,180 + launch 4,000 assuming 50 stages, all 3★),
-this yields a ~1.3x surplus ratio — within the 1.5-2.5x target for completionists.
+Against ~22,290 total income (puzzle 18,290 + launch 4,000 assuming 50 stages, all 3★),
+this yields a ~1.28x surplus ratio — within the 1.5-2.5x target for completionists.
 Casual players who skip Legendary cosmetics land at ~1.8-2.0x.
 
 ## B. Player Fantasy
@@ -130,8 +130,8 @@ Purchased via a new **Themes** section in Settings or Collection screen.
 | Grid Themes (6 items) | 2,400 |
 | **Total** | **17,350** |
 
-Post-expansion surplus: ~22,180 / 17,350 ≈ **1.28x** (completionist). Casual players
-who buy only Common/Uncommon cosmetics: ~22,180 / 10,750 ≈ **2.1x**.
+Post-expansion surplus: ~22,290 / 17,350 ≈ **1.28x** (completionist). Casual players
+who buy only Common/Uncommon cosmetics: ~22,290 / 10,750 ≈ **2.07x**.
 
 > **Note**: Income assumes 50 Cat Launch stages (all 3★). Launch stages are
 > procedurally unlimited — a dedicated Launch player can exceed this. See
@@ -166,8 +166,8 @@ totalSinkCapacity = hints + cosmetics + skips + themes
   total    = 4,000 + 9,900 + 1,050 + 2,400 = 17,350
 
 postExpansionSurplusRatio = totalIncome / totalSinkCapacity
-  completionist: 22,180 / 17,350 ≈ 1.28x
-  casual (common+uncommon only): 22,180 / 10,750 ≈ 2.06x
+  completionist: 22,290 / 17,350 ≈ 1.28x
+  casual (common+uncommon only): 22,290 / 10,750 ≈ 2.07x
 ```
 
 ---
@@ -230,7 +230,7 @@ postExpansionSurplusRatio = totalIncome / totalSinkCapacity
 6. **Skip limit enforcement**: After using 1 skip in World 3 (stages 61-90), no further skips are available for any stage in World 3.
 7. **Theme unlock persistence**: After purchasing a theme, it appears in the theme selector and persists across restarts.
 8. **Theme override in play**: Given the Neon theme is purchased and selected, launching any puzzle stage must display the Neon color palette (bright neon on dark background) for grid, cells, and blocks — regardless of which world the stage belongs to. The world's default colors must not appear.
-9. **Surplus ratio**: Total first-clear income (22,180) / total sink capacity (17,350) = 1.28x (completionist) to 2.06x (casual). Must remain within 1.0-2.5× range for completionists. Verified by formula when any income source or sink price changes, not at runtime.
+9. **Surplus ratio**: Total first-clear income (22,290) / total sink capacity (17,350) = 1.28x (completionist) to 2.07x (casual). Must remain within 1.0-2.5× range for completionists. Verified by formula when any income source or sink price changes, not at runtime.
 10. **No gameplay advantage from cosmetics**: Given cat #1 with Color Palette cosmetic active in Cat Launch: (a) trajectory and collision behavior must be identical to cat #1 without cosmetic on the same stage, (b) no ability stats change. Verified by code review of cosmetic rendering path confirming it is render-only.
 11. **Skip triggers cat unlock**: Given stage 75 is uncompleted and cat #6 is locked, skipping stage 75 must call `saveProgress(75, 1, null, 0)` then `getNewlyUnlockedCat(75)` must return cat #6. Congratulations dialog shown.
 12. **Skip triggers progress achievements**: Given `maxCompletedLevel == 89`, skipping stage 90 must trigger `clear_90` ("숲 졸업") achievement and award its 50-coin reward.

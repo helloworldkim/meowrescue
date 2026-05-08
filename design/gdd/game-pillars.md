@@ -86,7 +86,7 @@ seeing they are further along than when they started.
 
 **This pillar serves:**
 - 7 world themes with distinct color palettes (Progression System)
-- 30 achievements across 7 categories (Progression System)
+- 32 achievements across 7 categories (Progression System)
 - Star ratings per stage with best-ever tracking (Puzzle + Cat Launch)
 - Coin economy as visible reward signal (Economy System)
 - Grid themes and cosmetics as progress expression (Economy Expansion)

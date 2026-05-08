@@ -2,10 +2,10 @@
 
 | # | System | GDD File | Status | Dependencies |
 |---|--------|----------|--------|-------------|
-| 1 | Puzzle System | `puzzle-system.md` | Needs Revision | Economy, Progression, Cat Collection |
-| 2 | Cat Launch System | `cat-launch-system.md` | Needs Revision | Progression, Cat Collection, Economy |
-| 3 | Progression System | `progression-system.md` | Needs Revision | Puzzle, Cat Launch, Economy |
-| 4 | Economy System | `economy-system.md` | Needs Revision | Puzzle, Progression, Cat Launch |
+| 1 | Puzzle System | `puzzle-system.md` | Approved | Economy, Progression, Cat Collection |
+| 2 | Cat Launch System | `cat-launch-system.md` | Approved | Progression, Cat Collection, Economy |
+| 3 | Progression System | `progression-system.md` | Approved | Puzzle, Cat Launch, Economy |
+| 4 | Economy System | `economy-system.md` | Approved | Puzzle, Progression, Cat Launch |
 | 5 | Economy Expansion | `economy-expansion.md` | Approved | Economy, Puzzle, Cat Launch, Progression |
 
 ## Design Order

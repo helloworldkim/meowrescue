@@ -1,115 +1,106 @@
-# Cross-GDD Review Report — 2026-04-16 (Re-review)
+# Cross-GDD Review Report — 2026-04-16 (Post-Approval Full Review)
 
+**Date**: 2026-04-16
 **GDDs Reviewed**: 5
-**Systems Covered**: Economy System, Progression System, Puzzle System, Cat Launch System, Economy Expansion
-**Previous Review**: 2026-04-15 (Verdict: FAIL, 5 blockers)
+**Systems Covered**: Puzzle System, Cat Launch System, Progression System, Economy System, Economy Expansion
+**Pillars**: P1 Rescue & Collect, P2 Spatial Mastery, P3 Physics Spectacle, P4 Visible Progress
+**Anti-Pillars**: AP1 No Competition, AP2 No Narrative, AP3 No Pay-to-Win
+**Previous Review**: 2026-04-16 (earlier session, Verdict: CONCERNS — all prior blockers now resolved)
 
 ---
 
 ## Consistency Issues
 
-### Blocking
+### Blocking (must resolve before architecture begins)
 
-**B-1: Economy GDD Balance Snapshot uses 30 instead of 50 for Launch first-clear bonus**
-- File: `economy-system.md`, line 174
-- Text: `50 * 30 first-clear bonus = 1,500`
-- Should be: `50 * 50 first-clear bonus = 2,500`
-- Impact: Understates Launch income by 1,000 coins. Stated surplus ratio 8.8x is actually 9.2x. Propagates to Economy Expansion's ~24,000 income assumption.
-- Fix: Change 30 → 50 and recalculate downstream totals.
+**🔴 C-1: Income base mismatch — 22,290 vs 22,180**
+- `economy-expansion.md` uses **22,180** in Sections A, C, D, and AC#9
+- `economy-system.md` defines canonical income base as **22,290** (puzzle 18,290 + launch 4,000)
+- Economy System is the declared single source of truth
+- The expansion's figure is stale from before the final achievement total (2,290) was locked
+- **Fix**: Update 4 locations in economy-expansion.md: lines ~33, ~133, ~169-170, ~233
 
-**B-2: Economy Expansion overview table contradicts its own Section C**
-- File: `economy-expansion.md`, lines 26-29 vs lines 64-68 and 100-106
-- Overview table: Cosmetics "~5,200", Total "~12,300"
-- Detailed math: Cosmetics 5,850, Total 12,950
-- Fix: Update overview table to match Section C math (5,850 cosmetics, 12,950 total).
+**🔴 C-2: Economy Expansion overview sink total ~17,000 vs revised 17,350**
+- `economy-expansion.md` Section A overview table shows **~17,000** (using skip=700 = 7×100 direct cost)
+- The authoritative revised total in Section C is **17,350** (using skip=1,050 = 7×150 effective cost)
+- The overview table was never updated after the revised calculation was added
+- **Fix**: Update overview table total to ~17,350 and skip row to ~1,050
 
-**B-3: Cat Launch parity table says achievements "Not Started" but code implements all 3 triggers**
-- File: `cat-launch-system.md`, line 35
-- `checkLaunchAchievements()` in `LaunchGameActivity.kt` now calls `unlockAchievement()` for launch_10, launch_1cat, launch_tnt.
-- Fix: Update parity table to "3/3 existing implemented; 8-10 target remains Not Started."
+### Warnings (should resolve, but won't block)
 
-### Warnings
+**⚠️ C-3: Game pillars achievement count stale — 30 vs 32**
+- `game-pillars.md` P4 says "30 achievements across 7 categories"
+- Correct count is **32** (after cat_5 and cat_10 were added)
+- **Fix**: Update line 89 of game-pillars.md
 
-**W-1: Star coin rewards triple-owned** (Economy Section G, Puzzle Section D, Economy Section G again for Launch)
-**W-2: Power-up costs dual-owned** (Economy Section G, Puzzle Section G)
-**W-3: First-clear bonus dual-owned** (Economy Section G ×2, Puzzle Section D)
-**W-4: World theme boundaries dual-owned** (Progression Section G, Puzzle Section G/H)
-**W-5: Achievement coin rewards dual-owned** (Economy Section G, Progression Section G)
-- Recommendation: Economy GDD = sole owner of all coin/reward values. Progression GDD = sole owner of world boundaries and achievement definitions. Others use cross-references.
+**⚠️ C-4: Three missing reciprocal dependencies**
+- `economy-system.md`, `cat-launch-system.md`, and `progression-system.md` do not list `economy-expansion.md` in their Dependencies tables
+- Economy Expansion lists all three as dependencies in its Section F
+- **Fix**: Add Economy Expansion row to each GDD's Dependencies table
 
-**W-6: Economy Expansion income total (~24,000) has no derivation**
-- No explicit Launch stage count assumption. Economy GDD's calculation has the B-1 error.
-- Recommendation: Add income derivation to Economy Expansion Section D with stated assumptions.
+**⚠️ C-5: "Achievement System" named as standalone dependency**
+- `puzzle-system.md` and `cat-launch-system.md` list "Achievement System" in dependencies
+- No such standalone GDD exists — achievements are a subsection of `progression-system.md`
+- **Fix**: Rename to "Progression System (achievements)" in both dependency tables
 
-**W-7: Skip + first-clear interaction under-specified**
-- Does skip permanently consume the first-clear bonus? AC-5 says "isFirstClear forced false" but writes a completion record.
-- Recommendation: Clarify in edge cases whether skip preserves or consumes first-clear opportunity.
+**⚠️ C-6: Puzzle hint section incomplete post-expansion**
+- `puzzle-system.md` Section C (Hints) only describes the rewarded-ad path
+- Missing: coin-purchased hints (20 coins each) from Economy Expansion Sink 1
+- **Fix**: Add cross-reference to economy-expansion.md Sink 1
 
-**W-8: Cat Launch bestScore stored as `stars * 50` placeholder** (code) vs rich scoring formula (GDD)
-- `GameRepository.saveLaunchProgress()` uses `val score = stars * 50`.
-- Recommendation: Implement GDD formula or document placeholder as intentional.
-
-**W-9: Puzzle GDD does not explicitly state "no first-clear bonus for Endless"**
-- Economy GDD states it; Puzzle GDD is silent.
-- Recommendation: Add one sentence to Puzzle Endless section.
-
-**W-10: Economy Expansion has no reverse references from base GDDs' dependency tables**
-- Recommendation: Add Economy Expansion to dependency tables of base GDDs once it moves to Approved.
+**⚠️ C-7: No explicit Economy AC for Shuffle refund**
+- `economy-system.md` has AC#9 for Ice refund but no corresponding AC for Shuffle refund
+- Puzzle GDD specifies `refundCoins(50)` on all-shuffle-attempts-fail
+- General `refundCoins` semantics (AC#16) cover it implicitly
+- **Fix**: Add AC#9a for Shuffle refund mirroring Ice AC#9
 
 ---
 
 ## Game Design Issues
 
-### Blocking
-
-**D-1: Cat Launch first-clear bonus is an INFINITE uncapped income source**
-- Launch stages are unlimited procedural with unique IDs; each earns 50-coin first-clear.
-- All economy surplus calculations assume ~50 Launch clears but NO CAP exists in code or design.
-- This invalidates the entire economy-expansion balance model.
-- Suggested: Cap first-clear to first N unique Launch stages (e.g., 100), or replace with difficulty-based coin multiplier.
-
-**D-2: No formal game-concept.md or game-pillars.md exists**
-- No explicit design filter for feature scoping, prioritization, or cut/keep decisions.
-- Inferred pillars: Rescue/Collect, Spatial Mastery, Physics Spectacle, Visible Progress.
-- Suggested: Create `design/game-pillars.md` ratifying 3-4 pillars.
-
 ### Warnings
 
-**D-3: Cat Launch difficulty selector is non-functional**
-- Easy/Normal/Hard award identical coins with no separate progress tracking per difficulty.
-- Dominant strategy: always play Easy. The selector is dead UI.
-- Suggested: Add coin multiplier (1.0x/1.25x/1.5x) or remove selector.
+**⚠️ D-1: Long-term Endless income uncapped in aggregate**
+- Daily cap is 150 coins, but no aggregate/lifetime cap exists
+- Over 120 days of daily play: 18,000 Endless coins + 22,290 progression = 40,290 total
+- Against 17,350 sinks = 2.32x surplus — exceeds 1.0-2.5x target at ~150 days
+- No terminal sink absorbs long-tail income
+- **Recommendation**: Monitor post-launch; consider aggregate cap or live-ops sinks if retention exceeds 120 days
 
-**D-4: Endless mode is an uncapped infinite coin source with no diminishing returns**
-- No session cap, no escalating difficulty, no reduced payouts.
-- Suggested: Diminishing returns (e.g., halve coins every 10 consecutive clears per session) or daily cap.
+**⚠️ D-2: Cat Launch replay income uncapped**
+- Unlike Endless (150/day cap), Cat Launch replays have no daily limit
+- Hard 3-star replays earn 60 coins each, unlimited
+- **Recommendation**: Acceptable for MVP — replay income is low-yield. Revisit if analytics show farming
 
-**D-5: Cat Launch stage ID collision across difficulty levels**
-- Stage 35 Easy and stage 35 Hard share one progress record.
-- First-clear bonus consumed by first difficulty played; Hard play invisible if Easy played first.
-- Suggested: Encode difficulty into stage ID (e.g., stageId * 10 + difficultyLevel).
+**⚠️ D-3: One-time sinks exhaust; infinite sources persist**
+- After all cosmetics (9,900), themes (2,400), and skips (1,050) are purchased, only consumable sinks remain
+- No aspirational spending goals post-completion
+- **Recommendation**: Plan post-launch content sinks (seasonal cosmetics, new theme packs) in live-ops design
 
-**D-6: Skip → cat unlock interaction unspecified**
-- Skipping stage 150 could unlock cat #10 (Charge). Intended?
-- Binary design decision needed before implementation.
+**⚠️ D-4: No catch-up mechanism for struggling players**
+- Players who spend heavily on power-ups/hints early have fewer coins for cosmetics later
+- No mercy mechanic (failure bonus, pity timer)
+- **Recommendation**: Consider adding a small coin bonus after N consecutive failures on the same stage
 
-**D-7: Skip → achievement interaction unspecified**
-- Skipping to stage 200 could unlock "Legendary Rescuer" achievement.
-- Binary design decision needed before implementation.
+**⚠️ D-5: Cat Launch difficulty ignores ability roster**
+- Hard mode (+50 offset) assumes ability diversity
+- A player at puzzle stage 10 has only 3 Normal cats facing Hard-tier stages
+- Cat selection fills with repeated Normal cats — mechanically functional but strategically impoverished
+- **Recommendation**: Add UI warning when selecting Hard with < 5 unique ability types unlocked
 
-**D-8: Cross-mode difficulty not calibrated to cat ability power**
-- Explosive cats trivialize early Launch stages regardless of difficulty setting.
-- Suggested: Factor unlocked ability tier into Launch stage generation.
+**⚠️ D-6: "Equal-weight" Cat Launch parity aspirational, not current**
+- 4 of 7 parity requirements are "Not Started" (cat unlocks, coin sinks, visual progression, achievements)
+- Planning should treat Launch as a dependent secondary mode until parity items are implemented
+- **Recommendation**: Acknowledge in architecture that Launch parity is post-MVP scope
 
-**D-9: No coin sink exists within Cat Launch gameplay**
-- All current and planned sinks are Puzzle-only (power-ups, hints, skip, themes).
-- Cat cosmetics are purchased from Collection screen, not in-context during Launch.
+### Clean Passes
 
-**D-10: Cosmetic storage schema and rendering pipeline unspecified**
-- Economy-expansion.md describes behavior but no persistence schema or rendering spec.
-
-**D-11: Economy spending decisions have no weight**
-- 8.8x surplus pre-expansion. Post-expansion ratio is fictional due to uncapped Launch income.
+- **Player attention budget**: 3-4 concurrent systems — within casual mobile limits ✓
+- **No dominant strategy** invalidates all others ✓
+- **No runaway positive feedback loops** ✓
+- **Individual difficulty curves** well-designed for casual mobile ✓
+- **All systems serve at least one pillar**; no anti-pillar violations ✓
+- **Player fantasies coherent** and mutually reinforcing ✓
 
 ---
 
@@ -117,41 +108,74 @@
 
 **Scenarios walked**: 5
 
+1. First-time puzzle clear at cat unlock stage (stage 30)
+2. Endless mode clear near daily coin cap
+3. Shuffle power-up fails on a cat unlock stage
+4. Stage skip on a cat unlock stage (stage 75)
+5. Cat Launch clear triggering achievements + coins
+
+### Blockers
+
+**🔴 S-1: `cat_5`/`cat_10` achievements unreachable** — Progression + Economy
+- The two collection achievements (`cat_5`: 30 coins, `cat_10`: 80 coins) are defined in `AchievementDefs` but never checked in any code path
+- `checkAchievements()` checks cat_3/cat_7/cat_all only
+- `checkLaunchAchievements()` does the same
+- Endless branch checks only endless_10/endless_50
+- **110 coins of rewards are permanently inaccessible**
+- The 32-achievement total of 2,290 coins can never actually be fully earned
+- **Fix**: Add cat_5/cat_10 checks to all achievement check sites
+
+**🔴 S-2: Shuffle refund not implemented** — Puzzle + Economy
+- `puzzle-system.md` specifies `refundCoins(50)` on all-attempts-fail
+- `PuzzleView.applyShufflePowerUp()` returns `Unit` (void), not `Boolean`
+- The caller does not check for failure and does not refund
+- Player silently loses 50 coins with no effect
+- Contrast: Ice refund IS implemented correctly
+- **Fix**: Change return type to Boolean, add refund logic mirroring Ice path
+
+**🔴 S-3: Skip `isFirstClear` mechanism undefined** — Economy Expansion + Progression
+- Economy Expansion specifies "isFirstClear forced false in skip flow"
+- Current `saveProgress()` calculates `isFirstClear` from DB state — no parameter to force it false
+- The skip feature cannot be implemented as specified without a function signature change
+- **Fix**: Define mechanism in GDD (new parameter vs. separate method) before architecture
+
 ### Warnings
 
-**SC-1: Launch TNT Clear — Stage ID collision**
-Playing stage 35 on Easy consumes the first-clear bonus; later playing on Hard gets 0 bonus. Star rating max-merged makes Hard performance invisible.
+**⚠️ S-4: Endless branch skips economy/collection achievement checks**
+- `coins_100`, `coins_1000`, and `cat_*` achievements not checked in Endless path
+- Player earning 1000th coin through Endless won't get achievement until a non-Endless clear
+- **Fix**: Call shared achievement checks from Endless path
 
-**SC-2: Low-Coin Power-Up — No recovery guidance**
-"Not enough coins" toast shown but no suggestion how to earn more. Post-expansion this scenario becomes common.
+**⚠️ S-5: Power-up count increments on failed/refunded power-ups**
+- `incrementPowerUpUseCount()` runs before the effect is attempted
+- Failed Shuffle and failed Ice inflate count toward `powerup_10`
+- **Decision needed**: Should failed/refunded power-ups count toward the achievement?
 
-**SC-3: Stage Skip — Cat unlock/achievement interactions undefined**
-Skipping stage 150 or 200 may trigger cat unlocks and achievements. Design decision required.
+**⚠️ S-6: Skip star-coin award internally inconsistent**
+- Edge Case 10 calculates effective cost as 150 (100 paid + 50 forfeited) — implies no star coins
+- Formula section defines `skipStarAward = 1` — implies 10 coins ARE awarded (effective cost = 140)
+- **Decision needed**: Does skip award 10 star coins or not?
 
-**SC-4: Buy Cosmetic → Launch — Storage and rendering gaps**
-Cosmetic persistence schema undefined. Rendering pipeline for accessory overlay on physics projectile unspecified. Cat selection is random, so purchased cosmetic may not appear.
+**⚠️ S-7: Achievement notification UX for multi-unlock undefined**
+- Up to 5 achievements can fire in one stage clear
+- No specification for presentation (queue, batch, summary), ordering, or max simultaneous
+- **Fix**: Define in UX spec before implementation
+
+**⚠️ S-8: Achievement check order creates within-cycle coin feedback**
+- Each `unlockAchievement()` calls `addCoins()`, updating `totalCoinsEarned` mid-cycle
+- Later checks (e.g., `coins_1000`) see the updated total
+- Order of checks matters but is unspecified
+- **Fix**: Define check order or use snapshot of `totalCoinsEarned` at cycle start
 
 ### Info
 
-- Cat unlock on puzzle clear: works correctly, no failure modes.
-- Achievement timing: crash between saveProgress and checkAchievements self-heals.
-- Cat selection randomness: purchased cosmetics may not appear in next Launch stage.
+**ℹ️ S-9**: Cat unlock dialog vs achievement dialog ordering is implicit in code, not specified in GDD.
 
----
+**ℹ️ S-10**: Partial Endless coin award (e.g., 10 of 30) has no specified UI treatment distinct from a full award.
 
-## Previous Review (2026-04-15) Resolution Status
+**ℹ️ S-11**: Haptic feedback fires on failed Shuffle, giving false feedback.
 
-| Finding | Status |
-|---------|--------|
-| C-1: Launch achievements unreachable | **RESOLVED** |
-| C-2: "minigame" terminology | **RESOLVED** |
-| C-3: Stale "code fix needed" notes | **RESOLVED** |
-| C-4–C-7: Tuning knob dual-ownership | UNRESOLVED |
-| C-8: Endless first-clear exclusion | UNRESOLVED |
-| C-9: Endless theme cycling %7 | UNRESOLVED |
-| C-10: Launch bestScore placeholder | UNRESOLVED |
-| D-1: Cat Launch subordination | Partially addressed |
-| D-2: Economy open loop | Addressed (Expansion designed; arithmetic errors remain) |
+**ℹ️ S-12**: Coin display update timing after stage clear is not documented in any GDD.
 
 ---
 
@@ -159,27 +183,49 @@ Cosmetic persistence schema undefined. Rendering pipeline for accessory overlay 
 
 | GDD | Reason | Type | Priority |
 |-----|--------|------|----------|
-| economy-system.md | Launch first-clear arithmetic wrong (30→50) | Consistency | Blocking |
-| economy-expansion.md | Stale overview table; no income derivation; skip interactions | Consistency | Blocking |
-| cat-launch-system.md | Parity table stale; uncapped first-clear; difficulty selector | Design | Blocking |
-| puzzle-system.md | No explicit Endless first-clear exclusion | Consistency | Warning |
-| progression-system.md | Achievement reward ownership overlap | Consistency | Warning |
+| `economy-expansion.md` | Income base 22,180→22,290 (4 locations), overview sink total ~17,000→17,350 | Consistency | Blocking |
+| `progression-system.md` | `cat_5`/`cat_10` not in any achievement check code path | Scenario | Blocking |
+| `puzzle-system.md` | Shuffle refund not implemented; hint section stale post-expansion | Scenario + Consistency | Blocking + Warning |
+| `game-pillars.md` | Achievement count 30→32 | Consistency | Warning |
+| `economy-system.md` | Missing expansion dependency; no Shuffle refund AC | Consistency | Warning |
+| `cat-launch-system.md` | Missing expansion dependency | Consistency | Warning |
 
 ---
 
 ## Verdict: CONCERNS
 
-**Improvement from previous review**: FAIL → CONCERNS. Three original blockers (C-1 achievements, C-2 identity, C-3 stale notes) are RESOLVED. Economy Expansion closes the open loop structurally.
+No **design-level** blockers exist — the game's holistic design is sound. Pillar alignment, attention budget, difficulty curves, player fantasies, and economic loops are well-designed for casual mobile.
 
-**Remaining blockers**:
-- 3 consistency blockers (B-1, B-2, B-3) are quick edits (< 5 min total)
-- 2 design blockers (D-1 uncapped income, D-2 no pillars) require design decisions
+However, **3 scenario blockers** (S-1/S-2/S-3) and **2 consistency blockers** (C-1/C-2) require resolution:
 
-The consistency blockers do not prevent architecture. The design blockers are decisions, not contradictions — they can be resolved alongside implementation planning.
+- **S-1**: `cat_5`/`cat_10` achievements unreachable (110 coins locked, breaks 2,290 total)
+- **S-2**: Shuffle refund not implemented (GDD says refund, code does not)
+- **S-3**: Skip `isFirstClear` mechanism undefined (cannot implement skip as specified)
+- **C-1**: economy-expansion.md income base stale (22,180 → 22,290)
+- **C-2**: economy-expansion.md overview sink total stale (~17,000 → 17,350)
 
-**Required actions before re-running**:
-1. Fix B-1: Economy GDD Launch first-clear 30→50 in formula
-2. Fix B-2: Economy Expansion overview table 5,200→5,850, 12,300→12,950
-3. Fix B-3: Cat Launch parity table achievement status
-4. Decide D-1: Cap Launch first-clear income (design decision)
-5. Decide D-2: Create game-pillars.md (when ready)
+These do not prevent architecture from beginning, but should be resolved in parallel with early architecture work. The scenario blockers (S-1/S-2) are concrete code fixes; S-3 and the consistency blockers are GDD updates.
+
+### Required Actions
+
+1. **economy-expansion.md**: Update all instances of 22,180 to 22,290 and overview total to ~17,350
+2. **Code**: Add `cat_5`/`cat_10` to all achievement check paths (PuzzleActivity, LaunchGameActivity, Endless branch)
+3. **Code**: Implement Shuffle refund (change return type, add refund logic)
+4. **economy-expansion.md**: Resolve skip star-coin ambiguity (does skip award 10 coins or not?)
+5. **game-pillars.md**: Update achievement count 30→32
+6. **All GDDs**: Add missing reciprocal Economy Expansion dependencies
+
+---
+
+## Previous Review Resolution
+
+| Prior Finding | Status |
+|---------------|--------|
+| B-1: Launch first-clear 30→50 arithmetic | **RESOLVED** (economy-system.md updated) |
+| B-2: Expansion overview table stale totals | **PARTIALLY RESOLVED** (cosmetics fixed; skip/income stale) |
+| B-3: Launch parity table achievements | **RESOLVED** (status updated) |
+| D-1: Uncapped Launch first-clear income | **RESOLVED** (50-stage cap implemented) |
+| D-2: No game-pillars.md | **RESOLVED** (game-pillars.md created and approved) |
+| D-3: Difficulty selector non-functional | **RESOLVED** (coin multipliers 1.0/1.5/2.0 implemented) |
+| D-4: Endless uncapped income | **RESOLVED** (150/day cap implemented) |
+| W-1 through W-5: Tuning knob ownership | **RESOLVED** (Economy GDD declared sole owner) |

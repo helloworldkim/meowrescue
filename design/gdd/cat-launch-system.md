@@ -186,9 +186,23 @@ Cats are selected from the player's unlocked collection. If more cats are availa
 than needed, a random subset is chosen (seeded by stage). If fewer are available,
 cats are repeated.
 
+**Queue preview**: The player sees the **current cat** and the **next cat** in the
+launch queue before firing. This enables basic tactical planning ("the next cat is
+Explosive — I'll soften this structure with my current Normal cat first"). The full
+queue beyond the next cat is hidden, preserving some adaptation challenge.
+
+- The queue is displayed as two cat icons near the slingshot (current = large, next = small).
+- After launching, the queue shifts: next becomes current, and a new next is revealed.
+- On the final cat, the "next" slot is empty.
+
 ### Settling & Win/Lose
 
-- **Settled**: All dynamic bodies have velocity < 0.2 m/s.
+- **Settled**: All dynamic bodies have velocity < 0.2 m/s for 15 consecutive
+  physics frames (~0.25s at 60 Hz).
+- **Settling timeout**: If no settling occurs within **10 seconds** (600 physics
+  frames) after the last cat launch, all dynamic body velocities are forced to zero
+  and win/lose is evaluated immediately. This prevents permanent hangs from
+  physics oscillation or balanced-edge scenarios.
 - **Stage Clear**: All enemies destroyed after settling.
 - **Stage Fail**: All cats used and enemies remain after settling.
 - Out-of-bounds bodies (x < -0.5, x > 20.5, y < -1) are auto-removed.
@@ -292,6 +306,9 @@ oneStar = catCount
 7. **Empty cat pool**: If `unlockedCatIds` is empty, all cats default to ID 0 (Normal ability).
 8. **Out-of-bounds cleanup**: Bodies that fall below y=-1 or exit the world horizontally are destroyed silently (no score awarded for OOB enemies).
 9. **TNT never as base block**: TNT insertion skips blocks at `offsetY ≤ 0.01` to prevent structural collapse before the player acts.
+10. **Redirect CCD**: At redirect speeds above 15.0 m/s, continuous collision detection (CCD) is enabled on the cat body to prevent tunneling through thin obstacles. CCD is set at body creation time via `body.isBullet = true` for Redirect cats.
+11. **Settling timeout**: If physics bodies oscillate without settling within 10 seconds after the last cat launch, velocities are forced to zero and win/lose is evaluated. This prevents permanent game hangs from balanced-edge or low-energy oscillation scenarios.
+12. **Zero-force launch**: If the player releases the slingshot with zero pull distance, the cat drops from the anchor position under gravity. This counts as a used cat and the shot proceeds normally to settling.
 
 ---
 
@@ -302,7 +319,8 @@ oneStar = catCount
 | **Progression System** | Reads unlocked cats for selection; writes stage clear / star count |
 | **Cat Collection** | Cat IDs determine which abilities are available |
 | **Economy System** | Shared coin pool; awards coins on stage clears (10/20/30 + 50 first-clear) |
-| **Achievement System** | Triggers launch-specific achievements (launch_10, launch_1cat, launch_tnt) |
+| **Progression System (achievements)** | Triggers launch-specific achievements (launch_10, launch_1cat, launch_tnt) |
+| **Economy Expansion** | Cat cosmetics render on projectile sprites |
 | **Sound System** | Launch SFX, collision sounds, explosion effects |
 | **Puzzle System** | Independent sibling mode; shares cat collection |
 
@@ -338,15 +356,18 @@ oneStar = catCount
 | Difficulty offsets | 0/25/50 | `LaunchDifficulty` enum |
 | Difficulty coin multipliers | 1.0/1.5/2.0 | `LaunchDifficulty` enum |
 | First-clear bonus cap | 50 unique stages | `GameRepository.saveLaunchProgress()` |
+| Ability speed cap | 18.0 m/s | `CatAbility.Redirect` (max post-redirect speed) |
+| CCD threshold | 15.0 m/s | `LaunchPhysicsWorld` (enable bullet mode above this) |
+| Settling timeout | 10.0 seconds | `LaunchPhysicsWorld` (force-settle after this duration) |
 
 ---
 
 ## H. Acceptance Criteria
 
 ### Launch & Physics
-1. **Speed clamp**: `body.linearVelocity.length()` must never exceed `MAX_LAUNCH_SPEED` (12.0) after launch, regardless of pull distance.
+1. **Speed clamp (launch)**: At slingshot release, `body.linearVelocity.length()` must be clamped to `MAX_LAUNCH_SPEED` (12.0) regardless of pull distance. Post-launch abilities (Redirect) may produce velocities up to `ABILITY_SPEED_CAP` (18.0). At speeds above 15.0 m/s, continuous collision detection (CCD) must be enabled on the cat body to prevent tunneling through thin obstacles.
 2. **Damage symmetry**: On collision with impulse > 0.1, `damage = impulse * 10` is applied to **both** bodies independently.
-3. **Settling detection**: `isSettled()` returns true when all dynamic body velocities are < 0.2 m/s for 15 consecutive physics frames (~0.25s at 60 Hz). After settling, win/lose is evaluated.
+3. **Settling detection**: `isSettled()` returns true when (a) all dynamic body velocities are < 0.2 m/s for 15 consecutive physics frames (~0.25s at 60 Hz), OR (b) 10 seconds (600 frames) have elapsed since the last cat launch. Condition (b) forces all dynamic body velocities to zero before evaluating win/lose. After either condition triggers, win/lose is evaluated.
 
 ### Abilities
 4. **One-time activation**: Each ability fires exactly once per shot. After `abilityUsed = true`, subsequent taps or collisions must not re-trigger.
