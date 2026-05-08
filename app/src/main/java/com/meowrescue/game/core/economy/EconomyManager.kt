@@ -23,6 +23,7 @@ class EconomyManager(private val repository: IGameRepository) {
         const val PUZZLE_COINS_2_STAR = 20
         const val PUZZLE_COINS_3_STAR = 30
         const val FIRST_CLEAR_BONUS = 50
+        const val LAUNCH_FIRST_CLEAR_CAP = 50
     }
 
     private val _coins = MutableStateFlow(0)
@@ -90,6 +91,55 @@ class EconomyManager(private val repository: IGameRepository) {
         val total = base + if (isFirstClear) FIRST_CLEAR_BONUS else 0
         addCoins(total)
         return total
+    }
+
+    /**
+     * Awards coins for clearing a Cat Launch stage.
+     *
+     * Formula: `(starCoins(stars) * coinMultiplier).toInt()` + first-clear bonus.
+     * First-clear bonus (50) applies when [isFirstClear] and [completedLaunchCount] < [LAUNCH_FIRST_CLEAR_CAP].
+     * Stars=0 returns 0 without calling addCoins.
+     *
+     * @param stars 0..3
+     * @param coinMultiplier Easy=1.0f, Normal=1.5f, Hard=2.0f
+     * @param isFirstClear true if the stage was never cleared before this call
+     * @param completedLaunchCount total unique Launch stages cleared (including this one)
+     * @return Total coins awarded
+     */
+    suspend fun awardLaunchCoins(
+        stars: Int,
+        coinMultiplier: Float,
+        isFirstClear: Boolean,
+        completedLaunchCount: Int
+    ): Int {
+        require(stars in 0..3) { "stars must be in 0..3 (got $stars)" }
+        if (stars == 0) return 0
+        val base = when (stars) { 3 -> 30; 2 -> 20; else -> 10 }
+        val scaled = (base * coinMultiplier).toInt()
+        val bonus = if (isFirstClear && completedLaunchCount < LAUNCH_FIRST_CLEAR_CAP) FIRST_CLEAR_BONUS else 0
+        val total = scaled + bonus
+        if (total > 0) addCoins(total)
+        return total
+    }
+
+    /**
+     * Awards Endless mode coins subject to the daily cap (150 coins/day).
+     *
+     * Delegates to [IGameRepository.addEndlessCoins] for cap enforcement and date reset.
+     * Refreshes [coins] and [totalCoinsEarned] StateFlows after any successful award.
+     *
+     * @param amount Coins to award (must be > 0)
+     * @return Actual coins awarded (may be less than [amount] or 0 when cap is exhausted)
+     * @throws IllegalArgumentException if amount <= 0.
+     */
+    suspend fun awardEndlessCoins(amount: Int): Int {
+        require(amount > 0) { "awardEndlessCoins amount must be positive (got $amount)" }
+        val actual = repository.addEndlessCoins(amount)
+        if (actual > 0) {
+            _coins.value = repository.getCoins()
+            _totalCoinsEarned.value = repository.getTotalCoinsEarned()
+        }
+        return actual
     }
 
     /**

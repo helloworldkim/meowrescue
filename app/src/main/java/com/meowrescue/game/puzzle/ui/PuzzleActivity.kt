@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.ads.AdManager
 import com.meowrescue.game.data.AchievementDefs
+import com.meowrescue.game.core.economy.EconomyManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.ui.CatAssetResolver
 import com.meowrescue.game.puzzle.engine.PuzzleGenerator
@@ -35,6 +36,7 @@ class PuzzleActivity : AppCompatActivity() {
 
     private lateinit var puzzleView: PuzzleView
     private lateinit var repository: GameRepository
+    private lateinit var economyManager: EconomyManager
     private val generator = PuzzleGenerator()
     private var currentStage: Int = 1
     private var isEndless: Boolean = false
@@ -57,6 +59,7 @@ class PuzzleActivity : AppCompatActivity() {
         SoundManager.init(this)
         HapticManager.init(this)
         repository = GameRepository(this)
+        economyManager = EconomyManager(repository)
 
         isEndless = intent.getBooleanExtra("endless", false)
         if (isEndless) {
@@ -223,7 +226,7 @@ class PuzzleActivity : AppCompatActivity() {
                 }
                 // Award coins in endless mode (daily cap: 150 coins/day)
                 val starCoins = when (stars) { 3 -> 30; 2 -> 20; else -> 10 }
-                repository.addEndlessCoins(starCoins)
+                economyManager.awardEndlessCoins(starCoins)
                 AdManager.onStageClear()
                 // Endless achievements
                 if (endlessCount >= 10) repository.unlockAchievement("endless_10")

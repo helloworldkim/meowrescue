@@ -67,7 +67,12 @@ interface IGameRepository {
      * Records a Cat Launch stage clear. Promotes best stars and best score.
      * Requires [stars] in 1..3.
      */
-    suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float = 1.0f, score: Int = 0)
+    /**
+     * Records a Cat Launch stage clear. Promotes best stars and best score.
+     * Requires [stars] in 1..3.
+     * @return true on first clear (stage was never cleared before), false on repeat.
+     */
+    suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float = 1.0f, score: Int = 0): Boolean
 
     /** Returns stored Cat Launch progress for [stageId], or null if never cleared. */
     suspend fun getLaunchProgress(stageId: Int): LaunchProgress?

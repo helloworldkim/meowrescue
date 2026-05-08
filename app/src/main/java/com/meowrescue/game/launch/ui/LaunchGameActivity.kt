@@ -18,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.gms.ads.AdView
 import com.meowrescue.game.R
 import com.meowrescue.game.ads.AdManager
+import com.meowrescue.game.core.economy.EconomyManager
 import com.meowrescue.game.data.GameRepository
 import com.meowrescue.game.launch.model.LaunchDifficulty
 import com.meowrescue.game.ui.Theme
@@ -33,6 +34,7 @@ class LaunchGameActivity : AppCompatActivity() {
 
     private lateinit var gameView: LaunchGameView
     private lateinit var repository: GameRepository
+    private lateinit var economyManager: EconomyManager
     private val stageGenerator = LaunchStageGenerator()
 
     private var currentStageId: Int = 1
@@ -46,6 +48,7 @@ class LaunchGameActivity : AppCompatActivity() {
 
         SoundManager.init(this)
         repository = GameRepository(this)
+        economyManager = EconomyManager(repository)
 
         val rootLayout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -169,7 +172,16 @@ class LaunchGameActivity : AppCompatActivity() {
     private fun setupCallbacks() {
         gameView.onStageClear = { result ->
             lifecycleScope.launch {
-                repository.saveLaunchProgress(currentStageId, result.stars, selectedDifficulty.coinMultiplier, result.score)
+                val isFirstClear = repository.saveLaunchProgress(
+                    currentStageId, result.stars, selectedDifficulty.coinMultiplier, result.score
+                )
+                val completedCount = repository.getCompletedLaunchCount()
+                economyManager.awardLaunchCoins(
+                    stars = result.stars,
+                    coinMultiplier = selectedDifficulty.coinMultiplier,
+                    isFirstClear = isFirstClear,
+                    completedLaunchCount = completedCount
+                )
                 checkLaunchAchievements(result.catsUsed, result.tntExplosions)
             }
         }

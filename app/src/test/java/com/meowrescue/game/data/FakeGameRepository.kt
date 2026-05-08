@@ -100,9 +100,10 @@ public class FakeGameRepository(
         stars: Int,
         coinMultiplier: Float,
         score: Int
-    ) {
+    ): Boolean {
         require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
         val existing = launchProgressById[stageId]
+        val isFirstClear = existing == null || !existing.completed
         val bestStars = maxOf(stars, existing?.stars ?: 0)
         val bestScore = maxOf(score, existing?.bestScore ?: 0)
         launchProgressById[stageId] = LaunchProgress(
@@ -111,6 +112,7 @@ public class FakeGameRepository(
             completed = true,
             bestScore = bestScore
         )
+        return isFirstClear
     }
 
     override suspend fun getLaunchProgress(stageId: Int): LaunchProgress? =

@@ -20,6 +20,20 @@ class ProgressionManager(
     private val economyManager: EconomyManager
 ) {
 
+    companion object {
+        /**
+         * Returns true if [stageId] is playable given [maxCompletedLevel].
+         *
+         * Stage 1 is always unlocked. All other stages require the previous stage
+         * to have been cleared at least once (sequential unlock, ADR-0017 / TR-prog-004).
+         *
+         * This is a pure function — callers read [getMaxCompletedLevel] once and pass
+         * the result here to avoid repeated suspend calls per stage-select cell.
+         */
+        fun isStageUnlocked(stageId: Int, maxCompletedLevel: Int): Boolean =
+            stageId == 1 || stageId <= maxCompletedLevel + 1
+    }
+
     /**
      * Records a stage clear. Stars and score are promoted to best-ever (never demoted).
      *

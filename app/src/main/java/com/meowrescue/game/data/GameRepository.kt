@@ -151,7 +151,7 @@ class GameRepository(context: Context) : IGameRepository {
 
     // ── Launch Mode Progress ─────────────────────────────────────────
 
-    override suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float, score: Int) = withContext(Dispatchers.IO) {
+    override suspend fun saveLaunchProgress(stageId: Int, stars: Int, coinMultiplier: Float, score: Int): Boolean = withContext(Dispatchers.IO) {
         require(stars in 1..3) { "stars must be 1, 2, or 3 (got $stars)" }
         val existing = db.launchProgressDao().getProgressForStage(stageId)
         val bestStars = maxOf(stars, existing?.stars ?: 0)
@@ -160,13 +160,7 @@ class GameRepository(context: Context) : IGameRepository {
         db.launchProgressDao().saveProgress(
             LaunchProgress(stageId = stageId, stars = bestStars, completed = bestStars > 0, bestScore = bestScore)
         )
-
-        // Award coins with difficulty multiplier + first-clear cap (50 unique stages)
-        val baseStarCoins = when (stars) { 3 -> 30; 2 -> 20; 1 -> 10; else -> 0 }
-        val scaledStarCoins = Math.round(baseStarCoins * coinMultiplier)
-        val completedCount = db.launchProgressDao().getCompletedCount()
-        val firstClearBonus = if (isFirstClear && completedCount <= LAUNCH_FIRST_CLEAR_CAP) 50 else 0
-        addCoins(scaledStarCoins + firstClearBonus)
+        isFirstClear
     }
 
     override suspend fun getLaunchProgress(stageId: Int): LaunchProgress? = withContext(Dispatchers.IO) {
